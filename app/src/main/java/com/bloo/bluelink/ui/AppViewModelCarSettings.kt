@@ -18,6 +18,9 @@ import com.bloo.bluelink.data.setSectionOrder
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
 import com.bloo.bluelink.data.learnClimate
+import com.bloo.bluelink.data.learnComfort
+import com.bloo.bluelink.data.SmartClimateMode
+import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -129,4 +132,15 @@ fun AppViewModel.learnClimate(v: Vehicle, ambientF: Int, deltaF: Int) {
 fun AppViewModel.setTextClearPhoto(v: Vehicle, value: Boolean) {
     _state.update { it.copy(textClearPhotos = it.textClearPhotos.withCar(v.vin, value)) }
     persist { setTextClearPhoto(v.vin, value) }
+}
+
+/**
+ * A manual start that differs from the smart comfort chosen for [v] teaches what the person wanted: the seat, wheel and defrost levels on
+ * that kind of day move toward them, and the result is kept with the synced settings.
+ */
+fun AppViewModel.learnComfort(v: Vehicle, mode: SmartClimateMode, req: ClimateRequest) {
+    viewModelScope.launch {
+        val next = settingsStore.learnComfort(v.vin, mode, com.bloo.bluelink.data.comfortLevelsOf(req, mode))
+        _state.update { it.copy(comfortModels = it.comfortModels + (v.vin to next)) }
+    }
 }

@@ -105,6 +105,8 @@ object SettingsCatalog {
         car("text_clear_", Kind.TOGGLE, "", "floating photo text clear padding hero card edge"),
         // What smart climate has learned for a car: a few numbers, synced so every device plans from the same model.
         car("climate_model_", Kind.TEXT, "", "smart climate learned model feel"),
+        // What smart comfort has learned for a car (seats, wheel, defrost): synced, so every device comforts the same way.
+        car("comfort_model_", Kind.TEXT, "", "smart comfort learned seats wheel defrost heat cool"),
         car("plate_", Kind.TEXT, "Licence plate", "plate licence registration"),
         car("platform_", Kind.CHOICE, "Head-unit generation", "gen5w ccnc platform generation"),
         car("ptrain_", Kind.CHOICE, "Powertrain", "ev gas hybrid phev"),

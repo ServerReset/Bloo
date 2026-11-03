@@ -70,6 +70,10 @@ data class VehicleSnapshot(
      * surfaces (the watch's tile and complications, the phone's widget) can say "1h 55m" without the app open.
      */
     val chargeMinutes: Int? = null,
+    /** What this car can heat and cool (see [ComfortCaps.encode]), for smart comfort in the background. Null until the phone has it. */
+    val comfortCaps: String? = null,
+    /** What smart comfort has learned for this car (see [ComfortModel.encode]). */
+    val comfortModel: String? = null,
 ) {
     /** Rebuild the command-capable Vehicle. */
     fun toVehicle(): Vehicle = Vehicle(

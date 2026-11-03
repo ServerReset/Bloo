@@ -1,5 +1,7 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.SmartComfort
+import com.bloo.bluelink.data.smartComfort
 import com.bloo.bluelink.data.SmartClimateMode
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.Weather
@@ -22,7 +24,14 @@ import kotlin.math.roundToInt
  */
 internal object WearSmartClimate {
     /** The target for a car: [targetF] is what it will set, [ambientF] the outside temperature it is answering, [mode] which way it moves. */
-    data class Hint(val targetF: Int, val ambientF: Int, val mode: SmartClimateMode, val fetchedAt: Long)
+    data class Hint(
+        val targetF: Int,
+        val ambientF: Int,
+        val mode: SmartClimateMode,
+        val fetchedAt: Long,
+        /** The seats, wheel and defrost smart comfort picked for the car, from the same weather. */
+        val comfort: SmartComfort? = null,
+    )
 
     /** The last reading each car was planned from, so the plan can be made again when the person's own history arrives. */
     private val readings = java.util.concurrent.ConcurrentHashMap<String, Weather>()
@@ -60,7 +69,8 @@ internal object WearSmartClimate {
             learned = WearClimateChoices.modelFor(vin),
         )
         val feelsF = cToF(weather.feelsLikeC).roundToInt()
-        return Hint(plan.targetF, ambientFahrenheit(weather.tempC), smartClimateMode(feelsF), System.currentTimeMillis())
+        val comfort = smartComfort(weather, WearClimateChoices.comfortCapsFor(vin), WearClimateChoices.comfortModelFor(vin))
+        return Hint(plan.targetF, ambientFahrenheit(weather.tempC), smartClimateMode(feelsF), System.currentTimeMillis(), comfort)
     }
 
     /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit (the phone words the first part the same way). */

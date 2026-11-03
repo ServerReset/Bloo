@@ -95,7 +95,18 @@ internal fun WearClimatePebble(
                 onClick = {
                     WearClimateChoices.recordFeedback(context, v.vin, hint.ambientF, step * FEEL_STEP_F)
                     val base = presets[v.vin].orEmpty().firstOrNull()?.request
-                    val request = base?.copy(tempF = target) ?: ClimateRequest(tempF = target, defrost = false, durationMinutes = 10)
+                    // The seats, wheel and defrost smart comfort chose for this weather, for what the car has.
+                    val c = hint.comfort
+                    val start = base ?: ClimateRequest(tempF = target, defrost = false, durationMinutes = 10)
+                    val request = start.copy(
+                        tempF = target,
+                        defrost = c?.defrost ?: start.defrost,
+                        steeringWheelHeat = c?.wheel ?: start.steeringWheelHeat,
+                        seatFrontLeft = c?.seatDriver ?: start.seatFrontLeft,
+                        seatFrontRight = c?.seatPassenger ?: start.seatFrontRight,
+                        seatRearLeft = c?.seatRearLeft ?: start.seatRearLeft,
+                        seatRearRight = c?.seatRearRight ?: start.seatRearRight,
+                    )
                     requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, request) }
                 },
             )

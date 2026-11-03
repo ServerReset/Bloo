@@ -38,6 +38,8 @@ import com.bloo.bluelink.data.toGeoLocation
         // Canada's repo has no GPS on its status at all, so that fallback is its ONLY source.
         val fix = status.toGeoLocation() ?: state.locations[v.vin]
         return VehicleSnapshot(
+            comfortCaps = comfortCapsOf(state.seatConfigFor(v)).encode(),
+            comfortModel = state.comfortModels[v.vin]?.encode(),
             vin = v.vin,
             name = v.name,
             model = v.model,
@@ -78,3 +80,16 @@ import com.bloo.bluelink.data.toGeoLocation
 
     internal fun electric(v: Vehicle, state: UiState) =
         if (state.hasBattery(v)) v.copy(isEv = true) else v
+
+/** The heat and cool a car has, from the person's seat setup, for smart comfort. */
+internal fun comfortCapsOf(s: com.bloo.bluelink.data.SeatConfig): com.bloo.bluelink.data.ComfortCaps = com.bloo.bluelink.data.ComfortCaps(
+    driverHeat = s.driverHeat,
+    driverCool = s.driverCool,
+    passHeat = s.passHeat,
+    passCool = s.passCool,
+    rearLeftHeat = s.rearLeftHeat,
+    rearLeftCool = s.rearLeftCool,
+    rearRightHeat = s.rearRightHeat,
+    rearRightCool = s.rearRightCool,
+    wheel = s.steeringWheel,
+)

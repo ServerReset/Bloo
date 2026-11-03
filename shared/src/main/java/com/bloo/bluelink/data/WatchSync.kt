@@ -23,6 +23,10 @@ data class WatchSyncPayload(
     val climateFeedback: Map<String, List<ClimateFeedback>> = emptyMap(),
     /** What smart climate has learned for each car, as the short string [encodeClimateModel] writes: the same numbers on every device. */
     val climateModels: Map<String, String> = emptyMap(),
+    /** What each car can heat and cool, as [ComfortCaps.encode] writes it. */
+    val comfortCaps: Map<String, String> = emptyMap(),
+    /** What smart comfort has learned for each car, as [ComfortModel.encode] writes it. */
+    val comfortModels: Map<String, String> = emptyMap(),
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
     /**

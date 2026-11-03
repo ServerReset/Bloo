@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.BlooJson
 import com.bloo.bluelink.data.CarCommandRunner
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.climateModelNow
+import com.bloo.bluelink.data.comfortModelNow
 import com.bloo.bluelink.data.encodeClimateModel
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.SnapshotStore
@@ -247,6 +248,10 @@ class PhoneWatchSyncService : WearableListenerService() {
                     type = WatchType(appearance.fontChoice, appearance.classicHeadings),
                     climateFeedback = snapshot.vehicles.associate { it.vin to ClimateChoices.feedback(app, it.vin) }
                         .filterValues { it.isNotEmpty() },
+                    comfortCaps = snapshot.vehicles.associate { it.vin to com.bloo.bluelink.ui.comfortCapsOf(SettingsStore(app).seatConfig(it.vin)).encode() },
+                    comfortModels = snapshot.vehicles.mapNotNull { v ->
+                        SettingsStore(app).comfortModelNow(v.vin)?.let { v.vin to it.encode() }
+                    }.toMap(),
                     climateModels = snapshot.vehicles.mapNotNull { v ->
                         SettingsStore(app).climateModelNow(v.vin)?.let { v.vin to encodeClimateModel(it) }
                     }.toMap(),

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.bluelink.data.FEEL_STEP_F
+import com.bloo.bluelink.data.smartClimateMode
 import com.bloo.bluelink.data.ComfortCaps
 import com.bloo.bluelink.data.smartComfort
 import com.bloo.bluelink.data.SeatConfig
@@ -121,8 +122,12 @@ internal fun ClimatePebble(
     val startAtTarget: (Int, ClimateRequest) -> Unit = start@{ target, base ->
         if (pending) return@start
         form.tempF = target; form.defrost = false; activePresetId = null
-        // The seats, wheel and defrost follow the weather where the car is, for what this car has.
-        val comfort = (state.carWeather[v.vin] ?: state.homeWeather)?.let { smartComfort(it, comfortCapsOf(state.seatConfigFor(v))) }
+        // The seats, wheel and defrost follow the weather where the car is, for what this car has and what the person has taught it.
+        val w = state.carWeather[v.vin] ?: state.homeWeather
+        val comfort = w?.let { smartComfort(it, comfortCapsOf(state.seatConfigFor(v)), state.comfortModels[v.vin]) }
+        if (w != null && comfort != null) {
+            SmartComfortLearning.noteSmart(v.vin, comfort, smartClimateMode(cToF(w.feelsLikeC).roundToInt()))
+        }
         startClimateWithEngineCheck(
             base.copy(
                 tempF = target,
@@ -130,6 +135,8 @@ internal fun ClimatePebble(
                 steeringWheelHeat = comfort?.wheel ?: base.steeringWheelHeat,
                 seatFrontLeft = comfort?.seatDriver ?: base.seatFrontLeft,
                 seatFrontRight = comfort?.seatPassenger ?: base.seatFrontRight,
+                seatRearLeft = comfort?.seatRearLeft ?: base.seatRearLeft,
+                seatRearRight = comfort?.seatRearRight ?: base.seatRearRight,
             ),
         )
     }
@@ -526,12 +533,3 @@ private fun TempValue.asFahrenheit(): Int? {
 
 /** How long after a start the car's old reading of its settings is distrusted (see `lastSent`). */
 private const val CarCatchUpMs = 90_000L
-
-/** The heat and cool a car has, from the person's seat setup, for smart comfort. */
-private fun comfortCapsOf(s: SeatConfig): ComfortCaps = ComfortCaps(
-    driverHeat = s.driverHeat,
-    driverCool = s.driverCool,
-    passHeat = s.passHeat,
-    passCool = s.passCool,
-    wheel = s.steeringWheel,
-)

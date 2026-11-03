@@ -107,7 +107,10 @@ object VehicleCommandRunner {
         val lat = snap.lat ?: error("No location for smart climate")
         val lon = snap.lon ?: error("No location for smart climate")
         val w = WeatherApi.fetch(lat, lon) ?: error("No weather for smart climate")
-        return smartClimateRequest(w, ClimateChoices.list(ctx, snap.vin))
+        return smartClimateRequest(
+            w, ClimateChoices.list(ctx, snap.vin),
+            ComfortCaps.decode(snap.comfortCaps), snap.comfortModel?.let { ComfortModel.decode(it) },
+        )
     }
 
     /** The success wording the phone's toasts have always used, from the state the command started in. */

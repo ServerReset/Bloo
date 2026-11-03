@@ -348,6 +348,21 @@ suspend fun SettingsStore.setClimateModel(vin: String, model: ClimateModel) {
     editTracked { it[stringPreferencesKey("climate_model_$vin")] = encodeClimateModel(model) }
 }
 
+/** What smart comfort has learned for a car, kept with the synced settings. Null until it has learned anything. */
+fun SettingsStore.comfortModel(vin: String, p: Preferences): ComfortModel? =
+    p[stringPreferencesKey("comfort_model_$vin")]?.let { ComfortModel.decode(it) }
+
+/** What smart comfort has learned for a car, as stored right now. */
+suspend fun SettingsStore.comfortModelNow(vin: String): ComfortModel? =
+    comfortModel(vin, context.settingsDataStore.data.first())
+
+/** Learns the person's own comfort settings for a car on a kind of day, writes the result, and returns it. */
+suspend fun SettingsStore.learnComfort(vin: String, mode: SmartClimateMode, levels: IntArray): ComfortModel {
+    val next = (comfortModelNow(vin) ?: ComfortModel()).learn(mode, levels)
+    editTracked { it[stringPreferencesKey("comfort_model_$vin")] = next.encode() }
+    return next
+}
+
 /**
  * Learns one feel answer for a car from what is stored, writes the result, and returns it. Reading what is stored (not a copy in memory)
  * means an answer from the watch and one from the phone both count, whichever arrives first.

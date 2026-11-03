@@ -178,7 +178,13 @@ fun AppViewModel.stopClimate(v: Vehicle) =
  * Start climate with the given [req] (temp/duration/defrost/seat heating/etc). Shares the "climate"
  * action key with [stopClimate] so starting and stopping can't race each other on the same car.
  */
-fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) =
+fun AppViewModel.startClimate(v: Vehicle, req: ClimateRequest) = run {
+    // A manual setting that differs from the smart comfort just chosen teaches the model what the person wanted.
+    SmartComfortLearning.manualSend(v.vin, req)?.let { learnComfort(v, it, req) }
+    startClimateSent(v, req)
+}
+
+private fun AppViewModel.startClimateSent(v: Vehicle, req: ClimateRequest) =
     // degLabel converts and suffixes the °F value per the user's unit.
     runCommand(
         v.vin,

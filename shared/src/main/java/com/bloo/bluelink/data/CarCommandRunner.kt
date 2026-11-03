@@ -251,19 +251,26 @@ object CarCommandRunner {
  * The smart-climate request for a given weather reading: the target [smartClimatePlan] picks from the weather and the person's own past
  * choices, no defrost.
  */
-fun smartClimateRequest(w: Weather, choices: List<ClimateChoice> = emptyList(), caps: ComfortCaps? = null): ClimateRequest {
+fun smartClimateRequest(
+    w: Weather,
+    choices: List<ClimateChoice> = emptyList(),
+    caps: ComfortCaps? = null,
+    model: ComfortModel? = null,
+): ClimateRequest {
     val base = ClimateRequest(
         tempF = smartClimatePlan(w, choices).targetF,
         defrost = false,
         durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
     )
     // With the car's seat setup known, the seats, wheel and defrost follow the weather too.
-    val comfort = caps?.let { smartComfort(w, it) } ?: return base
+    val comfort = caps?.let { smartComfort(w, it, model) } ?: return base
     return base.copy(
         defrost = comfort.defrost,
         steeringWheelHeat = comfort.wheel,
         seatFrontLeft = comfort.seatDriver,
         seatFrontRight = comfort.seatPassenger,
+        seatRearLeft = comfort.seatRearLeft,
+        seatRearRight = comfort.seatRearRight,
     )
 }
 
@@ -277,5 +284,7 @@ suspend fun smartClimateRequestFor(context: Context, vin: String): ClimateReques
     val lat = snap.lat ?: return null
     val lon = snap.lon ?: return null
     val choices = ClimateChoices.list(context, vin)
-    return WeatherApi.fetch(lat, lon)?.let { smartClimateRequest(it, choices) }
+    val caps = ComfortCaps.decode(snap.comfortCaps)
+    val model = snap.comfortModel?.let { ComfortModel.decode(it) }
+    return WeatherApi.fetch(lat, lon)?.let { smartClimateRequest(it, choices, caps, model) }
 }
