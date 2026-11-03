@@ -144,6 +144,9 @@ internal fun ExpandableMapLayer(
     onDeselect: () -> Unit = {},
     /** A sideways swipe on the top bar: -1 for the previous car, +1 for the next. */
     onSwipeCar: (Int) -> Unit = {},
+    /** Which car the bar shows, and how many cars there are (see MapTopBar). */
+    carIndex: Int = 0,
+    carCount: Int = 1,
     /** How far the bar is being dragged toward closing, 0 to 1 (see [CentralMap.dismissFade]). */
     onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
@@ -462,6 +465,8 @@ internal fun ExpandableMapLayer(
                     details = details,
                     mapHazeState = mapHazeState,
                     onSwipeCar = onSwipeCar,
+                    carIndex = carIndex,
+                    carCount = carCount,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
                         dragPx, pull, gapPx, scope, density, dragSpring, LocalHaptics.current, ::close,

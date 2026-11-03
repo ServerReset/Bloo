@@ -23,6 +23,10 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.LocalWindowInfo
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
@@ -170,6 +174,9 @@ internal fun MapTopBar(
     dragModifier: Modifier,
     /** A sideways swipe on the bar: -1 for the previous car, +1 for the next. */
     onSwipeCar: (Int) -> Unit = {},
+    /** Which car the bar shows, and how many there are: a change of car slides the bar in from the side it came from. */
+    carIndex: Int = 0,
+    carCount: Int = 1,
     /** The car's photo at the bar's start, or null for the car glyph. */
     photo: String? = null,
     /** The car's charge, and its range, at the bar's end. Null leaves that line out. */
@@ -207,6 +214,22 @@ internal fun MapTopBar(
     val gutterPx = with(density) { GapPage.toPx() }
     val slidePx = with(density) { 24.dp.toPx() }
 
+    // The whole bar moves sideways: a swipe drags it off the screen to the neighbouring car, and the next car's bar comes in from the other side.
+    val slideX = remember { Animatable(0f) }
+    val barScope = rememberCoroutineScope()
+    val screenWidthPx = LocalWindowInfo.current.containerSize.width.toFloat()
+    val latestSwipe = rememberUpdatedState(onSwipeCar)
+    // A swipe runs its own motion; the car change it causes must not slide the bar a second time.
+    val swipeHandled = remember { BooleanArray(1) }
+    val prevIndex = remember { intArrayOf(carIndex) }
+    LaunchedEffect(carIndex) {
+        val before = prevIndex[0]
+        prevIndex[0] = carIndex
+        if (swipeHandled[0]) { swipeHandled[0] = false; return@LaunchedEffect }
+        if (before == carIndex) return@LaunchedEffect
+        slideX.snapTo(if (carIndex > before) screenWidthPx else -screenWidthPx)
+        slideX.animateTo(0f, tween(260))
+    }
     GlassSurface(
         // The corners ease between the pill and the rounded details panel on the same spring.
         shape = RoundedCornerShape(BlendCornerSize(detailsT)),
@@ -221,7 +244,41 @@ internal fun MapTopBar(
                     pillPressed = false
                 }
             }
-            .graphicsLayer { scaleX = pillScale; scaleY = pillScale },
+            .pointerInput(carIndex, carCount) {
+                // A sideways swipe moves to the neighbouring car: the bar follows the finger, then goes off the screen on the side it was
+                // pushed, and the next car's bar comes in from the other side. At either end of the list it springs back.
+                val thresholdPx = 56.dp.toPx()
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { total = 0f },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        total += amount
+                        barScope.launch { slideX.snapTo(total) }
+                    },
+                    onDragEnd = {
+                        val dir = when {
+                            total <= -thresholdPx -> 1
+                            total >= thresholdPx -> -1
+                            else -> 0
+                        }
+                        val next = carIndex + dir
+                        val canMove = dir != 0 && next in 0 until carCount
+                        barScope.launch {
+                            if (!canMove) {
+                                slideX.animateTo(0f, tween(180))
+                                return@launch
+                            }
+                            swipeHandled[0] = true
+                            slideX.animateTo(-dir * screenWidthPx, tween(180))
+                            latestSwipe.value(dir)
+                            slideX.snapTo(dir * screenWidthPx)
+                            slideX.animateTo(0f, tween(260))
+                        }
+                    },
+                )
+            }
+            .graphicsLayer { scaleX = pillScale; scaleY = pillScale; translationX = slideX.value },
         hazeState = mapHazeState,
         // No contentColor override: the map follows the app theme (dark filter only in dark mode), so a forced white glyph vanishes on a
         // light map. GlassSurface's onSurface default tracks the theme and custom palettes.
@@ -233,19 +290,6 @@ internal fun MapTopBar(
             Row(
                 Modifier
                     .then(dragModifier)
-                    .pointerInput(Unit) {
-                        // A sideways swipe moves to the neighbouring car, the way a swipe moves between pages. The latest handler is read
-                        // through rememberUpdatedState, so the gesture never holds a stale car.
-                        val thresholdPx = 56.dp.toPx()
-                        var total = 0f
-                        detectHorizontalDragGestures(
-                            onDragStart = { total = 0f },
-                            onHorizontalDrag = { change, amount -> change.consume(); total += amount },
-                            onDragEnd = {
-                                if (total <= -thresholdPx) latestSwipe.value(1) else if (total >= thresholdPx) latestSwipe.value(-1)
-                            },
-                        )
-                    }
                     .then(if (selected) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier)
                     .layout { measurable, constraints ->
                         val p = lineProgress().coerceIn(0f, 1f)

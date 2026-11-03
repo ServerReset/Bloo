@@ -563,6 +563,7 @@ internal fun BoxScope.CarIconLayer(
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     val edge = rememberEdgeWindow()
     val radiusPx = with(LocalDensity.current) { PillGroupRadiusDp.toPx() }
+    val edgeMarginPx = with(LocalDensity.current) { EdgeMarginDp.toPx() }
     // Every car's marker this frame. Read by each car's layout and draw, so a pan or a pinch moves the whole set together.
     fun markers(): List<CarMarker> = cars.map { car ->
         val place = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
@@ -578,10 +579,17 @@ internal fun BoxScope.CarIconLayer(
             val isPillLeader = { val l = leaderOf(); l[index] == index && l.count { it == index } > 1 }
             val tileModifier = Modifier.align(Alignment.Center)
                 .offset {
+                    // The icon's visible half-size, at its scale, keeps it whole inside the map, whatever the window says.
                     val m = markers()[index]
+                    val hw = CarIconWidth.toPx() / 2f * m.scale
+                    val hh = CarIconHeight.toPx() / 2f * m.scale
+                    val limX = kotlin.math.max(0f, viewport.width / 2f - hw - edgeMarginPx)
+                    val limY = kotlin.math.max(0f, viewport.height / 2f - hh - edgeMarginPx)
+                    val cx = m.x.coerceIn(-limX, limX)
+                    val cy = m.y.coerceIn(-limY, limY)
                     IntOffset(
-                        (m.x - CarIconWidth.toPx() / 2f).roundToInt(),
-                        (m.y - CarIconHeight.toPx() / 2f).roundToInt(),
+                        (cx - CarIconWidth.toPx() / 2f).roundToInt(),
+                        (cy - CarIconHeight.toPx() / 2f).roundToInt(),
                     )
                 }
                 .graphicsLayer {
