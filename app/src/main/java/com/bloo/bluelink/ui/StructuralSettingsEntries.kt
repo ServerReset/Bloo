@@ -79,7 +79,6 @@ internal fun pinnablePebbles(v: Vehicle, state: UiState): List<String> =
 @Composable
 private fun CarOrderControl(state: UiState, vm: AppViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        BodySmallText("Move a car up or down; the garage uses this order.")
         state.vehicles.forEachIndexed { i, v ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 RevealText("${i + 1}. ${v.name}", style = SecondaryTextStyle(), modifier = Modifier.weight(1f))
@@ -116,7 +115,6 @@ private fun CustomPaletteControl(appearance: SettingsStore.Appearance, vm: AppVi
 private fun PinnedPebbleControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     val pinned = state.hotspotSections[v.vin]
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        BodySmallText("Shown beside the controls full screen.")
         ChoiceRow("None", pinned == null) { pinned?.let { vm.setHotspot(v, it) } }
         pinnablePebbles(v, state).forEach { section ->
             // setHotspot toggles, so choosing the pebble that is already pinned must do nothing.
@@ -130,7 +128,6 @@ private fun PebbleOrderControl(v: Vehicle, state: UiState, vm: AppViewModel) {
     val order = state.sectionsFor(v).filter { state.isSectionAvailable(v, it) }
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         RevealText(order.joinToString(" · ") { sectionLabel(it) }, style = SecondaryTextStyle())
-        BodySmallText("Drag pebbles on the car page to reorder them.")
         MorphTextButton(
             "Reset to default order",
             enabled = state.sectionOrders[v.vin] != null && state.sectionOrders[v.vin] != DEFAULT_SECTIONS,

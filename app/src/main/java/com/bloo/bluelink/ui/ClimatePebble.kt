@@ -454,7 +454,6 @@ private fun ClimateRunningSummary(status: VehicleStatus?, presetName: String?, f
         }
         highlights.forEach { (label, value) -> ClimateHighlight(label, value) }
         if (highlights.isEmpty()) RevealMutedText("Nothing else is on.")
-        RevealMutedText("Read-only while climate runs.")
     }
 }
 

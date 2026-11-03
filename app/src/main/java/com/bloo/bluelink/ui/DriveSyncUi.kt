@@ -81,7 +81,6 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
             primaryName?.let { append(" · $it is primary") }
         },
     )
-    BodySmallText("Drag to reorder. The top phone is primary.")
     val context = LocalContext.current
     val liveWatch by WatchPresence.watch.collectAsStateWithLifecycle()
     val signInState by WatchSignIn.state.collectAsStateWithLifecycle()

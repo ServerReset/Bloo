@@ -64,7 +64,6 @@ internal fun VisualsCardContent(appearance: SettingsStore.Appearance, advanced: 
                 SettingsGroup("Size") { UiScaleSlider(appearance, vm) }
             }
             SettingsGroup("Welcome cards") {
-                BodySmallText("The cards you swipe through on first open.")
                 MorphTextButton("Show welcome cards", onClick = { vm.showWelcomeCards() }, icon = Icons.Filled.Style)
             }
             AccessibilityGroup(appearance, vm)
