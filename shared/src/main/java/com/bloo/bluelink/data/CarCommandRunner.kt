@@ -251,11 +251,21 @@ object CarCommandRunner {
  * The smart-climate request for a given weather reading: the target [smartClimatePlan] picks from the weather and the person's own past
  * choices, no defrost.
  */
-fun smartClimateRequest(w: Weather, choices: List<ClimateChoice> = emptyList()): ClimateRequest = ClimateRequest(
-    tempF = smartClimatePlan(w, choices).targetF,
-    defrost = false,
-    durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
-)
+fun smartClimateRequest(w: Weather, choices: List<ClimateChoice> = emptyList(), caps: ComfortCaps? = null): ClimateRequest {
+    val base = ClimateRequest(
+        tempF = smartClimatePlan(w, choices).targetF,
+        defrost = false,
+        durationMinutes = DEFAULT_CLIMATE_DURATION_MIN,
+    )
+    // With the car's seat setup known, the seats, wheel and defrost follow the weather too.
+    val comfort = caps?.let { smartComfort(w, it) } ?: return base
+    return base.copy(
+        defrost = comfort.defrost,
+        steeringWheelHeat = comfort.wheel,
+        seatFrontLeft = comfort.seatDriver,
+        seatFrontRight = comfort.seatPassenger,
+    )
+}
 
 /**
  * The smart-climate request for [vin] from the weather where the car is parked, or null when it cannot be built (no location,
