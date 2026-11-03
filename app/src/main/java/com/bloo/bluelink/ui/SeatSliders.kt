@@ -71,11 +71,6 @@ internal class SeatSlider(
 @Composable
 internal fun SeatSliders(seats: List<SeatSlider>) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        // Says how to use the sliders before anyone has to guess: the slider is the whole control.
-        RevealText(
-            style = SecondaryTextStyle(),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         seats.forEach { seat -> SeatSliderRow(seat) }
     }
 }
