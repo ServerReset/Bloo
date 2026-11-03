@@ -5,8 +5,6 @@ package com.bloo.bluelink.ui
  * SettingsHeaderRow title row.
  */
 
-import com.bloo.uicommon.LocalInstantText
-import androidx.compose.runtime.CompositionLocalProvider
 import com.bloo.bluelink.update.UpdateRuntime
 import com.bloo.uicommon.MorphButtonLabel
 import com.bloo.uicommon.container
@@ -209,7 +207,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                 Column {
                     Spacer(Modifier.height(GapGroup))
                     // One update body for both tracks: the Play copy and the GitHub build differ in what they offer, not in layout.
-                    CompositionLocalProvider(LocalInstantText provides true) { UpdatePanel(state, vm) }
+                    UpdatePanel(state, vm)
                 }
             }
         }

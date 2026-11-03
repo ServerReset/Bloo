@@ -1,6 +1,5 @@
 package com.bloo.bluelink.ui
 
-import com.bloo.uicommon.LocalInstantText
 import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -364,7 +363,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
             val diagnosticsState = stateSlice(state, v) { s ->
                 listOf(s.statuses[v.vin], s.hasBattery(v), s.isPebbleExpanded(v.vin, "diagnostics"))
             }
-            CompositionLocalProvider(LocalInstantText provides true) { DiagnosticsPebble(v, status, diagnosticsState, vm, modifier) }
+            DiagnosticsPebble(v, status, diagnosticsState, vm, modifier)
         }
         "ai" -> {
             val aiState = stateSlice(state, v) { s ->
