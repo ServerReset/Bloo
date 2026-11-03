@@ -188,7 +188,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer)
                             .clickable(role = Role.Button) { host?.open(v.vin) },
                     )
-                    host?.Content(
+                    host?.CardContent(
                         Modifier.fillMaxSize(),
                         MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
                     )

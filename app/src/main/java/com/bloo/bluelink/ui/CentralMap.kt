@@ -91,6 +91,30 @@ internal class CentralMap {
         mapState.showDevice(from.latitude, from.longitude, to.latitude, to.longitude)
     }
 
+    /**
+     * A car card's own copy of the map: it keeps its own pan and zoom, so it stays put while the big map opens and closes. It is centred on
+     * the car it is in, with every car on it.
+     */
+    @Composable
+    fun CardContent(modifier: Modifier, inputs: MapInputs) {
+        val own = rememberCarMapState()
+        CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
+            CarMap(
+                location = inputs.location,
+                modifier = modifier,
+                state = own,
+                deviceLocation = inputs.deviceLocation,
+                interactive = false,
+                tileArea = inputs.tileArea,
+                panWeight = { 1f },
+                cars = cars,
+                anchorVin = vin,
+                selectedVin = selectedVin,
+                onCarTap = { tapPin(it) },
+            )
+        }
+    }
+
     /** The map, as it is drawn wherever it is hosted: the one instance, anchored on the car it was opened for. */
     @Composable
     fun Content(modifier: Modifier, inputs: MapInputs) {
