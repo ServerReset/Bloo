@@ -31,12 +31,15 @@ import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import java.time.LocalDateTime
 
-/** The two pre-runs, one slider: the selected one is the one being edited. */
+/** The two pre-runs. The one selected is the one being edited. */
 private enum class PreRun { First, Second }
 
+/** The slider's stops: Off turns the pre-run being edited off; each name selects that pre-run and turns it on. */
+private enum class PreRunStop { Off, First, Second }
+
 /**
- * The car's two pre-runs: each one a time the car should be ready, its own switch, and a name. The slider picks which one is edited,
- * and each is shown by its name there. Smart climate sets what each should be when it starts.
+ * The car's two pre-runs: each one a time the car should be ready, and a name. The slider pages through them (the one under it is the
+ * one being edited) and is also the switch: moving it to Off turns the edited one off. Smart climate sets what each should be when it starts.
  */
 @Composable
 internal fun DepartureSection(v: Vehicle, state: UiState, vm: AppViewModel) {
@@ -48,12 +51,22 @@ internal fun DepartureSection(v: Vehicle, state: UiState, vm: AppViewModel) {
     var selected by rememberSaveable(v.vin) { mutableStateOf(PreRun.First) }
     val index = selected.ordinal
     val slot = schedule.slots[index]
+    // The slider shows Off while the edited pre-run is off, and that pre-run's name while it is on.
+    val stop = if (slot.enabled) PreRunStop.entries[index + 1] else PreRunStop.Off
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         EnumSegmented(
-            entries = PreRun.entries,
-            selected = selected,
-            label = { schedule.slots[it.ordinal].label(it.ordinal) },
-            onSelect = { selected = it },
+            entries = PreRunStop.entries,
+            selected = stop,
+            label = { if (it == PreRunStop.Off) "Off" else schedule.slots[it.ordinal - 1].label(it.ordinal - 1) },
+            onSelect = { choice ->
+                if (choice == PreRunStop.Off) {
+                    vm.setDeparture(v, index, slot.copy(enabled = false))
+                } else {
+                    val i = choice.ordinal - 1
+                    selected = PreRun.entries[i]
+                    if (!schedule.slots[i].enabled) vm.setDeparture(v, i, schedule.slots[i].copy(enabled = true))
+                }
+            },
         )
         if (slot.enabled && started.getOrElse(index) { -1L } == startedToday) {
             RevealMutedText("${slot.label(index)} started today: the car is warming up.")
@@ -67,17 +80,13 @@ internal fun DepartureSection(v: Vehicle, state: UiState, vm: AppViewModel) {
     }
 }
 
-/** One pre-run: its switch, its name, and the time it should be ready in 15-minute steps. */
+/** One pre-run being edited: its name, and, while it is on, the time it should be ready in 15-minute steps. */
 @Composable
 private fun PreRunEditor(index: Int, slot: DepartureSlot, suggestion: Int?, onChange: (DepartureSlot) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        ToggleRow(
-            slot.label(index),
-            slot.enabled,
-            description = "Starts the car $DEPARTURE_LEAD_MIN minutes before this time, every day.",
-        ) { onChange(slot.copy(enabled = it)) }
         PreRunName(index, slot, onChange)
         if (slot.enabled) {
+            RevealMutedText("Starts the car $DEPARTURE_LEAD_MIN minutes before this time, every day.")
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                 MorphTextButton("−15", onClick = { onChange(slot.copy(minuteOfDay = Math.floorMod(slot.minuteOfDay - 15, 1440))) })
                 RevealText(formatMinuteOfDay(slot.minuteOfDay), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
