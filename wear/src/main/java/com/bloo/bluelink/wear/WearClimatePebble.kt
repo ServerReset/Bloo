@@ -18,11 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.ComfortSwitches
-import com.bloo.bluelink.data.autoComfortRequest
+import com.bloo.bluelink.data.anySeatOn
+import com.bloo.bluelink.data.differsFromAuto
 import com.bloo.bluelink.data.comfortRequest
 import com.bloo.bluelink.data.formatMinuteOfDay
 import com.bloo.bluelink.data.comfortLevelsOf
-import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.degLabel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,13 +101,10 @@ internal fun WearClimatePebble(
             // Seats, wheel and defrost, switched on or off from the smart choice, for what the car has. Only what the car has is shown.
             val c = hint.comfort
             val caps = WearClimateChoices.comfortCapsFor(v.vin)
-            val seatsCap = caps.driverHeat || caps.driverCool || caps.passHeat || caps.passCool ||
-                caps.rearLeftHeat || caps.rearLeftCool || caps.rearRightHeat || caps.rearRightCool
-            val seatsAuto = c?.let { listOf(it.seatDriver, it.seatPassenger, it.seatRearLeft, it.seatRearRight).any { l -> l != SeatLevel.OFF } } ?: false
-            var seatsOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(seatsAuto) }
+            var seatsOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(c?.anySeatOn == true) }
             var wheelOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(c?.wheel?.isOn == true) }
             var defrostOn by remember(hint.targetF, hint.mode, c) { mutableStateOf(c?.defrost == true) }
-            if (seatsCap) WearToggleRow("Seats", icon = null, checked = seatsOn, description = "Heat or cool the seats") { seatsOn = it }
+            if (caps.hasSeats) WearToggleRow("Seats", icon = null, checked = seatsOn, description = "Heat or cool the seats") { seatsOn = it }
             if (caps.wheel) WearToggleRow("Wheel", icon = null, checked = wheelOn, description = "Warm the steering wheel") { wheelOn = it }
             WearToggleRow("Defrost", icon = null, checked = defrostOn, description = "Clear the glass") { defrostOn = it }
 
@@ -125,11 +122,8 @@ internal fun WearClimatePebble(
                         ComfortSwitches(seats = seatsOn, wheel = wheelOn, defrost = defrostOn),
                     )
                     // A start that differs from the smart choice teaches the watch what the person wanted, and the phone too.
-                    if (c != null) {
-                        val auto = autoComfortRequest(request, target, c)
-                        if (!comfortLevelsOf(auto, hint.mode).contentEquals(comfortLevelsOf(request, hint.mode))) {
-                            WearClimateChoices.recordComfortChoice(context, v.vin, hint.mode, comfortLevelsOf(request, hint.mode))
-                        }
+                    if (c != null && differsFromAuto(request, c, hint.mode, target)) {
+                        WearClimateChoices.recordComfortChoice(context, v.vin, hint.mode, comfortLevelsOf(request, hint.mode))
                     }
                     requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, request) }
                 },

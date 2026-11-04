@@ -14,6 +14,9 @@ data class ComfortCaps(
     val rearRightCool: Boolean = false,
     val wheel: Boolean = false,
 ) {
+    /** True when the car has at least one seat that heats or cools. */
+    val hasSeats: Boolean get() = driverHeat || driverCool || passHeat || passCool || rearLeftHeat || rearLeftCool || rearRightHeat || rearRightCool
+
     /** Nine digits, one per flag in declaration order. Carried in the snapshot and the watch sync. */
     fun encode(): String = listOf(
         driverHeat, driverCool, passHeat, passCool, rearLeftHeat, rearLeftCool, rearRightHeat, rearRightCool, wheel,
@@ -244,6 +247,17 @@ fun comfortRequest(
         seatRearRight = manualSeat(switches.seats, auto?.seatRearRight, mode, caps.rearRightHeat, caps.rearRightCool),
     )
 }
+
+/** True when the smart choice has any seat switched on. */
+val SmartComfort.anySeatOn: Boolean
+    get() = listOf(seatDriver, seatPassenger, seatRearLeft, seatRearRight).any { it != SeatLevel.OFF }
+
+/**
+ * True when the start the switches ask for differs from what smart comfort itself would have sent. Only such a start teaches the model:
+ * one that matches the smart choice teaches nothing.
+ */
+fun differsFromAuto(request: ClimateRequest, auto: SmartComfort, mode: SmartClimateMode, target: Int): Boolean =
+    !comfortLevelsOf(autoComfortRequest(request, target, auto), mode).contentEquals(comfortLevelsOf(request, mode))
 
 /** The request smart comfort itself would send for [target]: the choice as the rule and the model make it. */
 fun autoComfortRequest(base: ClimateRequest, target: Int, auto: SmartComfort): ClimateRequest = base.copy(
