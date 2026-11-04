@@ -103,15 +103,3 @@ private fun DepartureSlotEditor(
         }
     }
 }
-
-/** Who is driving this car: each driver keeps their own learned comfort, so a switch changes what smart climate sets. */
-@Composable
-internal fun DriverPicker(v: Vehicle, state: UiState, vm: AppViewModel) {
-    val active = state.activeDrivers[v.vin] ?: 0
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
-        RevealMutedText("Driving", modifier = Modifier.weight(1f))
-        for (d in 0 until com.bloo.bluelink.data.DRIVER_COUNT) {
-            MorphTextButton(if (d == active) "[Driver ${d + 1}]" else "Driver ${d + 1}", onClick = { vm.setActiveDriver(v, d) })
-        }
-    }
-}

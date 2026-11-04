@@ -355,9 +355,6 @@ internal fun ClimatePebble(
         ExpandVisibility(!climateOn) {
             DepartureSection(v, state, vm, fahrenheit)
         }
-        ExpandVisibility(!climateOn) {
-            DriverPicker(v, state, vm)
-        }
 
         ExpandVisibility(!climateOn) {
             ClimateControlsSection(

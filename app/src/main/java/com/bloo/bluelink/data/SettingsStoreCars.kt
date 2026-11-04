@@ -352,15 +352,7 @@ suspend fun SettingsStore.setClimateModel(vin: String, model: ClimateModel) {
 fun SettingsStore.comfortModel(key: String, p: Preferences): ComfortModel? =
     p[stringPreferencesKey("comfort_model_$key")]?.let { ComfortModel.decode(it) }
 
-/** Which driver of a car is driving: 0 for the first. Synced, so every device follows the same choice. */
-fun SettingsStore.activeDriver(vin: String, p: Preferences): Int =
-    p[stringPreferencesKey("driver_$vin")]?.toIntOrNull()?.coerceIn(0, DRIVER_COUNT - 1) ?: 0
 
-suspend fun SettingsStore.activeDriverNow(vin: String): Int = activeDriver(vin, context.settingsDataStore.data.first())
-
-suspend fun SettingsStore.setActiveDriver(vin: String, driver: Int) {
-    editTracked { it[stringPreferencesKey("driver_$vin")] = driver.coerceIn(0, DRIVER_COUNT - 1).toString() }
-}
 
 /** What smart comfort has learned for a car, as stored right now. */
 suspend fun SettingsStore.comfortModelNow(key: String): ComfortModel? =
