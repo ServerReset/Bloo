@@ -288,8 +288,6 @@ class BlooTileService : TileService() {
         const val BLACK = 0xFF000000.toInt()
         /** The ring's inset from the display's edge, and the gaps between quarters, matching the face (dp at 227dp). */
         const val RING_INSET = 13f
-        /** The gap between two segments of the ring, in degrees (the round caps stand out past it, so it reads as a small space). */
-        const val RING_GAP = 7f
         /** A gap in the ring is an arc nothing is drawn in. */
         const val CLEAR = 0x00000000
         /** The face's track: its ink at 16%. */

@@ -50,11 +50,7 @@ const val DRIVER_COUNT = 2
 /** The key a driver's learned comfort is kept under: the car's VIN for the first driver, so existing settings still apply to them. */
 fun comfortKey(vin: String, driver: Int): String = if (driver <= 0) vin else "$vin#$driver"
 
-/** At or below this feels-like °F, the seats and wheel warm up. */
-private const val COLD_F = 45.0
 
-/** At or above this feels-like °F, the seats cool down. */
-private const val HOT_F = 82.0
 
 /** At or below this feels-like °F the glass may frost, so defrost runs. */
 private const val FROST_F = 33.0

@@ -83,6 +83,4 @@ fun <T> lowPowerFloating() = lowPowerAwareSpring<T>(dampingRatio = FloatingDampi
  */
 val ChargeRampEasing: Easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
-/** How long a charge fill takes to ramp to its value. */
-const val ChargeRampMs = 900
 

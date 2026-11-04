@@ -4,7 +4,6 @@ import kotlin.math.roundToInt
 
 /** Weekdays as bits: bit 0 is Monday, bit 6 is Sunday. */
 const val DAYS_WEEKDAYS = 0b0011111
-const val DAYS_WEEKEND = 0b1100000
 const val DAYS_EVERY = 0b1111111
 
 /** How long before a departure the car starts warming. */

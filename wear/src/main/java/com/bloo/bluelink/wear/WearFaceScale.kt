@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.collectLatest
 
 /** The ring's stroke and the gap between it and the quarters inside it. */
 internal val RingStroke = 8.dp
-internal val RingGap = 5.dp
 
 /** The display the face's fixed sizes (ring, gaps, glyphs) were drawn for; every size scales by (real display / this). */
 internal val ReferenceFace = 227.dp

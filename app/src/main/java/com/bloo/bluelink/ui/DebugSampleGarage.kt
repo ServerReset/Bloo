@@ -63,8 +63,6 @@ internal object DebugSampleGarage {
 
     private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
-    /** Irrelevant - only the presence of a record matters, and the lock is never unlocked. */
-    private const val SAMPLE_PIN = "1234"
 
     /**
      * Set the app's own display mode.
