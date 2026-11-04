@@ -62,9 +62,10 @@ class SearchFactsTest {
         assertEquals(setOf("Locked", "Unlocked"), doors.map { it.value }.toSet())
     }
 
-    @Test fun aCarWithNoReadingYetAnswersNothing() {
+    @Test fun aCarWithNoReadingYetAnswersOnlyItsSavedClimate() {
+        // Live readings need the car to have reported; its saved presets and pre-runs do not, so only those answer.
         val none = UiState(vehicles = listOf(daisy))
-        assertTrue(carFacts(none, appearance).isEmpty())
+        assertTrue(carFacts(none, appearance).all { it.topic == FactTopic.CLIMATE })
     }
 
     @Test fun anEmptyQueryAsksForNothing() {
