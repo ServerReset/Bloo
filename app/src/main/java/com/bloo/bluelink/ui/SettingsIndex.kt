@@ -285,7 +285,16 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
  * A vehicle command recognised in a free-form search query. [cmd]/[climateTarget] use
  * [com.bloo.bluelink.data.VehicleCommandRunner]'s command vocabulary.
  */
-internal class ParsedVehicleCommand(val cmd: String, val climateTarget: String = "default", val label: String)
+/**
+ * A command the search read from a phrase. [atMinute], when the phrase names a time, makes it a scheduled command for that minute of
+ * the day ("departure" sets the pre-run to it instead of running a car command).
+ */
+internal class ParsedVehicleCommand(
+    val cmd: String,
+    val climateTarget: String = "default",
+    val label: String,
+    val atMinute: Int? = null,
+)
 
 /**
  * The temperature asked for, in Fahrenheit, or null if the query names none. Superlatives resolve

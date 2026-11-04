@@ -6,6 +6,7 @@ import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.degLabel
+import com.bloo.bluelink.data.parseClockMinute
 import com.bloo.bluelink.rethrowIfCancellation
 
 /**
@@ -14,7 +15,7 @@ import com.bloo.bluelink.rethrowIfCancellation
  * command parsing. Order matters: "unlock" is checked before the bare "lock" pattern so "unlock"
  * doesn't also match as "lock".
  */
-internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
+private fun parseVehicleCommandNow(query: String, metric: Boolean): ParsedVehicleCommand? {
     val q = query.lowercase()
     // Only meaningful for a climate START, and only when the phrasing is not already asking for
     // smart climate (which computes its own target from the weather -- naming a temperature and
@@ -116,7 +117,11 @@ internal val RxSmartClimate = Regex("smart climate|smart (ac|a/c|heat|clim)")
 
 internal val RxNegation = Regex("stop|turn off|cancel")
 
-internal val RxClimateOff = Regex("(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)")
+internal val RxClimateOff = Regex(
+    "(stop|turn off|cancel|kill|end) (the )?(climate|ac|a/c|heat(er)?|aircon|air con|cooling|warming)" +
+        // "climate off at 9": the word order a timed request usually takes.
+        "|(climate|ac|a/c|heat(er)?|aircon|air con) (is )?off\\b",
+)
 
 // Was constructed fresh inline at its one call site, unlike every other pattern in this block --
 // missed when the rest were hoisted (see the doc above this block for why that hoist mattered: once
@@ -224,4 +229,22 @@ internal fun resolveCommandTarget(query: String, vehicles: List<Vehicle>): Vehic
     val namedVehicle = nameMatches.filter { it.name.length == longestMatchLen }.singleOrNull()
     // Fall back to "the one car" only when NO name matched; an ambiguous match must not pick one.
     return namedVehicle ?: if (nameMatches.isEmpty()) vehicles.singleOrNull() else null
+}
+
+/** The commands a clock time turns into a scheduled run. */
+private val SchedulableCommands = setOf(CarCommandIds.CLIMATE_ON, CarCommandIds.CLIMATE_OFF, CarCommandIds.LOCK, CarCommandIds.UNLOCK)
+
+/** "Departure" or "pre-run": with a time, it sets the car's pre-run rather than running a command. */
+private val RxDepartureWord = Regex("\\bdepart(ure|ures)?\\b|\\bpre-?runs?\\b")
+
+/**
+ * The command a phrase asks for, with its clock time when it names one. "climate off at 9 pm" is climate off at 21:00, "lock the car at 6"
+ * is a lock at 18:00, and "schedule my departure for 9" sets the pre-run to 09:00. Without a time it is [parseVehicleCommandNow]'s answer.
+ */
+internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
+    val q = query.lowercase()
+    val at = parseClockMinute(q) ?: return parseVehicleCommandNow(query, metric)
+    if (RxDepartureWord.containsMatchIn(q)) return ParsedVehicleCommand("departure", label = "Pre-run for", atMinute = at)
+    val now = parseVehicleCommandNow(query, metric) ?: return null
+    return if (now.cmd in SchedulableCommands) ParsedVehicleCommand(now.cmd, now.climateTarget, now.label, at) else now
 }

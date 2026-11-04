@@ -192,7 +192,11 @@ internal fun CommandActionResult(
     var commandExecuted by rememberSaveable(submittedQuery) { mutableStateOf(false) }
     LaunchedEffect(submittedQuery) {
         if (targetVehicle != null && !commandExecuted) {
-            if (command.cmd == "open_app") {
+            if (command.atMinute != null) {
+                // A timed request is queued for its minute (or sets the pre-run), not run now.
+                actionResult = scheduleFromSearch(ctx, vm, state, targetVehicle, command)
+                commandExecuted = true
+            } else if (command.cmd == "open_app") {
                 // Not a car command: launches the OEM companion app (as OwnerLinks does).
                 val links = targetVehicle.brand.links
                 openApp(ctx, listOf(links.appPackage), links.playStoreUrl)
