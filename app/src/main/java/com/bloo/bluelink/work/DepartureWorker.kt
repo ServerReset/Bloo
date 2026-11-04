@@ -57,7 +57,7 @@ class DepartureWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     /** Says the car is warming up, and when it should be ready, so the person knows it has started without opening the app. */
     private fun announce(snap: VehicleSnapshot, slot: Int, readyMinute: Int) {
-        val ready = String.format(java.util.Locale.US, "%02d:%02d", readyMinute / 60, readyMinute % 60)
+        val ready = com.bloo.bluelink.data.formatMinuteOfDay(readyMinute)
         com.bloo.bluelink.data.AppLog.log("Departure: started ${snap.name} to be ready by $ready")
         com.bloo.bluelink.data.Notifications.post(
             applicationContext,
