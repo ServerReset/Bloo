@@ -28,7 +28,7 @@ import com.bloo.uicommon.AppIcons
  * battery of every car.
  */
 /** What a fact is about: each topic is drawn as ONE piece of the app's own UI lifted out into search (see SearchPieces.kt). */
-internal enum class FactTopic { CHARGE, TWELVE_VOLT, DOORS, CLIMATE, ENGINE, ODOMETER, LOCATION }
+internal enum class FactTopic { CHARGE, TWELVE_VOLT, DOORS, CLIMATE, ENGINE, ODOMETER, LOCATION, PEBBLE }
 
 internal class CarFact(
     val vin: String,
@@ -58,6 +58,10 @@ internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): Lis
         }
         (state.departures[v.vin] ?: DepartureSchedule()).slots.forEachIndexed { i, slot ->
             add(CarFact(v.vin, FactTopic.CLIMATE, v.name, slot.label(i), if (slot.enabled) "Ready ${formatMinuteOfDay(slot.minuteOfDay)}" else "Off", null, AppIcons.SmartClimate, "pre-run prerun departure depart ready warm schedule"))
+        }
+        // Each pebble on the car's page is found by its name, so "trips" or "diagnostics" finds that card of this car.
+        state.sectionsFor(v).forEach { section ->
+            add(CarFact(v.vin, FactTopic.PEBBLE, v.name, sectionLabel(section), "Pebble", null, AppIcons.DirectionsCar, "pebble section card panel page $section"))
         }
     }
     state.vehicles.forEach { v ->
@@ -119,8 +123,11 @@ internal fun rankFacts(tokens: List<String>, facts: List<CarFact>): List<CarFact
 }
 
 /** One piece of UI to lift into the results: a car's [topic], found by the words that matched its facts. */
-internal class SearchPiece(val vin: String, val car: String, val topic: FactTopic)
+internal class SearchPiece(val vin: String, val car: String, val topic: FactTopic, val label: String = "")
 
 /** The pieces [tokens] ask for, best first: each (car, topic) once, in the order its best fact ranked. */
 internal fun rankPieces(tokens: List<String>, facts: List<CarFact>): List<SearchPiece> =
-    rankFacts(tokens, facts).distinctBy { it.vin to it.topic }.map { SearchPiece(it.vin, it.car, it.topic) }
+    rankFacts(tokens, facts)
+        // A pebble is its own piece for each section; every other topic is one piece per car.
+        .distinctBy { if (it.topic == FactTopic.PEBBLE) Triple(it.vin, it.topic, it.label) else Triple(it.vin, it.topic, "") }
+        .map { SearchPiece(it.vin, it.car, it.topic, if (it.topic == FactTopic.PEBBLE) it.label else "") }

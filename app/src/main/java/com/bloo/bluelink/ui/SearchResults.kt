@@ -99,7 +99,7 @@ internal fun SettingsSearchResults(
             if (pieces.isNotEmpty()) {
                 pillItem("head:cars", listState) { SearchHeading(if (pieces.size > 1) "From your cars · ${pieces.size}" else "From your cars", hazeState) }
                 // Pieces of the car's own page, lifted out: the charge bar, the lock buttons, the climate switch, the map.
-                pieces.forEach { p -> pillItem("piece:${p.vin}:${p.topic}", listState) { SearchPieceView(p, state, vm, appearance, hazeState) } }
+                pieces.forEach { p -> pillItem("piece:${p.vin}:${p.topic}:${p.label}", listState) { SearchPieceView(p, state, vm, appearance, hazeState) } }
             }
             if (suggestedCommands.isNotEmpty()) {
                 pillItem("head:actions", listState) { SearchHeading("Actions", hazeState) }

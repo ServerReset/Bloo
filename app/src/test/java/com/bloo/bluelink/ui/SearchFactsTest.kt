@@ -68,6 +68,13 @@ class SearchFactsTest {
         assertTrue(carFacts(none, appearance).all { it.topic == FactTopic.CLIMATE })
     }
 
+    @Test fun aPebbleIsFoundByItsNameAsItsOwnPiece() {
+        val p = pieces("trips").filter { it.topic == FactTopic.PEBBLE }
+        assertTrue(p.any { it.label == "Trips" && it.vin == "V1" })
+        // Two pebbles of one car are two pieces, not one.
+        assertEquals(p.size, p.map { it.vin to it.label }.toSet().size, "each pebble appears once")
+    }
+
     @Test fun anEmptyQueryAsksForNothing() {
         assertTrue(rankFacts(emptyList(), carFacts(state(), appearance)).isEmpty())
     }

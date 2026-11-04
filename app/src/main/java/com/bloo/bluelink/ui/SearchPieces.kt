@@ -46,6 +46,7 @@ private fun FactTopic.origin(): Pair<String, ImageVector> = when (this) {
     FactTopic.ENGINE -> "Engine" to AppIcons.DirectionsCar
     FactTopic.ODOMETER -> "Odometer" to Icons.Filled.Speed
     FactTopic.LOCATION -> "Location" to Icons.Filled.Place
+    FactTopic.PEBBLE -> "Pebble" to AppIcons.DirectionsCar
 }
 
 /** One lifted piece for [piece], or nothing when the car or its reading has gone. */
@@ -60,7 +61,7 @@ internal fun SearchPieceView(
     val v = state.vehicles.firstOrNull { it.vin == piece.vin } ?: return
     val status = state.statusFor(v) ?: return
     val (origin, icon) = piece.topic.origin()
-    LiftedPiece("$origin · ${v.name}", icon, "${piece.vin}:${piece.topic}", hazeState) {
+    LiftedPiece("$origin · ${v.name}", icon, "${piece.vin}:${piece.topic}:${piece.label}", hazeState) {
         when (piece.topic) {
             FactTopic.CHARGE -> ChargePiece(v, status, state, appearance)
             FactTopic.TWELVE_VOLT -> status.battery?.let { b ->
@@ -72,6 +73,7 @@ internal fun SearchPieceView(
             FactTopic.ENGINE -> engineLabel(status.engine)?.let { StatusRow("Engine", it) }
             FactTopic.ODOMETER -> parseOdometerMiles(v.odometer)?.let { StatusRow("Odometer", formatDistance(it, appearance.metricDistance)) }
             FactTopic.LOCATION -> LocationPiece(v, state)
+            FactTopic.PEBBLE -> StatusRow("Section", piece.label)
         }
     }
 }
