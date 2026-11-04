@@ -80,12 +80,17 @@ internal class CentralMap {
 
     /** A tap on a car's icon: the bar shows that car, and the map glides to centre it from the anchor. */
     fun tapPin(tapped: String) {
-        selectedVin = tapped
-        // The car tapped is the one the map returns to when it closes, and the car page moves to it behind the map.
+        // The car tapped is the one the map returns to when it closes, and the car page moves to it.
         homeVin = tapped
         chosenVin = tapped
         onCarChosen?.invoke(tapped)
-        val anchor = vin ?: return
+        // Closed, a pin tap only moves to that car's card: no bar comes up and nothing floats over the card.
+        val anchor = vin
+        if (anchor == null) {
+            selectedVin = null
+            return
+        }
+        selectedVin = tapped
         if (tapped == anchor) {
             mapState.recenter()
             return
