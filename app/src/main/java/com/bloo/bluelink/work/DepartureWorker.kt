@@ -66,7 +66,7 @@ class DepartureWorker(context: Context, params: WorkerParameters) : CoroutineWor
     }
 
     /** The start for a departure: smart climate's request for the weather. Without a weather reading, the car's usual default. */
-    private suspend fun departureRequest(snap: VehicleSnapshot, slot: DepartureSlot): ClimateRequest =
+    private suspend fun departureRequest(snap: VehicleSnapshot): ClimateRequest =
         smartClimateRequestFor(applicationContext, snap.vin)
             ?: ClimateRequest(tempF = DEFAULT_CLIMATE_TEMP_F, defrost = false, durationMinutes = DEFAULT_CLIMATE_DURATION_MIN)
 
