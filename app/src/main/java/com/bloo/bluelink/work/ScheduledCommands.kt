@@ -45,8 +45,35 @@ object ScheduledCommands {
         } else {
             alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
         }
+        remember(context, vin, cmd, climateTarget, minuteOfDay)
         AppLog.log("Scheduled $cmd for $vin at ${java.time.Instant.ofEpochMilli(at)}${if (exact) "" else " (approximate: exact alarms not allowed)"}")
         return exact
+    }
+
+    private const val PREFS = "bloo_scheduled_commands"
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Keeps a pending command across a reboot: an alarm does not survive one. Stored as "vin|cmd" -> "target|minute". */
+    private fun remember(context: Context, vin: String, cmd: String, target: String, minuteOfDay: Int) {
+        prefs(context).edit().putString("$vin|$cmd", "$target|$minuteOfDay").apply()
+    }
+
+    /** Called once a command has fired: it is no longer pending. */
+    fun forget(context: Context, vin: String, cmd: String) {
+        prefs(context).edit().remove("$vin|$cmd").apply()
+    }
+
+    /** After a reboot: sets the alarm again for every command still pending, at its next occurrence of the same minute. */
+    fun rearmAll(context: Context) {
+        prefs(context).all.forEach { (key, value) ->
+            val vin = key.substringBefore('|')
+            val cmd = key.substringAfter('|')
+            val text = value as? String ?: return@forEach
+            val target = text.substringBeforeLast('|')
+            val minute = text.substringAfterLast('|').toIntOrNull() ?: return@forEach
+            schedule(context, vin, cmd, target, minute)
+        }
     }
 
     /** The next occurrence of [minuteOfDay] on the phone's clock, in epoch milliseconds. */

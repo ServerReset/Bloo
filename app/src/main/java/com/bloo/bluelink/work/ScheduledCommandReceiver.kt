@@ -17,6 +17,8 @@ class ScheduledCommandReceiver : BroadcastReceiver() {
         val vin = intent.getStringExtra(ScheduledCommands.EXTRA_VIN) ?: return
         val cmd = intent.getStringExtra(ScheduledCommands.EXTRA_CMD) ?: return
         val target = intent.getStringExtra(ScheduledCommands.EXTRA_TARGET) ?: "default"
+        // Fired, so it is no longer pending: a reboot must not set it again.
+        ScheduledCommands.forget(context, vin, cmd)
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
