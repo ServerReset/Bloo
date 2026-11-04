@@ -57,11 +57,11 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     // Closed, the map sits in the Location card of the car being looked at, so a swipe to another car brings it along.
     val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
     LaunchedEffect(currentIndex, state.value.vehicles) {
-        if (centralMap.vin == null) state.value.vehicles.getOrNull(currentIndex)?.vin?.let { centralMap.homeVin = it }
+        if (centralMap.vin == null) state.value.vehicles.getOrNull(currentIndex)?.vin?.let { centralMap.rest(it) }
     }
     // The map starts in the first car's Location card, until it is opened on another car.
     LaunchedEffect(state.value.vehicles.firstOrNull()?.vin) {
-        if (centralMap.homeVin == null) centralMap.homeVin = state.value.vehicles.firstOrNull()?.vin
+        if (centralMap.homeVin == null) state.value.vehicles.firstOrNull()?.vin?.let { centralMap.rest(it) }
     }
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
@@ -154,7 +154,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         onDismiss = {
             // The map closes onto the car last chosen on it, and the app is on that car, whatever the pager settled on meanwhile.
             centralMap.chosenVin?.let { chosen ->
-                centralMap.homeVin = chosen
+                centralMap.rest(chosen)
                 state.value.vehicles.indexOfFirst { it.vin == chosen }.takeIf { it >= 0 }?.let { vm.selectIndex(it) }
             }
             centralMap.selectedVin = null

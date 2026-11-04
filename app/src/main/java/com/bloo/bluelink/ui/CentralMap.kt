@@ -57,14 +57,27 @@ internal class CentralMap {
     /** While the map is collapsing, the car whose card it collapses onto (its own card, once the car page has moved there). */
     var closingTo by mutableStateOf<String?>(null)
 
+    /**
+     * Records [car] as the one the person is looking at: the card the closed map rests in, and the car it returns to when it closes. The
+     * one place those two are set, so they cannot drift apart.
+     */
+    private fun choose(car: String) {
+        homeVin = car
+        chosenVin = car
+    }
+
+    /** The closed map rests in [car]'s card. The garage calls this as the pager moves, so the map comes along with the car page. */
+    fun rest(car: String) {
+        homeVin = car
+    }
+
     /** Opens the map on [vin], with that car selected. A map already open is not switched under the person. */
     fun open(vin: String) {
         if (this.vin != null) return
         com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
         this.vin = vin
-        homeVin = vin
+        choose(vin)
         selectedVin = vin
-        chosenVin = vin
     }
 
     /** Closes the map: the selection and the anchor clear, and the map goes back to the card it rests in. */
@@ -79,8 +92,7 @@ internal class CentralMap {
     /** A tap on a car's icon: the bar shows that car, and the map glides to centre it from the anchor. */
     fun tapPin(tapped: String) {
         // The car tapped is the one the map returns to when it closes, and the car page moves to it.
-        homeVin = tapped
-        chosenVin = tapped
+        choose(tapped)
         onCarChosen?.invoke(tapped)
         // Closed, a pin tap only moves to that car's card: no bar comes up and nothing floats over the card.
         val anchor = vin
