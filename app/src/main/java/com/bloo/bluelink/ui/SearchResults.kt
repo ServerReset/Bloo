@@ -64,8 +64,14 @@ internal fun SettingsSearchResults(
         val scored = strict.ifEmpty { entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = true)?.let { e to it } } }
         scored.sortedByDescending { it.second }.map { it.first }.let { if (it.size > limit) it.take(limit) else it }
     }
+    // The commands the person picks most rise to the top among equal matches. Counted on this device (SearchUsage).
+    val usage = remember { SearchUsage(androidx.compose.ui.platform.LocalContext.current) }
     val suggestedCommands = remember(query, state.vehicles) {
-        if (query.isNotBlank()) searchCommands(query, state.vehicles, fuzzy = false).take(3) else emptyList()
+        if (query.isNotBlank()) {
+            searchCommands(query, state.vehicles, fuzzy = false).sortedByDescending { usage.count("cmd:${it.id}") }.take(3)
+        } else {
+            emptyList()
+        }
     }
 
     // A recognised command ("lock my Ioniq") runs via VehicleCommandRunner, the same path as the
@@ -107,6 +113,7 @@ internal fun SettingsSearchResults(
                     pillItem("cmd:${cmd.id}", listState) {
                         // Runs it, unless it needs a value first ("set charge limit"): then it just fills the box.
                         ActionPill(cmd.icon, cmd.title, cmd.description, MaterialTheme.colorScheme.secondary, hazeState) {
+                            usage.record("cmd:${cmd.id}")
                             onPick(if (cmd.requiresArg) cmd.title + " " else cmd.title, !cmd.requiresArg)
                         }
                     }
