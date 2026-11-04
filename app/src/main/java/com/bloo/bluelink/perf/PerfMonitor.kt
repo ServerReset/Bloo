@@ -467,7 +467,6 @@ object PerfMonitor {
         java.io.File("/proc/self/status").useLines { lines -> lines.firstOrNull { it.startsWith("Threads:") }?.substringAfter(':')?.trim()?.toInt() }
     }.getOrNull() ?: 0
 
-    /** Everything seen since the monitor started (or since [reset]), as text for the Debug card's Copy button. */
     /** The report, then every timeline line still kept on the device: what Save writes out. */
     fun saveableReport(): String = buildString {
         append(report())
@@ -476,6 +475,7 @@ object PerfMonitor {
         append(PerfFile.readAll())
     }
 
+    /** Everything seen since the monitor started (or since [reset]): the report the Debug card copies. */
     fun report(): String = buildString {
         val gc = GcSample.read()
         appendLine("== Bloo performance report ==")
@@ -498,10 +498,10 @@ object PerfMonitor {
         }
         appendLine()
         appendLine("-- Slowest frames (over ${SLOW_FRAME_LOG_MS.toInt()} ms) --")
-        synchronized(worstFrames) { if (worstFrames.isEmpty()) appendLine("none") else worstFrames.forEach { appendLine(it) } }
+        synchronized(worstFrames) { orNone(worstFrames.toList()) }
         appendLine()
         appendLine("-- Main-thread stalls (over $STALL_MS ms), with the code that was running --")
-        synchronized(stalls) { if (stalls.isEmpty()) appendLine("none") else stalls.forEach { appendLine(it) } }
+        synchronized(stalls) { orNone(stalls.toList()) }
         appendLine()
         appendLine("-- Timed spans (count, total, average, worst ms) --")
         if (spans.isEmpty()) appendLine("none") else spans.entries.sortedByDescending { it.value.totalMs }.forEach { (n, s) -> appendLine("$n: ${s.count} runs, ${fmt(s.totalMs)} total, ${fmt(s.totalMs / s.count)} avg, ${fmt(s.worstMs)} worst") }
@@ -510,7 +510,7 @@ object PerfMonitor {
         appendLine("main-post ${mainPost.line()}; pool-default ${defaultPool.line()}; pool-io ${ioPool.line()}")
         appendLine()
         appendLine("-- The last events (newest last) --")
-        synchronized(recentEvents) { if (recentEvents.isEmpty()) appendLine("none") else recentEvents.forEach { appendLine(it) } }
+        synchronized(recentEvents) { orNone(recentEvents.toList()) }
         appendLine()
         appendLine("-- Recompositions since start --")
         if (recompositions.isEmpty()) appendLine("none") else recompositions.entries.sortedByDescending { it.value.get() }.take(30).forEach { appendLine("${it.key}: ${it.value.get()}") }
@@ -576,4 +576,9 @@ object PerfMonitor {
 @Composable
 fun TrackRecompositions(name: String) {
     if (PerfMonitor.active) SideEffect { PerfMonitor.recomposed(name) }
+}
+
+/** Appends each line of [items], or "none" when there are none. */
+private fun StringBuilder.orNone(items: List<String>) {
+    if (items.isEmpty()) appendLine("none") else items.forEach { appendLine(it) }
 }
