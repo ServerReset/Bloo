@@ -3,55 +3,38 @@ package com.bloo.bluelink.data
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** Weekdays as bits: bit 0 is Monday, bit 6 is Sunday. */
-const val DAYS_WEEKDAYS = 0b0011111
-const val DAYS_EVERY = 0b1111111
-
 /** How long before a departure the car starts warming. */
 const val DEPARTURE_LEAD_MIN = 30
 
 /** How often the background check runs. A departure is started in the first check window it falls into. */
 const val DEPARTURE_CHECK_MIN = 15
 
-/** One departure: the time the car should be ready, on which days, and what it should be. */
-data class DepartureSlot(
-    val enabled: Boolean = false,
-    val minuteOfDay: Int = 8 * 60,
-    val days: Int = DAYS_WEEKDAYS,
-    /** True: the car takes smart climate's target for the weather. False: [targetF] as set. */
-    val smart: Boolean = true,
-    val targetF: Int = 72,
-    val seats: Boolean = false,
-    val wheel: Boolean = false,
-    val defrost: Boolean = false,
-) {
-    fun encode(): String = listOf(enabled, minuteOfDay, days, smart, targetF, seats, wheel, defrost)
-        .joinToString(",") { if (it is Boolean) (if (it) "1" else "0") else it.toString() }
+/** A departure: a time the car should be ready, every day, switched on or off. Smart climate sets what it should be. */
+data class DepartureSlot(val enabled: Boolean = false, val minuteOfDay: Int = 8 * 60) {
+    fun encode(): String = "${if (enabled) 1 else 0},$minuteOfDay"
 
     companion object {
         fun decode(text: String): DepartureSlot? {
             val p = text.split(",")
-            if (p.size != 8) return null
-            val ints = p.map { it.toIntOrNull() ?: return null }
-            return DepartureSlot(
-                enabled = ints[0] == 1, minuteOfDay = ints[1].coerceIn(0, 1439), days = ints[2] and DAYS_EVERY, smart = ints[3] == 1,
-                targetF = ints[4].coerceIn(50, 90), seats = ints[5] == 1, wheel = ints[6] == 1, defrost = ints[7] == 1,
-            )
+            if (p.size != 2) return null
+            val on = p[0].toIntOrNull() ?: return null
+            val minute = p[1].toIntOrNull() ?: return null
+            return DepartureSlot(enabled = on == 1, minuteOfDay = minute.coerceIn(0, 1439))
         }
     }
 }
 
 /** A car's two departures. Stored as one string, so the synced settings carry it. */
-data class DepartureSchedule(val slots: List<DepartureSlot> = listOf(DepartureSlot(), DepartureSlot(minuteOfDay = 17 * 60, days = DAYS_WEEKDAYS))) {
+data class DepartureSchedule(val slots: List<DepartureSlot> = listOf(DepartureSlot(), DepartureSlot(minuteOfDay = 17 * 60))) {
     fun encode(): String = slots.joinToString(";") { it.encode() }
 
     /**
      * The index of the departure that should start now, or null. A departure is due in the check window that begins
-     * [DEPARTURE_LEAD_MIN] before its time, on a day it is set for, and only once per day ([lastRun] holds each slot's last start day).
+     * [DEPARTURE_LEAD_MIN] before its time, and only once per day ([lastRun] holds each slot's last start day).
      */
-    fun dueSlot(nowMinute: Int, weekday: Int, epochDay: Long, lastRun: List<Long>): Int? {
+    fun dueSlot(nowMinute: Int, epochDay: Long, lastRun: List<Long>): Int? {
         slots.forEachIndexed { i, s ->
-            if (!s.enabled || (s.days and (1 shl weekday)) == 0) return@forEachIndexed
+            if (!s.enabled) return@forEachIndexed
             val start = s.minuteOfDay - DEPARTURE_LEAD_MIN
             val into = ((nowMinute - start) % 1440 + 1440) % 1440
             if (into < DEPARTURE_CHECK_MIN && lastRun.getOrElse(i) { -1L } != epochDay) return i

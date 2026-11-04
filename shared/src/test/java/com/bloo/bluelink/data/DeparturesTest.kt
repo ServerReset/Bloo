@@ -5,11 +5,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class DeparturesTest {
-    private val eight = DepartureSlot(enabled = true, minuteOfDay = 8 * 60, days = DAYS_WEEKDAYS)
+    private val eight = DepartureSlot(enabled = true, minuteOfDay = 8 * 60)
     private val off = DepartureSlot(enabled = false)
 
     @Test fun slotRoundTrips() {
-        val s = DepartureSlot(enabled = true, minuteOfDay = 7 * 60 + 15, days = DAYS_EVERY, smart = false, targetF = 68, seats = true, wheel = true, defrost = true)
+        val s = DepartureSlot(enabled = true, minuteOfDay = 7 * 60 + 15)
         assertEquals(s, DepartureSlot.decode(s.encode()))
     }
 
@@ -20,29 +20,28 @@ class DeparturesTest {
 
     @Test fun dueInTheWindowBeforeTheDeparture() {
         val sched = DepartureSchedule(listOf(eight, off))
-        // Monday (0), 7:35: inside the window that starts 30 minutes before 8:00.
-        assertEquals(0, sched.dueSlot(7 * 60 + 35, 0, 100L, listOf(-1L, -1L)))
-        // Monday 7:10: too early.
-        assertNull(sched.dueSlot(7 * 60 + 10, 0, 100L, listOf(-1L, -1L)))
+        // 7:35 is inside the window that starts 30 minutes before 8:00.
+        assertEquals(0, sched.dueSlot(7 * 60 + 35, 100L, listOf(-1L, -1L)))
+        // 7:10 is too early.
+        assertNull(sched.dueSlot(7 * 60 + 10, 100L, listOf(-1L, -1L)))
     }
 
-    @Test fun notOnAnOffDayOrTwiceInADay() {
+    @Test fun notTwiceInADayOrWhenOff() {
         val sched = DepartureSchedule(listOf(eight, off))
-        // Saturday (5) is not a weekday.
-        assertNull(sched.dueSlot(7 * 60 + 35, 5, 100L, listOf(-1L, -1L)))
-        // Already started today.
-        assertNull(sched.dueSlot(7 * 60 + 35, 0, 100L, listOf(100L, -1L)))
+        assertNull(sched.dueSlot(7 * 60 + 35, 100L, listOf(100L, -1L)))
+        // Switched off, a departure never fires.
+        assertNull(DepartureSchedule(listOf(off, off)).dueSlot(7 * 60 + 35, 100L, listOf(-1L, -1L)))
     }
 
     @Test fun windowWrapsMidnight() {
-        val early = DepartureSlot(enabled = true, minuteOfDay = 10, days = DAYS_EVERY)
+        val early = DepartureSlot(enabled = true, minuteOfDay = 10)
         val sched = DepartureSchedule(listOf(early, off))
-        // Start is at 23:40 the day before: 23:45 is in the window.
-        assertEquals(0, sched.dueSlot(23 * 60 + 45, 3, 100L, listOf(-1L, -1L)))
+        // The start is 23:40 the day before, so 23:45 is in the window.
+        assertEquals(0, sched.dueSlot(23 * 60 + 45, 100L, listOf(-1L, -1L)))
     }
 
     @Test fun suggestsTheUsualTimeWhenStartsAreTight() {
-        val recs = (0 until 6).map { StartRecord(it.toLong(), 1, 7 * 60 + 20 + it, 50) } // Tuesdays, around 7:20
+        val recs = (0 until 6).map { StartRecord(it.toLong(), 1, 7 * 60 + 20 + it, 50) }
         // Typical start 7:22, plus 15 minutes to leave, rounded to a quarter: 7:45.
         assertEquals(7 * 60 + 45, suggestDeparture(recs, 1))
     }
