@@ -3,7 +3,6 @@ package com.bloo.uicommon
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.spring
@@ -87,5 +86,3 @@ val ChargeRampEasing: Easing = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 /** How long a charge fill takes to ramp to its value. */
 const val ChargeRampMs = 900
 
-/** The charge ramp as an animation spec, for the fill, its colour and the limit marker. */
-fun <T> chargeRamp(durationMs: Int = ChargeRampMs): TweenSpec<T> = tween(durationMillis = durationMs, easing = ChargeRampEasing)

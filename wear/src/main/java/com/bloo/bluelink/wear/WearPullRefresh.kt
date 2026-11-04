@@ -58,9 +58,6 @@ internal class WearPullRefresh(
     /** True while the face is the page on screen and at rest: the only place a pull refreshes and shows the refresh indicator. */
     fun onFace(): Boolean = canPull()
 
-    /** The face's drop under the finger: pulls get harder the further they go, so it stretches rather than following one to one. */
-    fun offsetPx(): Float = pulledPx * 0.35f
-
     val connection = object : NestedScrollConnection {
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
             if (source != NestedScrollSource.UserInput || !canPull()) return Offset.Zero

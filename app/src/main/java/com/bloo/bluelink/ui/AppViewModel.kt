@@ -230,12 +230,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
     }
 
-    /** Normal logging (the activity log) on or off. Off also turns advanced logging off, since it is built on it. */
-    fun setLoggingOn(on: Boolean) {
-        com.bloo.bluelink.data.DiagSettings.setLogging(getApplication(), on)
-        if (!on) setAdvancedLoggingOn(false)
-    }
-
     /**
      * Advanced logging on or off: the perf monitor's detailed timing and the watch's own log. The watch learns of it with the next sync,
      * which is pushed straight away so its log starts at once.

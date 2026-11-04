@@ -88,13 +88,6 @@ fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
 fun smartClimateHint(ambientF: Int, fahrenheit: Boolean): String =
     smartClimateLabel(ambientF, fahrenheit) + " · " + degLabel(ambientF.toString(), fahrenheit) + " outside"
 
-/** The sentence under the smart-climate row on the phone: the ambient reading, then the target it will set. */
-fun smartClimateTargetLine(ambientF: Int, fahrenheit: Boolean): String {
-    val ambient = degLabel(ambientF.toString(), fahrenheit)
-    val target = degLabel(smartClimateTargetF(ambientF).toString(), fahrenheit)
-    return "It's $ambient by your car. Smart climate targets $target."
-}
-
 /** Just the temperature a saved climate preset sets, as "79°" (the unit is established by context). */
 fun climatePresetTemp(req: ClimateRequest, fahrenheit: Boolean): String = "${degValue(req.tempF.toDouble(), fahrenheit)}°"
 
