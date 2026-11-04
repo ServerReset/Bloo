@@ -15,16 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.ComfortSwitches
 import com.bloo.bluelink.data.autoComfortRequest
 import com.bloo.bluelink.data.comfortRequest
-import com.bloo.bluelink.data.WatchComfortChoice
 import com.bloo.bluelink.data.comfortLevelsOf
-import com.bloo.bluelink.data.SmartClimateMode
-import com.bloo.bluelink.data.WheelHeatLevel
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.degLabel
 import androidx.compose.runtime.LaunchedEffect
