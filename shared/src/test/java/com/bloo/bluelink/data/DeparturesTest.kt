@@ -26,6 +26,14 @@ class DeparturesTest {
         assertNull(sched.dueSlot(7 * 60 + 10, 100L, listOf(-1L, -1L)))
     }
 
+    @Test fun aLateCheckStillStartsIt() {
+        val sched = DepartureSchedule(listOf(eight, off))
+        // 8:20 is after the 8:00 departure, but a check that ran late still starts the car.
+        assertEquals(0, sched.dueSlot(8 * 60 + 20, 100L, listOf(-1L, -1L)))
+        // An hour and more past the window, it is left alone.
+        assertNull(sched.dueSlot(9 * 60 + 40, 100L, listOf(-1L, -1L)))
+    }
+
     @Test fun notTwiceInADayOrWhenOff() {
         val sched = DepartureSchedule(listOf(eight, off))
         assertNull(sched.dueSlot(7 * 60 + 35, 100L, listOf(100L, -1L)))

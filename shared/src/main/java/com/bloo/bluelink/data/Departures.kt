@@ -6,8 +6,14 @@ import kotlin.math.roundToInt
 /** How long before a departure the car starts warming. */
 const val DEPARTURE_LEAD_MIN = 30
 
-/** How often the background check runs. A departure is started in the first check window it falls into. */
+/** How often the background check runs. Android may run a periodic check late, so a departure is due for longer than that. */
 const val DEPARTURE_CHECK_MIN = 15
+
+/**
+ * How long, from [DEPARTURE_LEAD_MIN] before a departure, a check still starts it. Wider than the check period so a late check (Doze, a
+ * busy phone) still starts the car; the once-a-day record stops a second start.
+ */
+const val DEPARTURE_WINDOW_MIN = 60
 
 /** A departure: a time the car should be ready, every day, switched on or off. Smart climate sets what it should be. */
 data class DepartureSlot(val enabled: Boolean = false, val minuteOfDay: Int = 8 * 60) {
@@ -29,15 +35,15 @@ data class DepartureSchedule(val slots: List<DepartureSlot> = listOf(DepartureSl
     fun encode(): String = slots.joinToString(";") { it.encode() }
 
     /**
-     * The index of the departure that should start now, or null. A departure is due in the check window that begins
-     * [DEPARTURE_LEAD_MIN] before its time, and only once per day ([lastRun] holds each slot's last start day).
+     * The index of the departure that should start now, or null. A departure is due from [DEPARTURE_LEAD_MIN] before its time until
+     * [DEPARTURE_WINDOW_MIN] after that start, and only once per day ([lastRun] holds each slot's last start day).
      */
     fun dueSlot(nowMinute: Int, epochDay: Long, lastRun: List<Long>): Int? {
         slots.forEachIndexed { i, s ->
             if (!s.enabled) return@forEachIndexed
             val start = s.minuteOfDay - DEPARTURE_LEAD_MIN
             val into = ((nowMinute - start) % 1440 + 1440) % 1440
-            if (into < DEPARTURE_CHECK_MIN && lastRun.getOrElse(i) { -1L } != epochDay) return i
+            if (into < DEPARTURE_WINDOW_MIN && lastRun.getOrElse(i) { -1L } != epochDay) return i
         }
         return null
     }
