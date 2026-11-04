@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * section and [ChargeLimitPill].
  */
 
+import androidx.compose.foundation.border
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
@@ -211,7 +212,17 @@ private fun PresetEditor(
 ) {
     var name by remember(preset.id) { mutableStateOf(preset.name) }
     val form = rememberClimateForm(preset.id, preset.request)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+    // Its own panel, with an accent edge, so it reads as the one preset being edited and where its controls are.
+    val panel = RoundedCornerShape(16.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(panel)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f), panel)
+            .padding(GapGroup),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
+    ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             RevealText("Edit preset", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             // Delete sits in the editor's own header, as the popup's did. Opening the editor is the deliberate step, so it does not arm.
