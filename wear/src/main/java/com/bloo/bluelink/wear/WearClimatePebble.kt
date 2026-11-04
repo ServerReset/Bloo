@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.ComfortSwitches
 import com.bloo.bluelink.data.autoComfortRequest
 import com.bloo.bluelink.data.comfortRequest
+import com.bloo.bluelink.data.formatMinuteOfDay
 import com.bloo.bluelink.data.comfortLevelsOf
 import com.bloo.bluelink.data.SeatLevel
 import com.bloo.bluelink.data.degLabel
@@ -68,9 +69,7 @@ internal fun WearClimatePebble(
         )
         // The next departure the phone has set for this car, so the watch says when the car will be ready.
         WearClimateChoices.departuresFor(v.vin).slots.withIndex().firstOrNull { it.value.enabled }?.let { (i, slot) ->
-            val hh = slot.minuteOfDay / 60
-            val mm = slot.minuteOfDay % 60
-            WearCaption(String.format(java.util.Locale.US, "Departure %d · ready %02d:%02d", i + 1, hh, mm), small = true)
+            WearCaption("Departure ${i + 1} · ready ${formatMinuteOfDay(slot.minuteOfDay)}", small = true)
         }
         // Colder, normal or hotter than the smart plan on the standard slider; it opens on normal. Set starts the car there and tells
         // smart climate how it felt.

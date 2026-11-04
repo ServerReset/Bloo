@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.DepartureSchedule
 import com.bloo.bluelink.data.DepartureSlot
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.degLabel
+import com.bloo.bluelink.data.formatMinuteOfDay
 import com.bloo.bluelink.data.suggestDeparture
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
@@ -21,7 +22,6 @@ import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import java.time.LocalDateTime
-import java.util.Locale
 
 /** The two departures for a car, in the climate settings: each a time to be ready, on which days, and what the car should be. */
 @Composable
@@ -67,7 +67,7 @@ private fun DepartureSlotEditor(
         // The time to be ready, in 15-minute steps.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(GapRow)) {
             MorphTextButton("−15", onClick = { onChange(slot.copy(minuteOfDay = Math.floorMod(slot.minuteOfDay - 15, 1440))) })
-            RevealText(formatMinute(slot.minuteOfDay), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
+            RevealText(formatMinuteOfDay(slot.minuteOfDay), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
             MorphTextButton("+15", onClick = { onChange(slot.copy(minuteOfDay = Math.floorMod(slot.minuteOfDay + 15, 1440))) })
         }
         // The days, one letter each (Monday first); a bracket marks the days chosen.
@@ -98,13 +98,11 @@ private fun DepartureSlotEditor(
         ToggleRow("Defrost", slot.defrost, description = "Clear the glass.") { onChange(slot.copy(defrost = it)) }
         // What the person's own starts suggest for today, when they are regular enough to predict.
         suggestion?.takeIf { it != slot.minuteOfDay }?.let { s ->
-            RevealMutedText("Your usual starts suggest ${formatMinute(s)} today.")
-            MorphTextButton("Use ${formatMinute(s)}", onClick = { onChange(slot.copy(minuteOfDay = s)) })
+            RevealMutedText("Your usual starts suggest ${formatMinuteOfDay(s)} today.")
+            MorphTextButton("Use ${formatMinuteOfDay(s)}", onClick = { onChange(slot.copy(minuteOfDay = s)) })
         }
     }
 }
-
-private fun formatMinute(minute: Int): String = String.format(Locale.US, "%02d:%02d", minute / 60, minute % 60)
 
 /** Who is driving this car: each driver keeps their own learned comfort, so a switch changes what smart climate sets. */
 @Composable

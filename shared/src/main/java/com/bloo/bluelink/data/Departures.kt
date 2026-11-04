@@ -1,5 +1,6 @@
 package com.bloo.bluelink.data
 
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /** Weekdays as bits: bit 0 is Monday, bit 6 is Sunday. */
@@ -108,3 +109,6 @@ fun suggestDeparture(records: List<StartRecord>, weekday: Int): Int? {
     val typical = minutes[minutes.size / 2] + 15
     return ((typical / 15.0).roundToInt() * 15).coerceIn(0, 1439)
 }
+
+/** A minute of the day as a clock time, "07:30". */
+fun formatMinuteOfDay(minute: Int): String = String.format(Locale.US, "%02d:%02d", minute / 60, minute % 60)
