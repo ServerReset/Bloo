@@ -65,7 +65,8 @@ internal fun SettingsSearchResults(
         scored.sortedByDescending { it.second }.map { it.first }.let { if (it.size > limit) it.take(limit) else it }
     }
     // The commands the person picks most rise to the top among equal matches. Counted on this device (SearchUsage).
-    val usage = remember { SearchUsage(androidx.compose.ui.platform.LocalContext.current) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val usage = remember(context) { SearchUsage(context) }
     val suggestedCommands = remember(query, state.vehicles) {
         if (query.isNotBlank()) {
             searchCommands(query, state.vehicles, fuzzy = false).sortedByDescending { usage.count("cmd:${it.id}") }.take(3)
