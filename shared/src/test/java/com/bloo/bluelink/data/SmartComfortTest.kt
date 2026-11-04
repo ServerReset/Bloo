@@ -92,3 +92,30 @@ class ComfortModelTest {
         windKph = 0.0, humidity = 40, isDay = true, code = 0,
     )
 }
+
+class ComfortRequestTest {
+    private val base = ClimateRequest(tempF = 70, defrost = false, durationMinutes = 10)
+    private val caps = ComfortCaps(driverHeat = true, passHeat = true, rearLeftHeat = true, wheel = true)
+    private val coldWeather = Weather(tempC = 0.0, feelsLikeC = 0.0, highC = null, lowC = null, windKph = 0.0, humidity = 40, isDay = true, code = 0)
+
+    @Test fun switchesOffGiveNoComfort() {
+        val auto = smartComfort(coldWeather, caps)
+        val req = comfortRequest(base, 70, SmartClimateMode.HEAT, auto, caps, ComfortSwitches(seats = false, wheel = false, defrost = false))
+        assertEquals(SeatLevel.OFF, req.seatFrontLeft)
+        assertEquals(WheelHeatLevel.OFF, req.steeringWheelHeat)
+        assertEquals(false, req.defrost)
+    }
+
+    @Test fun matchingTheSmartChoiceChangesNothing() {
+        val auto = smartComfort(coldWeather, caps)
+        val req = comfortRequest(base, 70, SmartClimateMode.HEAT, auto, caps, ComfortSwitches(seats = true, wheel = true, defrost = auto.defrost))
+        assertEquals(autoComfortRequest(base, 70, auto).seatFrontLeft, req.seatFrontLeft)
+        assertEquals(autoComfortRequest(base, 70, auto).steeringWheelHeat, req.steeringWheelHeat)
+    }
+
+    @Test fun onWithoutAnAutoChoiceUsesMediumWhereTheSeatHasIt() {
+        val req = comfortRequest(base, 70, SmartClimateMode.HEAT, null, caps, ComfortSwitches(seats = true, wheel = false, defrost = false))
+        assertEquals(SeatLevel.MED_HEAT, req.seatFrontLeft)
+        assertEquals(SeatLevel.OFF, req.seatRearRight) // the car has no rear-right seat heat
+    }
+}

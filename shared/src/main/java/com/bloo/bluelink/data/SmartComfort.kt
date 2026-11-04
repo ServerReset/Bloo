@@ -206,3 +206,56 @@ private fun coolLevel(v: Double): SeatLevel = when (v.roundToInt().coerceIn(0, 3
 private fun wheelLevelValue(v: Double): Int = v.roundToInt().coerceIn(0, 2)
 
 private fun wheelLevelOf(v: Int): WheelHeatLevel = WheelHeatLevel.entries.first { it.apiValue == v }
+
+/** The three comfort switches the person can set by hand: seats, steering wheel and defrost. */
+data class ComfortSwitches(val seats: Boolean, val wheel: Boolean, val defrost: Boolean)
+
+/** One seat's level as its switch sets it: off when the switch is off; the smart level when there is one; otherwise medium, if the seat has it. */
+fun manualSeat(on: Boolean, auto: SeatLevel?, mode: SmartClimateMode, heatCap: Boolean, coolCap: Boolean): SeatLevel = when {
+    !on -> SeatLevel.OFF
+    auto != null && auto != SeatLevel.OFF -> auto
+    mode == SmartClimateMode.HEAT && heatCap -> SeatLevel.MED_HEAT
+    mode == SmartClimateMode.COOL && coolCap -> SeatLevel.MED_COOL
+    else -> SeatLevel.OFF
+}
+
+/**
+ * The start the switches ask for: [base] with the target, and every comfort setting as the switches set it, for what the car has. Where a
+ * switch matches the smart choice, the smart choice stands.
+ */
+fun comfortRequest(
+    base: ClimateRequest,
+    target: Int,
+    mode: SmartClimateMode,
+    auto: SmartComfort?,
+    caps: ComfortCaps,
+    switches: ComfortSwitches,
+): ClimateRequest {
+    val autoWheel = auto?.wheel
+    val wheel = when {
+        !switches.wheel -> WheelHeatLevel.OFF
+        autoWheel != null && autoWheel.isOn -> autoWheel
+        caps.wheel -> WheelHeatLevel.HIGH
+        else -> WheelHeatLevel.OFF
+    }
+    return base.copy(
+        tempF = target,
+        defrost = switches.defrost,
+        steeringWheelHeat = wheel,
+        seatFrontLeft = manualSeat(switches.seats, auto?.seatDriver, mode, caps.driverHeat, caps.driverCool),
+        seatFrontRight = manualSeat(switches.seats, auto?.seatPassenger, mode, caps.passHeat, caps.passCool),
+        seatRearLeft = manualSeat(switches.seats, auto?.seatRearLeft, mode, caps.rearLeftHeat, caps.rearLeftCool),
+        seatRearRight = manualSeat(switches.seats, auto?.seatRearRight, mode, caps.rearRightHeat, caps.rearRightCool),
+    )
+}
+
+/** The request smart comfort itself would send for [target]: the choice as the rule and the model make it. */
+fun autoComfortRequest(base: ClimateRequest, target: Int, auto: SmartComfort): ClimateRequest = base.copy(
+    tempF = target,
+    defrost = auto.defrost,
+    steeringWheelHeat = auto.wheel,
+    seatFrontLeft = auto.seatDriver,
+    seatFrontRight = auto.seatPassenger,
+    seatRearLeft = auto.seatRearLeft,
+    seatRearRight = auto.seatRearRight,
+)

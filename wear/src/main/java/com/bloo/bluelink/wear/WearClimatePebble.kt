@@ -18,6 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.ComfortSwitches
+import com.bloo.bluelink.data.autoComfortRequest
+import com.bloo.bluelink.data.comfortRequest
 import com.bloo.bluelink.data.WatchComfortChoice
 import com.bloo.bluelink.data.comfortLevelsOf
 import com.bloo.bluelink.data.SmartClimateMode
@@ -121,34 +124,14 @@ internal fun WearClimatePebble(
                     WearClimateChoices.recordFeedback(context, v.vin, hint.ambientF, step * FEEL_STEP_F)
                     val base = presets[v.vin].orEmpty().firstOrNull()?.request
                     val start = base ?: ClimateRequest(tempF = target, defrost = false, durationMinutes = 10)
-                    // What the switches say, as the car is to be set. Where a switch matches the smart choice, the choice stands.
-                    val seatDriver = manualSeat(seatsOn, c?.seatDriver, hint.mode, caps.driverHeat, caps.driverCool)
-                    val seatPass = manualSeat(seatsOn, c?.seatPassenger, hint.mode, caps.passHeat, caps.passCool)
-                    val seatRl = manualSeat(seatsOn, c?.seatRearLeft, hint.mode, caps.rearLeftHeat, caps.rearLeftCool)
-                    val seatRr = manualSeat(seatsOn, c?.seatRearRight, hint.mode, caps.rearRightHeat, caps.rearRightCool)
-                    val autoWheel = c?.wheel
-                    val wheel = when {
-                        !wheelOn -> WheelHeatLevel.OFF
-                        autoWheel != null && autoWheel.isOn -> autoWheel
-                        caps.wheel -> WheelHeatLevel.HIGH
-                        else -> WheelHeatLevel.OFF
-                    }
-                    val request = start.copy(
-                        tempF = target,
-                        defrost = defrostOn,
-                        steeringWheelHeat = wheel,
-                        seatFrontLeft = seatDriver,
-                        seatFrontRight = seatPass,
-                        seatRearLeft = seatRl,
-                        seatRearRight = seatRr,
+                    // What the switches say, as the car is to be set: the same rule the phone uses.
+                    val request = comfortRequest(
+                        start, target, hint.mode, c, caps,
+                        ComfortSwitches(seats = seatsOn, wheel = wheelOn, defrost = defrostOn),
                     )
                     // A start that differs from the smart choice teaches the watch what the person wanted, and the phone too.
                     if (c != null) {
-                        val auto = ClimateRequest(
-                            tempF = target, defrost = c.defrost, durationMinutes = request.durationMinutes,
-                            steeringWheelHeat = c.wheel, seatFrontLeft = c.seatDriver, seatFrontRight = c.seatPassenger,
-                            seatRearLeft = c.seatRearLeft, seatRearRight = c.seatRearRight,
-                        )
+                        val auto = autoComfortRequest(request, target, c)
                         if (!comfortLevelsOf(auto, hint.mode).contentEquals(comfortLevelsOf(request, hint.mode))) {
                             WearClimateChoices.recordComfortChoice(context, v.vin, hint.mode, comfortLevelsOf(request, hint.mode))
                         }
@@ -190,13 +173,4 @@ internal fun WearClimateRows(
         val text = "Presets from your phone show here."
         if (smallCaption) WearCaption(text, small = true) else WearCaption(text)
     }
-}
-
-/** One seat's level as the switch sets it: off when the switch is off; the smart level when there is one; otherwise medium, if the seat has it. */
-private fun manualSeat(on: Boolean, auto: SeatLevel?, mode: SmartClimateMode, heatCap: Boolean, coolCap: Boolean): SeatLevel = when {
-    !on -> SeatLevel.OFF
-    auto != null && auto != SeatLevel.OFF -> auto
-    mode == SmartClimateMode.HEAT && heatCap -> SeatLevel.MED_HEAT
-    mode == SmartClimateMode.COOL && coolCap -> SeatLevel.MED_COOL
-    else -> SeatLevel.OFF
 }

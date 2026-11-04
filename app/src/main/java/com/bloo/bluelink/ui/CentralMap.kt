@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.MapTiles
 
 /*
  * The app's one map. Every screen references this controller to open, select and dismiss the map; the map itself is drawn once, by
@@ -41,9 +42,6 @@ internal class CentralMap {
 
     /** The car the top bar is showing, by a tap on its icon. Null is no selection: the bar is just its handle. */
     var selectedVin by mutableStateOf<String?>(null)
-
-    /** The anchor's location, so the full-screen map knows where it is centred. */
-    var expandedLocation: GeoLocation? = null
 
     /** How far the bar is being dragged toward closing, 0 (not at all) to 1: the garage behind the map fades with it. */
     var dismissFade by mutableFloatStateOf(0f)
@@ -97,28 +95,11 @@ internal class CentralMap {
         }
         val from = cars.firstOrNull { it.vin == anchor }?.location ?: return
         val to = cars.firstOrNull { it.vin == tapped }?.location ?: return
-        // The map glides to the other car rather than jumping: the pan is worked out as showDevice does, and eased to over a short time.
-        val z = mapState.zoom
-        val tx = (-(com.bloo.bluelink.data.MapTiles.tileX(to.longitude, z) - com.bloo.bluelink.data.MapTiles.tileX(from.longitude, z)) *
-            com.bloo.bluelink.data.MapTiles.TILE_PX).toFloat()
-        val ty = (-(com.bloo.bluelink.data.MapTiles.tileY(to.latitude, z) - com.bloo.bluelink.data.MapTiles.tileY(from.latitude, z)) *
-            com.bloo.bluelink.data.MapTiles.TILE_PX).toFloat()
-        glide?.cancel()
-        val sx = mapState.panX
-        val sy = mapState.panY
-        // A plain animator on the main thread: a coroutine on Dispatchers.Main has no frame clock, and crashed the app on the first tap.
-        glide = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = GlideMs.toLong()
-            interpolator = android.view.animation.DecelerateInterpolator()
-            addUpdateListener { a ->
-                val t = a.animatedValue as Float
-                mapState.panTo(sx + (tx - sx) * t, sy + (ty - sy) * t)
-            }
-            start()
-        }
+        val (tx, ty) = panBetween(from, to, mapState.zoom)
+        glide.glideTo(tx, ty)
     }
 
-    private var glide: android.animation.ValueAnimator? = null
+    private val glide = MapGlide(mapState)
 
     /**
      * A car card's own copy of the map: it keeps its own pan and zoom, so it stays put while the big map opens and closes. It is centred on
@@ -167,3 +148,35 @@ internal class CentralMap {
 
 /** How long the map takes to glide to a car chosen on it. */
 private const val GlideMs = 420
+
+/**
+ * The pan that centres the map on [to] when it is anchored on [from], at zoom [zoom]. The map glides this far, rather than jumping.
+ */
+internal fun panBetween(from: GeoLocation, to: GeoLocation, zoom: Int): Pair<Float, Float> {
+    val tx = (-(MapTiles.tileX(to.longitude, zoom) - MapTiles.tileX(from.longitude, zoom)) * MapTiles.TILE_PX).toFloat()
+    val ty = (-(MapTiles.tileY(to.latitude, zoom) - MapTiles.tileY(from.latitude, zoom)) * MapTiles.TILE_PX).toFloat()
+    return tx to ty
+}
+
+/**
+ * Eases the map's pan to a point over [GlideMs]. A plain animator on the main thread: a coroutine on Dispatchers.Main has no frame clock,
+ * and crashed the app on the first tap.
+ */
+internal class MapGlide(private val state: CarMapState) {
+    private var animator: android.animation.ValueAnimator? = null
+
+    fun glideTo(tx: Float, ty: Float) {
+        animator?.cancel()
+        val sx = state.panX
+        val sy = state.panY
+        animator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = GlideMs.toLong()
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { a ->
+                val t = a.animatedValue as Float
+                state.panTo(sx + (tx - sx) * t, sy + (ty - sy) * t)
+            }
+            start()
+        }
+    }
+}
