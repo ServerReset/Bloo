@@ -15,17 +15,31 @@ const val DEPARTURE_CHECK_MIN = 15
  */
 const val DEPARTURE_WINDOW_MIN = 60
 
-/** A departure: a time the car should be ready, every day, switched on or off. Smart climate sets what it should be. */
-data class DepartureSlot(val enabled: Boolean = false, val minuteOfDay: Int = 8 * 60) {
-    fun encode(): String = "${if (enabled) 1 else 0},$minuteOfDay"
+/** The longest name a pre-run can be given. */
+const val PRE_RUN_NAME_MAX = 24
+
+/**
+ * A pre-run: a time the car should be ready, every day, switched on or off, and what it is called. Smart climate sets what it should be.
+ * A blank [name] shows as "Pre-run N" for its place in the schedule.
+ */
+data class DepartureSlot(val enabled: Boolean = false, val minuteOfDay: Int = 8 * 60, val name: String = "") {
+    /** What this pre-run is called: its own name, or "Pre-run N" for its place ([index] from 0). */
+    fun label(index: Int): String = name.ifBlank { "Pre-run ${index + 1}" }
+
+    /** The name with the separators the stored text uses removed, cut to [PRE_RUN_NAME_MAX]. */
+    fun encode(): String = "${if (enabled) 1 else 0},$minuteOfDay,${cleanName(name)}"
 
     companion object {
+        /** A name as it is stored: no commas or semicolons (they separate the stored text), at most [PRE_RUN_NAME_MAX] characters. */
+        fun cleanName(text: String): String = text.filter { it != ',' && it != ';' }.trim().take(PRE_RUN_NAME_MAX)
+
         fun decode(text: String): DepartureSlot? {
-            val p = text.split(",")
-            if (p.size != 2) return null
+            // Older saves have no name; the third part, when there is one, is the name, and may itself be empty.
+            val p = text.split(",", limit = 3)
+            if (p.size < 2) return null
             val on = p[0].toIntOrNull() ?: return null
             val minute = p[1].toIntOrNull() ?: return null
-            return DepartureSlot(enabled = on == 1, minuteOfDay = minute.coerceIn(0, 1439))
+            return DepartureSlot(enabled = on == 1, minuteOfDay = minute.coerceIn(0, 1439), name = p.getOrElse(2) { "" }.trim())
         }
     }
 }

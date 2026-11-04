@@ -69,7 +69,7 @@ internal fun WearClimatePebble(
         )
         // The next departure the phone has set for this car, so the watch says when the car will be ready.
         WearClimateChoices.departuresFor(v.vin).slots.withIndex().firstOrNull { it.value.enabled }?.let { (i, slot) ->
-            WearCaption("Departure ${i + 1} · ready ${formatMinuteOfDay(slot.minuteOfDay)}", small = true)
+            WearCaption("${slot.label(i)} · ready ${formatMinuteOfDay(slot.minuteOfDay)}", small = true)
         }
         // Colder, normal or hotter than the smart plan on the standard slider; it opens on normal. Set starts the car there and tells
         // smart climate how it felt.
