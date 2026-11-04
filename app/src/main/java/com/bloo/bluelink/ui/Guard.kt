@@ -85,18 +85,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
     val lockBg = MaterialTheme.colorScheme.background
     val haptics = LocalHaptics.current
 
-    fun authenticateDevice() {
-        context.findFragmentActivity()?.let { activity ->
-            showBiometricPrompt(
-                activity = activity,
-                title = "Unlock Bloo",
-                subtitle = "Confirm it's you to access your cars",
-                onSuccess = { vm.unlocked() },
-                onError = { },
-            )
-        }
-    }
-    LaunchedEffect(Unit) { authenticateDevice() }
+    LaunchedEffect(Unit) { vm.promptBiometricUnlock(context) }
 
     // The backdrop animates between fully opaque (the first frames of a cold start, before the
     // content underneath has settled -- see LockBlurLayer's own note) and the 45% scrim.
@@ -129,7 +118,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             LoginHero()
             val unlockSource = remember { MutableInteractionSource() }
             MorphButton(
-                onClick = { authenticateDevice() },
+                onClick = { vm.promptBiometricUnlock(context) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = ControlHeight),
                 interactionSource = unlockSource,
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -140,5 +129,18 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
                 MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
             }
         }
+    }
+}
+
+/** Asks for the device's own unlock (fingerprint, face, PIN), and unlocks Bloo when it is given. Does nothing without an activity to show it in. */
+internal fun AppViewModel.promptBiometricUnlock(context: android.content.Context) {
+    context.findFragmentActivity()?.let { activity ->
+        showBiometricPrompt(
+            activity = activity,
+            title = "Unlock Bloo",
+            subtitle = "Confirm it's you to access your cars",
+            onSuccess = { unlocked() },
+            onError = { },
+        )
     }
 }

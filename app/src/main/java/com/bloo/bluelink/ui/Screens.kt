@@ -331,17 +331,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                         onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
                         updateChecking = loginUpdateChecking,
                         updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
-                        onFingerprint = if (vm.canUseBiometrics()) ({
-                            loginContext.findFragmentActivity()?.let { activity ->
-                                showBiometricPrompt(
-                                    activity = activity,
-                                    title = "Unlock Bloo",
-                                    subtitle = "Confirm it's you to access your cars",
-                                    onSuccess = { vm.unlocked() },
-                                    onError = { },
-                                )
-                            }
-                        }) else null,
+                        onFingerprint = if (vm.canUseBiometrics()) ({ vm.promptBiometricUnlock(loginContext) }) else null,
                     )
                     kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
                     canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
