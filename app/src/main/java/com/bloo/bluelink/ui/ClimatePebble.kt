@@ -328,14 +328,6 @@ internal fun ClimatePebble(
                 plan = smartPlan,
                 fahrenheit = fahrenheit,
                 enabled = !pending && !climateOn,
-                onStartAtTarget = { target ->
-                    // Starting on the plan as it stands counts as the plan being right.
-                    weather?.let {
-                        ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), 0)
-                        vm.learnClimate(v, ambientFahrenheit(it.tempC), 0)
-                    }
-                    startAtTarget(target, currentReq)
-                },
                 onSubmitFeel = { delta ->
                     // The feel slider: what they wanted, against the plan, is kept, and the car starts at that setting.
                     weather?.let {
@@ -387,9 +379,9 @@ internal fun ClimatePebble(
 }
 
 /**
- * Smart climate: the weather where the car is (falling back to home) picks a target, by [smartClimateTargetF], the same rule the
- * tile command runner uses: about 10°F off ambient, or the car's most aggressive setting on a genuinely extreme day, always within
- * what the car's climate range accepts. With no reading yet ([ambientF] null) the button finds the weather itself when pressed.
+ * Smart climate, as one card: the target the car will take and the outside temperature it answers, an influence slider that leans the
+ * target toward hot or cold, one button that starts the car there, and the factors that moved the target. With no weather reading yet
+ * the button finds the weather itself when pressed.
  */
 @Composable
 private fun SmartClimateSection(
@@ -397,59 +389,54 @@ private fun SmartClimateSection(
     plan: SmartClimatePlan?,
     fahrenheit: Boolean,
     enabled: Boolean,
-    onStartAtTarget: (Int) -> Unit,
-    /** The feel slider's answer, in degrees from the plan (negative cooler, positive warmer), submitted with the start. */
+    /** The influence slider's answer, in degrees from the plan (negative colder, positive hotter), submitted with the start. */
     onSubmitFeel: (Int) -> Unit,
     onStartUnread: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         SectionLabel(CarLabels.SMART_CLIMATE)
-        MorphActionButton(
-            label = if (ambientF != null && plan != null) smartLabel(plan, ambientF, fahrenheit) else CarLabels.SMART_CLIMATE,
-            icon = Icons.Filled.AcUnit,
-            onClick = { if (plan != null) onStartAtTarget(plan.targetF) else onStartUnread() },
+        if (plan == null || ambientF == null) {
+            MorphActionButton(label = CarLabels.SMART_CLIMATE, icon = Icons.Filled.AcUnit, onClick = onStartUnread, enabled = enabled)
+            return@Column
+        }
+        RevealText(degLabel(plan.targetF.toString(), fahrenheit), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
+        RevealMutedText("${degLabel(ambientF.toString(), fahrenheit)} outside")
+
+        // Influence: lean the target colder or hotter than the plan. It opens in the middle, on the plan as it stands.
+        var influence by remember(plan.targetF) { mutableFloatStateOf(0f) }
+        val step = influence.roundToInt().coerceIn(-1, 1)
+        val target = plan.targetF + step * FEEL_STEP_F
+        val scheme = MaterialTheme.colorScheme
+        val haptics = com.bloo.uicommon.LocalHaptics.current
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            RevealMutedText("Colder")
+            RevealMutedText("Hotter")
+        }
+        AnimatedSlider(
+            value = influence,
+            onValueChange = { influence = it },
+            valueRange = -1f..1f,
+            steps = 1,
+            accent = scheme.primary,
+            inactiveColor = scheme.surfaceContainerHighest,
+            dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
+            dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
+            reduceMotion = com.bloo.uicommon.LocalReduceMotion.current,
+            onStepTick = { haptics?.tick() },
+            onSettle = { haptics?.click() },
             enabled = enabled,
         )
-        if (plan != null && ambientF != null) {
-            // How hot or cold they want it, against the plan. Submitting starts the car there and tells smart climate how it felt.
-            // Colder, normal or hotter than the plan: three stops on the standard slider. It always opens on normal.
-            var feel by remember(plan.targetF) { mutableFloatStateOf(0f) }
-            val step = feel.roundToInt().coerceIn(-1, 1)
-            val feelTarget = plan.targetF + step * FEEL_STEP_F
-            val scheme = MaterialTheme.colorScheme
-            val haptics = com.bloo.uicommon.LocalHaptics.current
-            AnimatedSlider(
-                value = feel,
-                onValueChange = { feel = it },
-                valueRange = -1f..1f,
-                steps = 1,
-                accent = scheme.primary,
-                inactiveColor = scheme.surfaceContainerHighest,
-                dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
-                dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
-                reduceMotion = com.bloo.uicommon.LocalReduceMotion.current,
-                onStepTick = { haptics?.tick() },
-                onSettle = { haptics?.click() },
-                enabled = enabled,
-            )
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                RevealMutedText("${feelLabel(step)} · ${degLabel(feelTarget.toString(), fahrenheit)}", modifier = Modifier.weight(1f))
-                MorphActionButton(
-                    label = "Set",
-                    icon = Icons.Filled.AcUnit,
-                    onClick = { onSubmitFeel(step * FEEL_STEP_F) },
-                    enabled = enabled,
-                )
-            }
-        }
+        RevealMutedText("${feelLabel(step)} · ${degLabel(target.toString(), fahrenheit)}")
+        MorphActionButton(
+            label = "Start at ${degLabel(target.toString(), fahrenheit)}",
+            icon = Icons.Filled.AcUnit,
+            onClick = { onSubmitFeel(step * FEEL_STEP_F) },
+            enabled = enabled,
+        )
         // Every factor that moved the target, one per line, so the number is never a mystery.
-        plan?.reasons?.joinToString("\n")?.let { RevealMutedText(it) }
+        plan.reasons.joinToString("\n").takeIf { it.isNotBlank() }?.let { RevealMutedText(it) }
     }
 }
-
-/** "Cool to 72°" or "Heat to 78°": which way the plan goes, from the outside temperature it answers. */
-private fun smartLabel(plan: SmartClimatePlan, ambientF: Int, fahrenheit: Boolean): String =
-    (if (plan.targetF < ambientF) "Cool to " else "Heat to ") + degLabel(plan.targetF.toString(), fahrenheit)
 
 /** Names the climate settings on screen as a new preset, in place under the controls: no pop-up. */
 @Composable

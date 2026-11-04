@@ -119,7 +119,7 @@ internal fun DebugCardContent(
                 )
             }
             SettingsGroup("Performance") {
-                BodySmallText("Needs Advanced logging on. The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions, garbage collection, CPU and memory, filed under what you were doing. Reset, use the app for a minute, then save the file and upload it. The whole timeline is in the file, not only the summary.")
+                BodySmallText("Needs Advanced logging on. The cost of every frame (composition, layout, draw, GPU), main-thread stalls with the code that was running, recompositions, garbage collection, CPU and memory, filed under what you were doing. Reset, use the app for a minute, then save the file and upload it. A trace records every method on every thread for ten seconds, for a profiler to open. The whole timeline is in the file, not only the summary.")
                 ActionRow {
                     MorphTextButton(
                         "Save file",
@@ -127,6 +127,7 @@ internal fun DebugCardContent(
                         emphasis = ButtonEmphasis.Confirm,
                     )
                     MorphTextButton("Copy report", onClick = { copy("bloo performance", com.bloo.bluelink.perf.PerfMonitor.report()) })
+                    MorphTextButton("Record 10 s trace", onClick = { com.bloo.bluelink.perf.PerfMonitor.recordTrace(context) })
                     MorphTextButton("Share log file", onClick = {
                         com.bloo.bluelink.perf.PerfFile.shareIntent(context)?.let { context.startActivity(android.content.Intent.createChooser(it, "Send the performance log")) }
                     })

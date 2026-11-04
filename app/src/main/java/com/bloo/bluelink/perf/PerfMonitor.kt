@@ -519,6 +519,21 @@ object PerfMonitor {
         if (counters.isEmpty()) appendLine("none") else counters.entries.sortedByDescending { it.value.get() }.forEach { appendLine("${it.key}: ${it.value.get()}") }
     }
 
+    /**
+     * Records a method trace of the app for [seconds], then saves it to the app's files, where the Performance card can share it. The
+     * trace shows every method's time on every thread, for a profiler to open. Its path is logged.
+     */
+    fun recordTrace(context: android.content.Context, seconds: Int = 10) {
+        val dir = context.getExternalFilesDir(null) ?: context.filesDir
+        val base = java.io.File(dir, "bloo-trace-${System.currentTimeMillis()}").path
+        android.os.Debug.startMethodTracing(base, 64 * 1024 * 1024)
+        com.bloo.bluelink.data.AppLog.log("Trace: recording $seconds s to $base.trace")
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            android.os.Debug.stopMethodTracing()
+            com.bloo.bluelink.data.AppLog.log("Trace: saved $base.trace")
+        }, seconds * 1000L)
+    }
+
     /** Forgets everything seen so far, so the next report covers only what happens from now. */
     fun reset() {
         stats.clear(); spans.clear(); recompositions.clear(); counters.clear(); lastRecomp.clear(); lastCount.clear()
