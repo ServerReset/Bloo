@@ -61,6 +61,8 @@ import com.bloo.bluelink.data.smartClimateTargetF
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.container
@@ -101,6 +103,8 @@ internal fun ClimatePebble(
     val currentReq = form.toRequest()
 
     val presets = state.climatePresets[v.vin].orEmpty()
+    // Which sub-menu is open under the smart card: one at a time, so the tile stays short.
+    var openSub by remember(v.vin) { mutableStateOf<String?>(null) }
     var showAddPreset by remember { mutableStateOf(false) }
 
     // Warn if the engine is on before changing climate settings.
@@ -305,24 +309,6 @@ internal fun ClimatePebble(
 
         // While climate runs, its presets, smart climate and controls go away, and what is running reads back in their place.
         ExpandVisibility(!climateOn) {
-            ClimatePresetSection(
-                presets = presets,
-                activeId = activePresetId,
-                fahrenheit = fahrenheit,
-                onStart = startPreset,
-                onDelete = { id ->
-                    if (activePresetId == id) activePresetId = null
-                    vm.deleteClimatePreset(v, id)
-                },
-                onReorder = { vm.reorderClimatePresets(v, it) },
-                onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
-                steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
-                seats = seats,
-                showSeats = showSeatControls,
-            )
-        }
-
-        ExpandVisibility(!climateOn) {
             SmartClimateSection(
                 ambientF = weather?.let { ambientFahrenheit(it.tempC) },
                 plan = smartPlan,
@@ -345,10 +331,38 @@ internal fun ClimatePebble(
         }
 
         ExpandVisibility(!climateOn) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+                listOf("presets" to "Presets", "departures" to "Departures", "controls" to "Seats & wheel").forEach { (key, label) ->
+                    MorphTextButton(
+                        label,
+                        onClick = { openSub = if (openSub == key) null else key },
+                        modifier = Modifier.weight(1f),
+                        emphasis = if (openSub == key) ButtonEmphasis.Confirm else ButtonEmphasis.Tonal,
+                    )
+                }
+            }
+        }
+        ExpandVisibility(!climateOn && openSub == "presets") {
+            ClimatePresetSection(
+                presets = presets,
+                activeId = activePresetId,
+                fahrenheit = fahrenheit,
+                onStart = startPreset,
+                onDelete = { id ->
+                    if (activePresetId == id) activePresetId = null
+                    vm.deleteClimatePreset(v, id)
+                },
+                onReorder = { vm.reorderClimatePresets(v, it) },
+                onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
+                steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
+                seats = seats,
+                showSeats = showSeatControls,
+            )
+        }
+        ExpandVisibility(!climateOn && openSub == "departures") {
             DepartureSection(v, state, vm)
         }
-
-        ExpandVisibility(!climateOn) {
+        ExpandVisibility(!climateOn && openSub == "controls") {
             ClimateControlsSection(
                 form = form,
                 fahrenheit = fahrenheit,
