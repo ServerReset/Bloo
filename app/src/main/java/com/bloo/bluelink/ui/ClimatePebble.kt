@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,6 @@ import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.bluelink.data.FEEL_STEP_F
 import com.bloo.bluelink.data.smartClimateMode
-import com.bloo.bluelink.data.ComfortCaps
 import com.bloo.bluelink.data.smartComfort
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.feelLabel
@@ -101,6 +101,7 @@ internal fun ClimatePebble(
     val currentReq = form.toRequest()
 
     val presets = state.climatePresets[v.vin].orEmpty()
+    val steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries
     var showAddPreset by remember { mutableStateOf(false) }
 
     // Warn if the engine is on before changing climate settings.
@@ -330,7 +331,7 @@ internal fun ClimatePebble(
         // in reach without opening anything first. They give way to the running summary while climate is on.
         ExpandVisibility(!climateOn) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                Column(Modifier.fillMaxWidth().innerGlassPanel(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                ClimateSubPanel {
                     ClimatePresetSection(
                         presets = presets,
                         activeId = activePresetId,
@@ -342,15 +343,13 @@ internal fun ClimatePebble(
                         },
                         onReorder = { vm.reorderClimatePresets(v, it) },
                         onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
-                        steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
+                        steeringLevels = steeringLevels,
                         seats = seats,
                         showSeats = showSeatControls,
                     )
                 }
-                Column(Modifier.fillMaxWidth().innerGlassPanel()) {
-                    DepartureSection(v, state, vm)
-                }
-                Column(Modifier.fillMaxWidth().innerGlassPanel(), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                ClimateSubPanel { DepartureSection(v, state, vm) }
+                ClimateSubPanel {
                     SectionLabel("Seats & wheel")
                     ClimateControlsSection(
                         form = form,
@@ -360,7 +359,7 @@ internal fun ClimatePebble(
                         // too.
                         showSeats = showSeatControls,
                         onSaveAsPreset = { showAddPreset = true },
-                        steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries,
+                        steeringLevels = steeringLevels,
                     )
                 }
             }
@@ -529,3 +528,9 @@ private fun TempValue.asFahrenheit(): Int? {
 
 /** How long after a start the car's old reading of its settings is distrusted (see `lastSent`). */
 private const val CarCatchUpMs = 90_000L
+
+/** One of the climate pebble's inline sub-areas (presets, departures, seats & wheel): the app's inner glass panel, full width. */
+@Composable
+private fun ClimateSubPanel(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().innerGlassPanel(), verticalArrangement = Arrangement.spacedBy(GapRow), content = content)
+}
