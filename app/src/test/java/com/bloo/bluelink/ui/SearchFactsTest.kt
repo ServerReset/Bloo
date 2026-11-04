@@ -35,7 +35,8 @@ class SearchFactsTest {
     private fun hits(query: String) = rankFacts(searchTokens(query), carFacts(state(), appearance))
 
     @Test fun batteryShowsTheBatteryOfEveryCarAndTheTwelveVoltOneToo() {
-        val h = hits("battery")
+        // "battery" also matches a car's Charge pebble (battery means charge), which is a pebble result, not a battery fact.
+        val h = hits("battery").filter { it.topic != FactTopic.PEBBLE }
         assertEquals(listOf("Battery", "Battery", "12V battery"), h.map { it.label }.sortedBy { if (it == "Battery") 0 else 1 })
         assertEquals(setOf("Daisy", "Lana"), h.filter { it.label == "Battery" }.map { it.car }.toSet())
     }
@@ -65,7 +66,7 @@ class SearchFactsTest {
     @Test fun aCarWithNoReadingYetAnswersOnlyItsSavedClimate() {
         // Live readings need the car to have reported; its saved presets and pre-runs do not, so only those answer.
         val none = UiState(vehicles = listOf(daisy))
-        assertTrue(carFacts(none, appearance).all { it.topic == FactTopic.CLIMATE })
+        assertTrue(carFacts(none, appearance).all { it.topic == FactTopic.CLIMATE || it.topic == FactTopic.PEBBLE })
     }
 
     @Test fun aPebbleIsFoundByItsNameAsItsOwnPiece() {
@@ -82,7 +83,7 @@ class SearchFactsTest {
     private fun pieces(query: String) = rankPieces(searchTokens(query), carFacts(state(), appearance))
 
     @Test fun batteryLiftsTheChargePieceOfEveryCarAndTheTwelveVoltOne() {
-        val p = pieces("battery")
+        val p = pieces("battery").filter { it.topic != FactTopic.PEBBLE }
         assertEquals(setOf("V1" to FactTopic.CHARGE, "V2" to FactTopic.CHARGE, "V1" to FactTopic.TWELVE_VOLT), p.map { it.vin to it.topic }.toSet())
         assertEquals(p.size, p.map { it.vin to it.topic }.toSet().size, "each piece appears once")
         assertEquals(FactTopic.CHARGE, p.first().topic)
