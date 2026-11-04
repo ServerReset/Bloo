@@ -5,7 +5,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.bloo.bluelink.data.DepartureSchedule
 import com.bloo.bluelink.data.SettingsStore
+import com.bloo.bluelink.data.formatMinuteOfDay
 import com.bloo.bluelink.data.coordString
 import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.displayChargeLimit
@@ -48,6 +50,16 @@ internal class CarFact(
 
 /** Every fact the loaded cars can answer, from the status the garage already holds. Cars with no reading yet answer nothing. */
 internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): List<CarFact> = buildList {
+    // What the person SAVED for each car needs no live reading, so it is found even before the car has reported: its climate presets
+    // (by name, with the temperature each sets) and its two pre-runs (by name, with the time each is ready).
+    state.vehicles.forEach { v ->
+        state.climatePresets[v.vin].orEmpty().forEach { p ->
+            add(CarFact(v.vin, FactTopic.CLIMATE, v.name, p.name, "Climate preset", degLabel(p.request.tempF.toString(), fahrenheit = appearance.useFahrenheit), AppIcons.Thermostat, "preset saved climate start"))
+        }
+        (state.departures[v.vin] ?: DepartureSchedule()).slots.forEachIndexed { i, slot ->
+            add(CarFact(v.vin, FactTopic.CLIMATE, v.name, slot.label(i), if (slot.enabled) "Ready ${formatMinuteOfDay(slot.minuteOfDay)}" else "Off", null, AppIcons.SmartClimate, "pre-run prerun departure depart ready warm schedule"))
+        }
+    }
     state.vehicles.forEach { v ->
         val st = state.statusFor(v) ?: return@forEach
         val name = v.name

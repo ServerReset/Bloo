@@ -150,68 +150,6 @@ internal val RxHeatCoolVerb = Regex("\\b(heat|cool|warm)\\b")
 
 internal val RxSearchTokens = Regex("[^a-z0-9%]+")
 
-/**
- * Enhances command parsing with Gemini Nano when available and the regex parse found nothing; falls
- * back gracefully if it is unavailable or fails.
- */
-internal suspend fun enhanceCommandWithAi(
-    query: String,
-    initialCommand: ParsedVehicleCommand?,
-    ai: com.bloo.bluelink.data.Ai,
-): ParsedVehicleCommand? {
-    // Keep a confident regex match.
-    if (initialCommand != null) return initialCommand
-
-    // Only try AI when the regex patterns didn't match.
-    if (query.isBlank()) return null
-
-    return try {
-        // Ask the model to identify the command intent.
-        val availableCommands = listOf(
-            "lock - lock the car doors",
-            "unlock - unlock the car doors",
-            "charge_on - start charging the battery",
-            "charge_off - stop charging the battery",
-            "climate_on - start the climate control/AC",
-            "climate_off - stop the climate control/AC",
-            "lights - flash the lights",
-            "horn - sound the horn",
-        )
-        val commandsList = availableCommands.joinToString(", ")
-
-        val prompt = """User query: "$query"
-
-Available vehicle commands: $commandsList
-
-What is the user most likely trying to do? Answer with ONLY the command name (e.g., "lock", "unlock", "charge_on") or "none" if no clear command."""
-
-        // Padded to meet the model's minimum character requirement.
-        val paddedPrompt = if (prompt.length < 400) {
-            prompt + "\n\n" + prompt.repeat((400 / prompt.length) + 1)
-        } else {
-            prompt
-        }
-
-        val result = ai.summarize(paddedPrompt).trim().lowercase()
-
-        // Map the AI's answer to a command.
-        return when {
-            result.contains("lock") && !result.contains("unlock") -> ParsedVehicleCommand("lock", label = "Locking")
-            result.contains("unlock") -> ParsedVehicleCommand("unlock", label = "Unlocking")
-            result.contains("charge_on") || (result.contains("charge") && !result.contains("off")) -> ParsedVehicleCommand("charge_on", label = "Starting charge for")
-            result.contains("charge_off") || (result.contains("charge") && result.contains("off")) -> ParsedVehicleCommand("charge_off", label = "Stopping charge for")
-            result.contains("climate_on") || (result.contains("climate") && !result.contains("off")) -> ParsedVehicleCommand("climate_on", "default", "Starting climate for")
-            result.contains("climate_off") -> ParsedVehicleCommand("climate_off", label = "Stopping climate for")
-            result.contains("light") -> ParsedVehicleCommand("lights", label = "Flashing lights on")
-            result.contains("horn") -> ParsedVehicleCommand("horn", label = "Sounding horn on")
-            else -> null
-        }
-    } catch (e: Exception) {
-        rethrowIfCancellation(e)
-        // Fall back to the original parse result.
-        null
-    }
-}
 
 /**
  * Which car a recognised command's text refers to: the one whose name whole-word matches the query,

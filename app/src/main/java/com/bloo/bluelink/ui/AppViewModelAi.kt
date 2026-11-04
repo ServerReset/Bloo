@@ -3,7 +3,10 @@ package com.bloo.bluelink.ui
 import com.bloo.bluelink.data.CarCommandIds
 import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.NaturalIntent
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.parseClockMinute
+import java.time.LocalDateTime
 import com.bloo.bluelink.data.aiAutoSummarize
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiAutoSummarize
@@ -151,41 +154,58 @@ fun AppViewModel.askAi(query: String) {
     }
 }
 
-/** Enhance command parsing using Gemini Nano for ambiguous queries. */
+/**
+ * Reads a free-form request into an intent with Gemini Nano (ML Kit Prompt API), or null when the model is not ready on this phone or
+ * the request is unclear. The model only classifies; what runs is decided by the app.
+ */
+private suspend fun AppViewModel.readIntent(query: String): NaturalIntent? {
+    if (!_state.value.aiActive || query.isBlank()) return null
+    val now = LocalDateTime.now().let { String.format(java.util.Locale.US, "%02d:%02d", it.hour, it.minute) }
+    return runCatching { intents.intentFor(query, now, _state.value.vehicles.map { it.name }) }
+        .onFailure { AppLog.log("⚠ AI intent: ${it.message}") }
+        .getOrNull()
+}
+
+/** The command a free-form request asks for, with its clock time when it names one ("climate off at 9 pm"). Null when there is none. */
 internal suspend fun AppViewModel.enhanceCommandParsing(
     query: String,
     initialCommand: ParsedVehicleCommand?,
-): ParsedVehicleCommand? =
-    enhanceCommandWithAi(query, initialCommand, ai)
+): ParsedVehicleCommand? {
+    if (initialCommand != null) return initialCommand
+    return readIntent(query)?.toParsedCommand()
+}
+
+/** The app's own command for an intent, with its time when the request named one. Null for an intent the app has no command for. */
+internal fun NaturalIntent.toParsedCommand(): ParsedVehicleCommand? {
+    val at = time?.let { parseClockMinute(it) }
+    return when (intent) {
+        "climate_on" -> ParsedVehicleCommand(CarCommandIds.CLIMATE_ON, label = "Starting climate for", atMinute = at)
+        "climate_off" -> ParsedVehicleCommand(CarCommandIds.CLIMATE_OFF, label = "Stopping climate for", atMinute = at)
+        "lock" -> ParsedVehicleCommand(CarCommandIds.LOCK, label = "Locking", atMinute = at)
+        "unlock" -> ParsedVehicleCommand(CarCommandIds.UNLOCK, label = "Unlocking", atMinute = at)
+        "departure" -> at?.let { ParsedVehicleCommand("departure", label = "Pre-run for", atMinute = it) }
+        else -> null
+    }
+}
 
 /**
- * Maps a free-form command to a structured one the app can run, or null if it cannot be mapped
- * safely. A hallucination can only produce null, never reach the vehicle.
+ * Maps a free-form command to an action the app can run, and the VIN of its car, or null. A request that names a time is left to the
+ * scheduling path, so this never runs it at once by mistake. Only an action in [AI_COMMANDS] and a listed car survive.
  */
 suspend fun AppViewModel.aiResolveCommand(query: String): Pair<String, String>? {
-    if (!_state.value.aiActive || query.isBlank()) return null
     val cars = _state.value.vehicles
     if (cars.isEmpty()) return null
-    val names = cars.joinToString(", ") { it.name }
-    val prompt = buildString {
-        append("Map the request to one car action. Reply with ONE line, no explanation.\n")
-        append("Format: ACTION|CAR\n")
-        append("ACTION must be exactly one of: ")
-        append(AI_COMMANDS.joinToString(", "))
-        append(", none\n")
-        append("CAR must be exactly one of: ").append(names).append("\n")
-        append("Use none if the request is not one of those actions.\n")
-        append("Request: ").append(query)
+    val intent = readIntent(query) ?: return null
+    if (intent.time != null) return null
+    val action = when (intent.intent) {
+        "climate_on" -> CarCommandIds.CLIMATE_ON
+        "climate_off" -> CarCommandIds.CLIMATE_OFF
+        "lock" -> CarCommandIds.LOCK
+        "unlock" -> CarCommandIds.UNLOCK
+        else -> return null
     }
-    val raw = runCatching { ai.summarize(prompt) }
-        .onFailure { AppLog.log("⚠ AI command: ${it.message}") }
-        .getOrNull() ?: return null
-    // The model sometimes wraps the line in prose; take the first line containing the separator.
-    val line = raw.lineSequence().map { it.trim() }.firstOrNull { it.contains('|') } ?: return null
-    val action = line.substringBefore('|').trim().lowercase().removePrefix("action:").trim()
-    val carName = line.substringAfter('|').trim().removePrefix("car:").trim()
     if (action !in AI_COMMANDS) return null
-    val car = cars.firstOrNull { it.name.equals(carName, ignoreCase = true) }
+    val car = cars.firstOrNull { it.name.equals(intent.car, ignoreCase = true) }
         ?: cars.singleOrNull()
         ?: return null
     return action to car.vin

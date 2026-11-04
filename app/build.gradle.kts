@@ -343,6 +343,8 @@ dependencies {
     // On-device Gemini Nano (ML Kit GenAI) - optional AI summaries; gated at
     // runtime by feature availability so unsupported devices simply hide it.
     implementation("com.google.mlkit:genai-summarization:1.0.0-beta1")
+    // Gemini Nano free-form reading of a request (ML Kit Prompt API), for search and scheduling. Version from the ML Kit release notes; CI confirms it resolves.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta1")
 
     // Play-free watch install: the phone pairs with the watch's Wireless debugging and sideloads
     // the watch APK (see WatchAdbInstaller). Conscrypt supplies TLS 1.3 below Android 10.

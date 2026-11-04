@@ -98,6 +98,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val statusCache = StartupTrace.trace(StartupLabels.STATUS_CACHE_CONSTRUCTED) { StatusCache(app) }
 
     internal val ai = StartupTrace.trace(StartupLabels.AI_CONSTRUCTED) { com.bloo.bluelink.data.Ai(app) }
+    /** Gemini Nano (Prompt API) for reading a free-form request into an intent; created here so it lives as long as the app. */
+    internal val intents = com.bloo.bluelink.data.IntentModel()
 
     // One repository per signed-in brand (any mix of brands can be active).
     internal val repos = mutableMapOf<Brand, VehicleRepository>()
