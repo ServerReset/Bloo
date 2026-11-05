@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
     var note by remember(v.vin) { mutableStateOf<String?>(null) }
     var busy by remember(v.vin) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val repo = vm.repoFor(v)
 
     fun refresh() {
@@ -95,7 +97,13 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
                     list.forEach { c ->
                         val bitmap = remember(c.jpeg) { BitmapFactory.decodeByteArray(c.jpeg, 0, c.jpeg.size)?.asImageBitmap() }
                         Column(Modifier.fillMaxWidth()) {
-                            Text(c.utcTime ?: "Photos", style = MaterialTheme.typography.titleSmall)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(c.utcTime ?: "Photos", style = MaterialTheme.typography.titleSmall)
+                                OutlinedButton(onClick = {
+                                    val where = saveSurroundPhoto(context, surroundPhotoName(c.utcTime), c.jpeg)
+                                    note = if (where != null) "Saved to $where" else "Couldn't save that photo."
+                                }) { Text("Save") }
+                            }
                             bitmap?.let {
                                 Image(
                                     bitmap = it,
