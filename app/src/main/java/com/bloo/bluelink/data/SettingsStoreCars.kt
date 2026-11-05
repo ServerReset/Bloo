@@ -320,6 +320,14 @@ suspend fun SettingsStore.setSurroundView(vin: String, value: SurroundViewAccess
     editTracked { it[stringPreferencesKey("surround_$vin")] = value.name }
 }
 
+/** Whether Bluelink refused this car's surround-view request: the car's own answer that it does not take the photos. */
+fun SettingsStore.surroundRefused(vin: String, p: Preferences): Boolean =
+    p[booleanPreferencesKey("surround_refused_$vin")] ?: false
+
+suspend fun SettingsStore.setSurroundRefused(vin: String, refused: Boolean) {
+    editTracked { it[booleanPreferencesKey("surround_refused_$vin")] = refused }
+}
+
 // Remaining global appearance setters (theme/font/dynamic-color/palette):
 // each stores its enum's name() (or, for dynamicColor, a "true"/"false"
 // string) under its fixed SettingsStore.Keys.* entry; decoding happens once, centrally,

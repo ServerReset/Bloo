@@ -17,6 +17,7 @@ import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setSectionOrder
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
+import com.bloo.bluelink.data.setSurroundRefused
 import com.bloo.bluelink.data.setSurroundView
 import com.bloo.bluelink.data.SurroundViewAccess
 import com.bloo.bluelink.data.learnClimate
@@ -103,8 +104,18 @@ fun AppViewModel.setPlatform(v: Vehicle, value: VehiclePlatform) {
 }
 
 fun AppViewModel.setSurroundView(v: Vehicle, value: SurroundViewAccess) {
-    _state.update { it.copy(surroundViews = it.surroundViews.withCar(v.vin, value)) }
-    viewModelScope.launch { settingsStore.setSurroundView(v.vin, value) }
+    _state.update { it.copy(surroundViews = it.surroundViews.withCar(v.vin, value), surroundRefused = it.surroundRefused - v.vin) }
+    // Choosing again is a fresh try: the refusal from before no longer hides the feature.
+    viewModelScope.launch {
+        settingsStore.setSurroundView(v.vin, value)
+        settingsStore.setSurroundRefused(v.vin, false)
+    }
+}
+
+/** Records that Bluelink refused this car's surround-view request (or clears it), so the feature is hidden for that car. */
+fun AppViewModel.setSurroundRefused(v: Vehicle, refused: Boolean) {
+    _state.update { it.copy(surroundRefused = if (refused) it.surroundRefused + (v.vin to true) else it.surroundRefused - v.vin) }
+    viewModelScope.launch { settingsStore.setSurroundRefused(v.vin, refused) }
 }
 
 /** Pin or unpin a pebble in the dual-column hot spot. */

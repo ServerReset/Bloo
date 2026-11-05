@@ -18,6 +18,7 @@ import com.bloo.bluelink.data.licensePlate
 import com.bloo.bluelink.data.onboardingSeen
 import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.powertrain
+import com.bloo.bluelink.data.surroundRefused
 import com.bloo.bluelink.data.surroundView
 import com.bloo.bluelink.data.seatConfig
 import com.bloo.bluelink.data.sectionOrder
@@ -56,6 +57,8 @@ internal suspend fun AppViewModel.perCarConfig(
     val powertrains = vehicles.perCar { settingsStore.powertrain(it, prefs) }
     val platforms = vehicles.perCar { settingsStore.platform(it, prefs) }
     val surroundViews = vehicles.perCar { settingsStore.surroundView(it, prefs) }
+    // Only the cars Bluelink refused are in the map; the rest read as not refused.
+    val surroundRefused = vehicles.perCar { settingsStore.surroundRefused(it, prefs).takeIf { refused -> refused } }
     val sectionOrders = vehicles.perCarAll { settingsStore.sectionOrder(it, prefs) }
     val stored = vehicles.perCar { settingsStore.imageUrl(it, prefs) }
     // A car with no picture of its own gets the bundled one for its model and paint, once, when the account tells us both. It is
@@ -82,6 +85,7 @@ internal suspend fun AppViewModel.perCarConfig(
                 powertrains = powertrains,
                 platforms = platforms,
                 surroundViews = surroundViews,
+                surroundRefused = surroundRefused,
                 sectionOrders = sectionOrders,
                 imageUrls = images,
                 textClearPhotos = textClear,

@@ -72,6 +72,8 @@ data class UiState(
     val platforms: Map<String, VehiclePlatform> = emptyMap(),
     /** Per car: the surround-view choice. Absent means the default, [com.bloo.bluelink.data.SurroundViewAccess.AUTO]. */
     val surroundViews: Map<String, com.bloo.bluelink.data.SurroundViewAccess> = emptyMap(),
+    /** Per car: Bluelink refused a surround-view request, so the car does not take the photos. */
+    val surroundRefused: Map<String, Boolean> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
     val imageUrls: Map<String, String> = emptyMap(),
     /** Per car: whether its name and charge sit clear of its photo. Absent until the user chooses (see [textClearPhoto]). */
@@ -302,7 +304,9 @@ data class UiState(
 
     /** Whether a surround-view feature shows for [v], given whether its brand has it ([hasFeature]). The 3D surroundings share the choice. */
     fun surroundOn(v: Vehicle, hasFeature: Boolean): Boolean =
-        com.bloo.bluelink.data.surroundViewShown(hasFeature, platformOf(v), v.trim, surroundViews[v.vin])
+        com.bloo.bluelink.data.surroundViewShown(
+            hasFeature, platformOf(v), v.trim, surroundViews[v.vin], refused = surroundRefused[v.vin] == true,
+        )
 
     /** [com.bloo.bluelink.data.isGen5W] honouring the user override; all UI gates read this. */
     fun isGen5WEffective(v: Vehicle): Boolean = platformOf(v) == VehiclePlatform.GEN5W

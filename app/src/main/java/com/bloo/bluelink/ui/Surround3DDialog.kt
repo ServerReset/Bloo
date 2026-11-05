@@ -118,11 +118,7 @@ internal fun Surround3DDialog(v: Vehicle, onDismiss: () -> Unit) {
                 }
                 val current = scene
                 when {
-                    newest == null -> Text(
-                        "Ask the car for surround-view photos first, then come back here.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    )
+                    newest == null -> SurroundNote("Ask the car for surround-view photos first, then come back here.")
                     needsDownload -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "The 3D view needs three models, about ${ModelStore.TOTAL_BYTES / 1_000_000} MB, downloaded once from their " +
@@ -146,12 +142,14 @@ internal fun Surround3DDialog(v: Vehicle, onDismiss: () -> Unit) {
                             onHasPainted = { hasPainted = it },
                         )
                         if (hasPainted) {
-                            OutlinedButton(onClick = { painted = !painted }) { Text(if (painted) "Show the simple view" else "Show the painted view") }
+                            OutlinedButton(onClick = { painted = !painted }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (painted) "Show the simple view" else "Show the painted view")
+                            }
                         }
                     }
                     else -> Button(onClick = { start(downloadFirst = false) }) { Text("Build the 3D view") }
                 }
-                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
+                error?.let { SurroundNote(it, emphasised = true) }
             }
         }
     }

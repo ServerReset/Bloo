@@ -101,7 +101,13 @@ internal fun CarSettingsCard(
             // Surround view is a brand feature (see BrandCapabilities); the choice then decides per car, by trim.
             if (vm.brandOf(v).capabilities.surroundView) {
                 SecondaryText("Surround view")
-                BodySmallText("Limited trims: ccNC limited cars only. Always: every car that takes the photos. Off: hidden.")
+                BodySmallText("Limited trims: ccNC limited cars only. Always: every ccNC car that takes the photos. Off: hidden.")
+                if (state.isGen5WEffective(v)) {
+                    BodySmallText("Needs a ccNC head unit. Set Head unit above if this car has one.")
+                }
+                if (state.surroundRefused[v.vin] == true) {
+                    BodySmallText("Bluelink refused this car's photo request, so the feature is hidden. Choose a setting to try again.")
+                }
                 SurroundViewPicker(current = state.surroundAccessOf(v)) { a -> vm.setSurroundView(v, a) }
             }
         }
