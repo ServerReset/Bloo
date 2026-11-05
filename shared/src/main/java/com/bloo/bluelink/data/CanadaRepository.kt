@@ -96,6 +96,11 @@ class CanadaRepository(
         api.chargeOrders(s, summaryFor(s, v).id, profile, start, end)
     }
 
+    /** Public chargers within [radiusKm] of the car's position, nearest first. */
+    suspend fun chargingStations(v: Vehicle, lat: Double, lon: Double, radiusKm: Int): List<ChargingStation> = withSession { s ->
+        api.chargingStations(s, summaryFor(s, v).id, lat, lon, radiusKm)
+    }
+
     /** The Bluelink Store's token for this car. It needs only the session, not the car's PIN, so it does not go through [withCommandAuth]. */
     suspend fun storeAccess(v: Vehicle): StoreAccess = withSession { s -> api.storeAccess(s, summaryFor(s, v).id) }
 

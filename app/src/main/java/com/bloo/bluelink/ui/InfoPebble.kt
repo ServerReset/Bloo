@@ -175,6 +175,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
     val links = v.brand.links
     var showCarStore by remember { mutableStateOf(false) }
     var showChargeHistory by remember { mutableStateOf(false) }
+    var showChargers by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -224,6 +225,16 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showChargeHistory) ChargeHistoryDialog(vm, v) { showChargeHistory = false }
+            // Nearby chargers need the car's position; they are offered once the car has reported one.
+            val at = state.locations[v.vin]
+            if (usesInAppStore(vm.brandOf(v)) && at != null) {
+                MorphActionButton(
+                    label = "Chargers nearby",
+                    icon = AppIcons.Bolt,
+                    onClick = { showChargers = true },
+                )
+            }
+            if (showChargers && at != null) ChargersNearbyDialog(vm, v, at) { showChargers = false }
         }
         group("Service") {
             MorphActionButton(
