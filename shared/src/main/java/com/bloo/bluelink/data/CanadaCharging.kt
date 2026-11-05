@@ -357,3 +357,14 @@ suspend fun CanadaApi.tripPlan(
     }
     TripPlan(status = result.path("status").intLoose() ?: 0, routes = routes)
 }
+
+// --- Charge port and battery preconditioning (Canada). Reference: upstream's client (evc/chportopn, evc/chportcls, evc/prcndtngon,
+// evc/prcndtngoff). PIN-authorised like lock and unlock. Not verified against a live car.
+
+/** Opens or closes the charge port. */
+suspend fun CanadaApi.chargePort(s: CanadaSession, v: CanadaVehicleSummary, pAuth: String, open: Boolean) =
+    pinCommand(if (open) "evc/chportopn" else "evc/chportcls", s, v, pAuth)
+
+/** Turns battery preconditioning on or off: warms the battery before a DC fast charge. */
+suspend fun CanadaApi.batteryPreconditioning(s: CanadaSession, v: CanadaVehicleSummary, pAuth: String, on: Boolean) =
+    pinCommand(if (on) "evc/prcndtngon" else "evc/prcndtngoff", s, v, pAuth)

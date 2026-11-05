@@ -246,6 +246,13 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showTrip && at != null) TripPlannerDialog(vm, v, at) { showTrip = false }
+            // Charge port and preconditioning: Hyundai Canada electric cars only (the reference has no US endpoint for them).
+            if (vm.brandOf(v) == Brand.HYUNDAI_CA && v.isEv) {
+                MorphActionButton(label = "Open charge port", icon = AppIcons.Bolt, onClick = { vm.setChargePort(v, true) })
+                MorphActionButton(label = "Close charge port", icon = AppIcons.Bolt, onClick = { vm.setChargePort(v, false) })
+                MorphActionButton(label = "Precondition battery", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, true) })
+                MorphActionButton(label = "Stop preconditioning", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, false) })
+            }
             if (vm.brandOf(v) == Brand.HYUNDAI || vm.brandOf(v) == Brand.HYUNDAI_CA) {
                 MorphActionButton(
                     label = "Surround view",

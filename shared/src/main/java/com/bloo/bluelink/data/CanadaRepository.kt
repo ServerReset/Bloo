@@ -89,6 +89,13 @@ class CanadaRepository(
     override suspend fun mintControlToken(s: CanadaSession, summary: CanadaVehicleSummary, pin: String): String =
         api.pinAuth(s, summary.id, pin)
 
+    /** Opens or closes the charge port. Needs the PIN, as lock does. */
+    suspend fun chargePort(v: Vehicle, open: Boolean) = withCommandAuth(v) { s, summary, pAuth -> api.chargePort(s, summary, pAuth, open) }
+
+    /** Turns battery preconditioning on or off, to warm the battery before a DC fast charge. Needs the PIN. */
+    suspend fun batteryPreconditioning(v: Vehicle, on: Boolean) =
+        withCommandAuth(v) { s, summary, pAuth -> api.batteryPreconditioning(s, summary, pAuth, on) }
+
     /** The account's paid charging sessions for this car between [start] and [end] (yyyyMMdd), newest first. */
     suspend fun chargeOrders(v: Vehicle, start: String, end: String): List<ChargeOrder> = withSession { s ->
         val profile = credentialStore.load(brand)?.email

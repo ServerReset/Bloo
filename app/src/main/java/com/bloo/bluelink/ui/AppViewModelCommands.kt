@@ -434,3 +434,15 @@ private fun AppViewModel.confirmWithCar(vin: String, key: String, success: Strin
         }
     }
 }
+
+/** Opens or closes the car's charge port (Canada). Runs like the other commands: pending, then confirmed or reverted. */
+fun AppViewModel.setChargePort(v: Vehicle, open: Boolean) =
+    runCommand(v.vin, "chargePort", if (open) "Charge port opened" else "Charge port closed", null) {
+        canadaRepo(brandOf(v)).chargePort(electric(v, _state.value), open)
+    }
+
+/** Turns battery preconditioning on or off (Canada). */
+fun AppViewModel.setBatteryPreconditioning(v: Vehicle, on: Boolean) =
+    runCommand(v.vin, "preconditioning", if (on) "Battery preconditioning on" else "Battery preconditioning off", null) {
+        canadaRepo(brandOf(v)).batteryPreconditioning(electric(v, _state.value), on)
+    }
