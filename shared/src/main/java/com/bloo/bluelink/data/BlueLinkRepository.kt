@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import kotlinx.coroutines.delay
+
 /**
  * One signed-in brand's vehicle operations, however that brand's backend works underneath
  * (Hyundai/Genesis telematics, or Kia Connect via [KiaRepository]).
@@ -19,6 +21,12 @@ interface VehicleRepository {
     suspend fun setChargeTargets(v: Vehicle, acPercent: Int, dcPercent: Int)
     suspend fun startCharge(v: Vehicle)
     suspend fun stopCharge(v: Vehicle)
+
+    /** Asks the car for a set of surround-view photos, and returns once they are in. Brands without it say so. */
+    suspend fun requestSurroundView(v: Vehicle): Unit = throw BlueLinkException("Surround view isn't available for this car")
+
+    /** The car's most recent surround-view photos, newest first. Brands without it say so. */
+    suspend fun lastSurroundView(v: Vehicle): List<SurroundCapture> = throw BlueLinkException("Surround view isn't available for this car")
 
     /**
      * True where the backend actually supports [flashLights]/[hornAndLights] (Hyundai/Genesis US
@@ -197,6 +205,26 @@ class BlueLinkRepository(
         withSession { s -> api.setChargeTargets(s.accessToken, s.username, s.pin, v, acPercent, dcPercent) }
     }
 
+    override suspend fun lastSurroundView(v: Vehicle): List<SurroundCapture> = withSession { s ->
+        listOfNotNull(api.svmLatest(s.accessToken, s.username, s.pin, v))
+    }
+
+    override suspend fun requestSurroundView(v: Vehicle) {
+        withSession { s ->
+            val before = api.svmLatest(s.accessToken, s.username, s.pin, v)?.utcTime
+            api.svmRequest(s.accessToken, s.username, s.pin, v)
+            delay(SVM_FIRST_CHECK_MS)
+            var waited = SVM_FIRST_CHECK_MS
+            while (waited < SVM_TIMEOUT_MS) {
+                val now = api.svmLatest(s.accessToken, s.username, s.pin, v)?.utcTime
+                if (now != null && now != before) return@withSession Unit
+                delay(SVM_POLL_MS)
+                waited += SVM_POLL_MS
+            }
+            throw BlueLinkException("The car didn't send new photos within 2 minutes. Try Refresh later.")
+        }
+    }
+
     override suspend fun startCharge(v: Vehicle) {
         withSession { s -> api.startCharge(s.accessToken, s.username, s.pin, v) }
     }
@@ -261,3 +289,8 @@ internal class SummaryCache<S : AccountVehicle> {
             ?: refresh(fetch).firstOrNull { it.vin == vin }
             ?: throw BlueLinkException("Vehicle not found on this account")
 }
+
+/** How long the car takes to send a surround-view capture: the first look is after 15 s, then every 15 s, for up to 2 minutes. */
+private const val SVM_FIRST_CHECK_MS = 15_000L
+private const val SVM_POLL_MS = 15_000L
+private const val SVM_TIMEOUT_MS = 120_000L

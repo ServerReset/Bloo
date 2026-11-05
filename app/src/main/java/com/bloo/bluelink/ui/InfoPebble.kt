@@ -246,7 +246,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showTrip && at != null) TripPlannerDialog(vm, v, at) { showTrip = false }
-            if (usesInAppStore(vm.brandOf(v))) {
+            if (vm.brandOf(v) == Brand.HYUNDAI || vm.brandOf(v) == Brand.HYUNDAI_CA) {
                 MorphActionButton(
                     label = "Surround view",
                     icon = AppIcons.Bolt,

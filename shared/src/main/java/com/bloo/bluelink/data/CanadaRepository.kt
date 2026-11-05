@@ -131,13 +131,15 @@ class CanadaRepository(
         }
 
     /** Asks the car for a set of surround-view photos. Needs the PIN saved with the sign-in. */
-    suspend fun requestSurroundView(v: Vehicle): String? = withSession { s ->
-        val pin = s.pin ?: throw BlueLinkException("Save your Bluelink PIN to take surround-view photos")
-        api.requestSurroundView(s, summaryFor(s, v).id, pin)
+    override suspend fun requestSurroundView(v: Vehicle) {
+        withSession { s ->
+            val pin = s.pin ?: throw BlueLinkException("Save your Bluelink PIN to take surround-view photos")
+            api.requestSurroundView(s, summaryFor(s, v).id, pin)
+        }
     }
 
     /** The car's most recent surround-view photos, newest first. */
-    suspend fun lastSurroundView(v: Vehicle): List<SurroundCapture> = withSession { s ->
+    override suspend fun lastSurroundView(v: Vehicle): List<SurroundCapture> = withSession { s ->
         api.lastSurroundView(s, summaryFor(s, v).id)
     }
 

@@ -1,6 +1,10 @@
 package com.bloo.bluelink.data
 
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -106,4 +110,35 @@ suspend fun BlueLinkApi.setChargeTargets(
         .post(payload)
         .build()
     call(request)
+}
+
+// --- Surround view (US): the car's latest composite, and a request for a fresh capture. Reference client: svm/getSVMDetails and
+// svm/findMyCarSVM. The capture takes a while; BlueLinkRepository polls the latest composite until its time changes.
+
+/** The car's latest surround-view composite and when it was taken, or null when Bluelink has none. */
+suspend fun BlueLinkApi.svmLatest(token: String, username: String, pin: String, v: Vehicle): SurroundCapture? = execute {
+    val request = baseRequest("/ac/v2/svm/getSVMDetails", token, username, pin, v).get().build()
+    val root = BlooJson.parseToJsonElement(call(request)).jsonObject
+    val detail = root["svmDetails"]?.jsonArray?.firstOrNull()?.jsonObject?.get("svmDetail")?.jsonObject
+        ?: return@execute null
+    val image = detail["svmImage"]?.jsonPrimitive?.contentOrNull ?: return@execute null
+    val jpeg = runCatching { java.util.Base64.getMimeDecoder().decode(image) }.getOrNull() ?: return@execute null
+    SurroundCapture(
+        utcTime = detail["gpsDetail"]?.jsonObject?.get("time")?.jsonPrimitive?.contentOrNull,
+        jpeg = jpeg,
+        imageSize = emptyList(),
+    )
+}
+
+/** Asks the car for a fresh surround-view capture (svm/findMyCarSVM). Returns when Bluelink accepts the request. */
+suspend fun BlueLinkApi.svmRequest(token: String, username: String, pin: String, v: Vehicle): Unit = execute {
+    val body = buildJsonObject {
+        put("vin", JsonPrimitive(v.vin))
+        put("username", JsonPrimitive(username))
+        put("gen", JsonPrimitive(v.generation))
+        put("blueLinkServicePin", JsonPrimitive(pin))
+    }.toString().toRequestBody(jsonMedia)
+    val request = baseRequest("/ac/v2/svm/findMyCarSVM", token, username, pin, v).post(body).build()
+    call(request)
+    Unit
 }

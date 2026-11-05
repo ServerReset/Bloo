@@ -44,7 +44,7 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
     var note by remember(v.vin) { mutableStateOf<String?>(null) }
     var busy by remember(v.vin) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val repo = vm.canadaRepo(vm.brandOf(v))
+    val repo = vm.repoFor(v)
 
     fun refresh() {
         busy = true
