@@ -180,6 +180,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
     var showSurround by remember { mutableStateOf(false) }
     var show3D by remember { mutableStateOf(false) }
     var showLimits by remember { mutableStateOf(false) }
+    var show3DSurround by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -271,6 +272,11 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
             )
             if (show3D) Car3DDialog(v, state.statusFor(v)) { show3D = false }
             if (showLimits) ChargeLimitsCanadaDialog(vm, v) { showLimits = false }
+            // The 3D surroundings are built from the newest surround-view set, so they are offered where that set can be had.
+            if (vm.brandOf(v) == Brand.HYUNDAI || vm.brandOf(v) == Brand.HYUNDAI_CA) {
+                MorphActionButton(label = "3D surroundings", icon = AppIcons.DirectionsCar, onClick = { show3DSurround = true })
+            }
+            if (show3DSurround) Surround3DDialog(v) { show3DSurround = false }
         }
         group("Service") {
             MorphActionButton(
