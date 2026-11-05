@@ -130,6 +130,17 @@ class CanadaRepository(
             api.tripPlan(s, summary.id, summary.vin, fromLat, fromLon, toLat, toLon, chargerSoc, destinationSoc, vendor)
         }
 
+    /** Asks the car for a set of surround-view photos. Needs the PIN saved with the sign-in. */
+    suspend fun requestSurroundView(v: Vehicle): String? = withSession { s ->
+        val pin = s.pin ?: throw BlueLinkException("Save your Bluelink PIN to take surround-view photos")
+        api.requestSurroundView(s, summaryFor(s, v).id, pin)
+    }
+
+    /** The car's most recent surround-view photos, newest first. */
+    suspend fun lastSurroundView(v: Vehicle): List<SurroundCapture> = withSession { s ->
+        api.lastSurroundView(s, summaryFor(s, v).id)
+    }
+
     /** The Bluelink Store's token for this car. It needs only the session, not the car's PIN, so it does not go through [withCommandAuth]. */
     suspend fun storeAccess(v: Vehicle): StoreAccess = withSession { s -> api.storeAccess(s, summaryFor(s, v).id) }
 
