@@ -307,15 +307,8 @@ data class UiState(
     /** [com.bloo.bluelink.data.isGen5W] honouring the user override; all UI gates read this. */
     fun isGen5WEffective(v: Vehicle): Boolean = platformOf(v) == VehiclePlatform.GEN5W
 
-    /**
-     * [com.bloo.bluelink.data.supportsConnectedStore], honouring the same override
-     * [isGen5WEffective] does -- mirrors that property's own Kia-is-always-eligible special case.
-     */
     /** On-device AI is usable: the device has Gemini Nano AND the user has it switched on. */
     val aiActive: Boolean get() = aiSupported && aiEnabled
-
-    fun supportsConnectedStoreEffective(v: Vehicle): Boolean =
-        v.brand == com.bloo.bluelink.data.Brand.KIA || (v.platformOverridable && platformOf(v) == VehiclePlatform.CCNC)
 
     /**
      * Whether [section] has anything to show for [v]; the one predicate every section list filters

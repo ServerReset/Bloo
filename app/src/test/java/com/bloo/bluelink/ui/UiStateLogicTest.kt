@@ -142,32 +142,10 @@ class UiStateLogicTest {
     }
 
     @Test
-    fun platformOverrideFlipFlopsEveryNonKiaGateButNotKiaConnectedStore() {
-        // For a Kia, the override changes the GENERATION gate, while the
-        // connected-store special case (brand == KIA) keeps its answer true.
+    fun platformOverrideFlipsTheGenerationGateForKia() {
         val s = UiState(platforms = mapOf("V2" to VehiclePlatform.CCNC))
         assertEquals(VehiclePlatform.CCNC, s.platformOf(usKia))
         assertFalse(s.isGen5WEffective(usKia))
-        assertTrue(s.supportsConnectedStoreEffective(usKia))
-    }
-
-    @Test
-    fun connectedStore_kiaAlwaysEligible_othersNeedCcnc() {
-        // KIA US: the special case grants connected store regardless of gen.
-        assertTrue(UiState().supportsConnectedStoreEffective(usKia))
-        // Kia Canada is NOT Brand.KIA and not overridable -> no.
-        assertFalse(UiState().supportsConnectedStoreEffective(kiaCanada))
-        // A modern US Hyundai (gen >= 3) is ccNC -> store eligible.
-        assertTrue(UiState().supportsConnectedStoreEffective(usHyundai))
-        // An OLD US Hyundai (gen 2, genuine Gen5W) is NOT store-eligible.
-        assertFalse(UiState().supportsConnectedStoreEffective(oldHyundai))
-        // A Kia gen-1 gen override (GEN5W on Kia, which the picker can't even
-        // write -- platformOverridable is false for KIA) still special-cases
-        // true only because brand == KIA, and the test documents that.
-        assertTrue(
-            UiState(platforms = mapOf(usKiaGen3.vin to VehiclePlatform.GEN5W))
-                .supportsConnectedStoreEffective(usKiaGen3),
-        )
     }
 
     @Test

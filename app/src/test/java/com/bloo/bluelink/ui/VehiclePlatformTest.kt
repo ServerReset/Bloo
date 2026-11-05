@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
 
 /**
  * Pins the effective-value accessors the new per-car "head-unit generation"
- * override added to [UiState] -- [UiState.platformOf], [UiState.isGen5WEffective],
- * [UiState.supportsConnectedStoreEffective] -- against the exact contract their
+ * override added to [UiState] -- [UiState.platformOf], [UiState.isGen5WEffective] --
+ * against the exact contract their
  * own doc comments describe: user override wins when present, the API-derived
  * guess otherwise, and no effect at all for a vehicle where
  * [com.bloo.bluelink.data.platformOverridable] is false. Written the same way
@@ -55,25 +55,6 @@ class VehiclePlatformTest {
         assertTrue(UiState().isGen5WEffective(v))
         val corrected = UiState(platforms = mapOf(v.vin to VehiclePlatform.CCNC))
         assertFalse(corrected.isGen5WEffective(v))
-    }
-
-    @Test
-    fun supportsConnectedStoreEffective_kiaIsAlwaysEligibleRegardlessOfOverride() {
-        // Mirrors supportsConnectedStore's own "brand == KIA ||" special case --
-        // an override for a VIN that happens to collide (it can't, vins are
-        // unique, but the point is the KIA branch short-circuits first) must
-        // never be able to turn this off for a Kia.
-        assertTrue(UiState().supportsConnectedStoreEffective(kia))
-        val withStrayOverride = UiState(platforms = mapOf(kia.vin to VehiclePlatform.GEN5W))
-        assertTrue(withStrayOverride.supportsConnectedStoreEffective(kia))
-    }
-
-    @Test
-    fun supportsConnectedStoreEffective_hyundaiHonoursTheOverride() {
-        val v = hyundai("2") // API says Gen5W -- no store link by default
-        assertFalse(UiState().supportsConnectedStoreEffective(v))
-        val corrected = UiState(platforms = mapOf(v.vin to VehiclePlatform.CCNC))
-        assertTrue(corrected.supportsConnectedStoreEffective(v))
     }
 
     @Test

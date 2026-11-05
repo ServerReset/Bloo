@@ -209,18 +209,15 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 icon = Icons.Filled.Person,
                 onClick = { openUrl(context, links.ownersUrl) },
             )
-            // Features-on-Demand store (themes, lighting patterns…): ccNC-era head units only -
-            // older Gen5W cars have nothing to buy. Honours the user's own confirmed generation
-            // over the raw API guess.
+            // Features-on-Demand store (themes, lighting patterns…). Offered for every car, even one the official app doesn't
+            // list, as the README describes; the other brands open their site.
             val caps = vm.brandOf(v).capabilities
-            if (state.supportsConnectedStoreEffective(v)) {
-                MorphActionButton(
-                    label = "Car store",
-                    icon = Icons.Filled.Storefront,
-                    // Where the store can open in the app (with its token), it does; the other brands open their site.
-                    onClick = { if (caps.store) showCarStore = true else openUrl(context, links.storeUrl) },
-                )
-            }
+            MorphActionButton(
+                label = "Car store",
+                icon = Icons.Filled.Storefront,
+                // Where the store can open in the app (with its token), it does; the other brands open their site.
+                onClick = { if (caps.store) showCarStore = true else openUrl(context, links.storeUrl) },
+            )
             if (showCarStore) CarStoreDialog(vm, v) { showCarStore = false }
             if (caps.inAppCharging) {
                 MorphActionButton(
