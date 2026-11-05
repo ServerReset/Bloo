@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,11 +14,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -193,8 +193,8 @@ internal fun CommandActionResult(
     LaunchedEffect(submittedQuery) {
         if (targetVehicle != null && !commandExecuted) {
             if (command.atMinute != null) {
-                // A timed request is queued for its minute (or sets the pre-run), not run now.
-                actionResult = scheduleFromSearch(ctx, vm, state, targetVehicle, command)
+                // A timed request (a lock or unlock at a time) is queued for its minute, not run now.
+                actionResult = scheduleFromSearch(ctx, targetVehicle, command)
                 commandExecuted = true
             } else if (command.cmd == "open_app") {
                 // Not a car command: launches the OEM companion app (as OwnerLinks does).

@@ -365,41 +365,6 @@ suspend fun SettingsStore.learnComfort(key: String, mode: SmartClimateMode, leve
     return next
 }
 
-/** A car's two departures, kept with the synced settings. Defaults until the person sets them. */
-fun SettingsStore.departures(vin: String, p: Preferences): DepartureSchedule =
-    p[stringPreferencesKey("departures_$vin")]?.let { DepartureSchedule.decode(it) } ?: DepartureSchedule()
-
-suspend fun SettingsStore.departuresNow(vin: String): DepartureSchedule = departures(vin, context.settingsDataStore.data.first())
-
-suspend fun SettingsStore.setDepartures(vin: String, schedule: DepartureSchedule) {
-    editTracked { it[stringPreferencesKey("departures_$vin")] = schedule.encode() }
-}
-
-/** The start day of each departure the last time it ran on this device, from the preferences snapshot. */
-fun SettingsStore.departureLastRuns(vin: String, p: Preferences): List<Long> =
-    (p[stringPreferencesKey("departure_last_$vin")] ?: "").split(",").map { it.toLongOrNull() ?: -1L }
-
-/** The start day of each departure the last time it ran on this device. Not synced: each device runs its own departures. */
-suspend fun SettingsStore.departureLastRuns(vin: String): List<Long> =
-    (context.settingsDataStore.data.first()[stringPreferencesKey("departure_last_$vin")] ?: "")
-        .split(",").map { it.toLongOrNull() ?: -1L }
-
-suspend fun SettingsStore.setDepartureLastRun(vin: String, slot: Int, epochDay: Long) {
-    val runs = departureLastRuns(vin).toMutableList()
-    while (runs.size <= slot) runs.add(-1L)
-    runs[slot] = epochDay
-    editTracked { it[stringPreferencesKey("departure_last_$vin")] = runs.joinToString(",") }
-}
-
-/** The climate starts the person has made for a car: what the departure suggestions are learned from. Synced. */
-fun SettingsStore.startHistory(vin: String, p: Preferences): List<StartRecord> =
-    p[stringPreferencesKey("start_history_$vin")]?.let { StartRecord.decodeAll(it) } ?: emptyList()
-
-suspend fun SettingsStore.appendStart(vin: String, record: StartRecord) {
-    val kept = startHistory(vin, context.settingsDataStore.data.first()) + record
-    editTracked { it[stringPreferencesKey("start_history_$vin")] = StartRecord.encodeAll(kept) }
-}
-
 /**
  * Learns one feel answer for a car from what is stored, writes the result, and returns it. Reading what is stored (not a copy in memory)
  * means an answer from the watch and one from the phone both count, whichever arrives first.

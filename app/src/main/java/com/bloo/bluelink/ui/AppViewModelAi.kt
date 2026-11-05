@@ -179,11 +179,11 @@ internal suspend fun AppViewModel.enhanceCommandParsing(
 internal fun NaturalIntent.toParsedCommand(): ParsedVehicleCommand? {
     val at = time?.let { parseClockMinute(it) }
     return when (intent) {
-        "climate_on" -> ParsedVehicleCommand(CarCommandIds.CLIMATE_ON, label = "Starting climate for", atMinute = at)
-        "climate_off" -> ParsedVehicleCommand(CarCommandIds.CLIMATE_OFF, label = "Stopping climate for", atMinute = at)
+        // Climate runs now: a clock time does not schedule it.
+        "climate_on" -> ParsedVehicleCommand(CarCommandIds.CLIMATE_ON, label = "Starting climate for")
+        "climate_off" -> ParsedVehicleCommand(CarCommandIds.CLIMATE_OFF, label = "Stopping climate for")
         "lock" -> ParsedVehicleCommand(CarCommandIds.LOCK, label = "Locking", atMinute = at)
         "unlock" -> ParsedVehicleCommand(CarCommandIds.UNLOCK, label = "Unlocking", atMinute = at)
-        "departure" -> at?.let { ParsedVehicleCommand("departure", label = "Pre-run for", atMinute = it) }
         else -> null
     }
 }

@@ -81,17 +81,6 @@ internal object WearClimateChoices {
         }
     }
 
-    private val _departures = MutableStateFlow<Map<String, com.bloo.bluelink.data.DepartureSchedule>>(emptyMap())
-
-    /** The car's two departures, as the phone has them (none until it has sent them). */
-    fun departuresFor(vin: String): com.bloo.bluelink.data.DepartureSchedule = _departures.value[vin] ?: com.bloo.bluelink.data.DepartureSchedule()
-
-    /** The phone's departures arrived: kept for the climate pebble to show. */
-    fun applyDepartures(map: Map<String, String>) {
-        val decoded = map.mapValues { com.bloo.bluelink.data.DepartureSchedule.decode(it.value) }
-        if (decoded != _departures.value) _departures.value = decoded
-    }
-
     /** The phone's comfort setup and learned comfort arrived: kept, and any plan made from older ones is made again. */
     fun applyComfort(caps: Map<String, String>, models: Map<String, String>) {
         val decodedCaps = caps.mapValues { ComfortCaps.decode(it.value) }

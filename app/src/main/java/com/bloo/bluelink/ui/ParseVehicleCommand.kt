@@ -7,7 +7,6 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.bluelink.data.degLabel
 import com.bloo.bluelink.data.parseClockMinute
-import com.bloo.bluelink.rethrowIfCancellation
 
 /**
  * Recognises a small, deliberately-conservative set of command phrasings -- lock/unlock,
@@ -169,20 +168,16 @@ internal fun resolveCommandTarget(query: String, vehicles: List<Vehicle>): Vehic
     return namedVehicle ?: if (nameMatches.isEmpty()) vehicles.singleOrNull() else null
 }
 
-/** The commands a clock time turns into a scheduled run. */
-private val SchedulableCommands = setOf(CarCommandIds.CLIMATE_ON, CarCommandIds.CLIMATE_OFF, CarCommandIds.LOCK, CarCommandIds.UNLOCK)
-
-/** "Departure" or "pre-run": with a time, it sets the car's pre-run rather than running a command. */
-private val RxDepartureWord = Regex("\\bdepart(ure|ures)?\\b|\\bpre-?runs?\\b")
+/** The commands a clock time turns into a scheduled run: locks and unlocks. Climate runs now, so a time does not schedule it. */
+private val SchedulableCommands = setOf(CarCommandIds.LOCK, CarCommandIds.UNLOCK)
 
 /**
- * The command a phrase asks for, with its clock time when it names one. "climate off at 9 pm" is climate off at 21:00, "lock the car at 6"
- * is a lock at 18:00, and "schedule my departure for 9" sets the pre-run to 09:00. Without a time it is [parseVehicleCommandNow]'s answer.
+ * The command a phrase asks for, with its clock time when it names one. "lock the car at 6" is a lock at 18:00. Without a time it is
+ * [parseVehicleCommandNow]'s answer.
  */
 internal fun parseVehicleCommand(query: String, metric: Boolean = false): ParsedVehicleCommand? {
     val q = query.lowercase()
     val at = parseClockMinute(q) ?: return parseVehicleCommandNow(query, metric)
-    if (RxDepartureWord.containsMatchIn(q)) return ParsedVehicleCommand("departure", label = "Pre-run for", atMinute = at)
     val now = parseVehicleCommandNow(query, metric) ?: return null
     return if (now.cmd in SchedulableCommands) ParsedVehicleCommand(now.cmd, now.climateTarget, now.label, at) else now
 }

@@ -21,7 +21,7 @@ class NaturalIntentTest {
     }
 
     @Test fun badTimeIsDropped() {
-        assertNull(parseNaturalIntent("""{"intent":"departure","time":"soon"}""")!!.time)
+        assertNull(parseNaturalIntent("""{"intent":"lock","time":"soon"}""")!!.time)
     }
 
     @Test fun noJsonIsNull() {

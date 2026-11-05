@@ -287,7 +287,7 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
  */
 /**
  * A command the search read from a phrase. [atMinute], when the phrase names a time, makes it a scheduled command for that minute of
- * the day ("departure" sets the pre-run to it instead of running a car command).
+ * the day (locks and unlocks only).
  */
 internal class ParsedVehicleCommand(
     val cmd: String,

@@ -20,7 +20,7 @@ class ClockPhraseTest {
     }
 
     @Test fun bareHourUsesTheNaturalReading() {
-        assertEquals(9 * 60, parseClockMinute("schedule my departure for 9"))
+        assertEquals(9 * 60, parseClockMinute("lock the car for 9"))
         assertEquals(18 * 60, parseClockMinute("lock the car at 6"))
         assertEquals(13 * 60, parseClockMinute("at 1"))
         assertEquals(12 * 60, parseClockMinute("at 12"))

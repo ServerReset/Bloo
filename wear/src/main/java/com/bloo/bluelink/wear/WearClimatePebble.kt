@@ -3,6 +3,8 @@ package com.bloo.bluelink.wear
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -12,7 +14,6 @@ import com.bloo.bluelink.data.feelLabel
 import com.bloo.uicommon.AnimatedSlider
 import kotlin.math.roundToInt
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -21,11 +22,9 @@ import com.bloo.bluelink.data.ComfortSwitches
 import com.bloo.bluelink.data.anySeatOn
 import com.bloo.bluelink.data.differsFromAuto
 import com.bloo.bluelink.data.comfortRequest
-import com.bloo.bluelink.data.formatMinuteOfDay
 import com.bloo.bluelink.data.comfortLevelsOf
 import com.bloo.bluelink.data.degLabel
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.ClimatePreset
@@ -67,17 +66,6 @@ internal fun WearClimatePebble(
             onSmart = { requestCommand { repo.command(v.vin, CarAction.CLIMATE_SMART) } },
             onPreset = { preset -> requestCommand { repo.command(v.vin, CarAction.CLIMATE_ON, preset.request) } },
         )
-        // The phone's two pre-runs, as it has them: each one's name, whether it is on, and when the car will be ready. Read here;
-        // they are set on the phone, so the switches show the phone's state and do nothing when pressed.
-        WearCaption("Pre-run", small = true)
-        WearClimateChoices.departuresFor(v.vin).slots.forEachIndexed { i, slot ->
-            WearToggleRow(
-                label = slot.label(i),
-                icon = null,
-                checked = slot.enabled,
-                description = if (slot.enabled) "Ready ${formatMinuteOfDay(slot.minuteOfDay)}" else "Off · set on the phone",
-            ) {}
-        }
         // Colder, normal or hotter than the smart plan on the standard slider; it opens on normal. Set starts the car there and tells
         // smart climate how it felt.
         hints[v.vin]?.let { hint ->

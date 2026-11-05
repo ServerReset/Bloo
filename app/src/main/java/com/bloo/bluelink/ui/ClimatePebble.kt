@@ -29,13 +29,13 @@ import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.RevealText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.onClick
 import com.bloo.bluelink.data.CLIMATE_TEMP_RANGE_F
@@ -327,7 +327,7 @@ internal fun ClimatePebble(
             )
         }
 
-        // Presets, departures and seats & wheel are all shown inline, each in its own inner panel, so the climate controls are
+        // Presets and seats & wheel are all shown inline, each in its own inner panel, so the climate controls are
         // in reach without opening anything first. They give way to the running summary while climate is on.
         ExpandVisibility(!climateOn) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
@@ -348,7 +348,6 @@ internal fun ClimatePebble(
                         showSeats = showSeatControls,
                     )
                 }
-                ClimateSubPanel { DepartureSection(v, state, vm) }
                 ClimateSubPanel {
                     SectionLabel("Seats & wheel")
                     ClimateControlsSection(
@@ -529,7 +528,7 @@ private fun TempValue.asFahrenheit(): Int? {
 /** How long after a start the car's old reading of its settings is distrusted (see `lastSent`). */
 private const val CarCatchUpMs = 90_000L
 
-/** One of the climate pebble's inline sub-areas (presets, departures, seats & wheel): the app's inner glass panel, full width. */
+/** One of the climate pebble's inline sub-areas (presets, seats & wheel): the app's inner glass panel, full width. */
 @Composable
 private fun ClimateSubPanel(content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().innerGlassPanel(), verticalArrangement = Arrangement.spacedBy(GapRow), content = content)

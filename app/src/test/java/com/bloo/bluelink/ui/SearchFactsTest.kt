@@ -64,7 +64,7 @@ class SearchFactsTest {
     }
 
     @Test fun aCarWithNoReadingYetAnswersOnlyItsSavedClimate() {
-        // Live readings need the car to have reported; its saved presets and pre-runs do not, so only those answer.
+        // Live readings need the car to have reported; its saved presets do not, so only those answer.
         val none = UiState(vehicles = listOf(daisy))
         assertTrue(carFacts(none, appearance).all { it.topic == FactTopic.CLIMATE || it.topic == FactTopic.PEBBLE })
     }

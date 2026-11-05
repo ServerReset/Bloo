@@ -27,8 +27,6 @@ data class WatchSyncPayload(
     val comfortCaps: Map<String, String> = emptyMap(),
     /** What smart comfort has learned for each car, as [ComfortModel.encode] writes it. */
     val comfortModels: Map<String, String> = emptyMap(),
-    /** Each car's two departures, as [DepartureSchedule.encode] writes them, so the watch can show when they are. */
-    val departures: Map<String, String> = emptyMap(),
     val watchUpdateApkUrl: String? = null,
     val watchUpdateNotes: String? = null,
     /**

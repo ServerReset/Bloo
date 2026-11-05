@@ -19,7 +19,6 @@ import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.learnComfort
-import com.bloo.bluelink.data.setDepartures
 import com.bloo.bluelink.data.SmartClimateMode
 import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.flow.update
@@ -147,10 +146,3 @@ fun AppViewModel.learnComfort(v: Vehicle, mode: SmartClimateMode, req: ClimateRe
 }
 
 
-/** Changes one of a car's two departures, and keeps it with the synced settings. */
-fun AppViewModel.setDeparture(v: Vehicle, index: Int, slot: com.bloo.bluelink.data.DepartureSlot) {
-    val current = _state.value.departures[v.vin] ?: com.bloo.bluelink.data.DepartureSchedule()
-    val next = com.bloo.bluelink.data.DepartureSchedule(current.slots.mapIndexed { i, s -> if (i == index) slot else s })
-    _state.update { it.copy(departures = it.departures + (v.vin to next)) }
-    persist { setDepartures(v.vin, next) }
-}

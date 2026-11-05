@@ -15,7 +15,6 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -122,7 +121,6 @@ class MainActivity : FragmentActivity() {
         // cold start.
         lifecycleScope.launch(Dispatchers.Default) {
             AlertWorker.schedule(applicationContext)
-            com.bloo.bluelink.work.DepartureWorker.schedule(applicationContext)
             MainToMainSyncWorker.schedule(applicationContext)
             // A copy Play installed has no CI-build check to run -- Play updates it (see UpdateRuntime).
             if (com.bloo.bluelink.update.UpdateRuntime.usesGitHub(applicationContext)) {

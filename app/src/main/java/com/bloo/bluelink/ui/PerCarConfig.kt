@@ -25,9 +25,6 @@ import com.bloo.bluelink.data.snapshot
 import com.bloo.bluelink.data.textClearPhoto
 import com.bloo.bluelink.data.climateModel
 import com.bloo.bluelink.data.comfortModel
-import com.bloo.bluelink.data.departures
-import com.bloo.bluelink.data.startHistory
-import com.bloo.bluelink.data.departureLastRuns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -66,9 +63,6 @@ internal suspend fun AppViewModel.perCarConfig(
     val textClear = vehicles.perCar { settingsStore.textClearPhoto(it, prefs) }
     val climateModels = vehicles.perCar { settingsStore.climateModel(it, prefs) }
     val comfortModels = vehicles.perCar { settingsStore.comfortModel(it, prefs) }
-    val departures = vehicles.perCarAll { settingsStore.departures(it, prefs) }
-    val startHistories = vehicles.perCarAll { settingsStore.startHistory(it, prefs) }
-    val departureStarted = vehicles.perCarAll { settingsStore.departureLastRuns(it, prefs) }
     val plates = vehicles.perCarAll { settingsStore.licensePlate(it, prefs) }.filterValues { it.isNotBlank() }
     val lastSvc = vehicles.perCar { settingsStore.lastServiceMiles(it, prefs) }
     val svcInterval = vehicles.perCar { settingsStore.serviceIntervalMiles(it, prefs) }
@@ -90,9 +84,6 @@ internal suspend fun AppViewModel.perCarConfig(
                 textClearPhotos = textClear,
                 climateModels = climateModels,
                 comfortModels = comfortModels,
-                departures = departures,
-                startHistories = startHistories,
-                departureStarted = departureStarted,
                 licensePlates = plates,
                 lastServiceMiles = lastSvc,
                 serviceIntervalMiles = svcInterval,

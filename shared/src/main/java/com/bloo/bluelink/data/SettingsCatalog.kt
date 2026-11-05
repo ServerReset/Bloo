@@ -107,11 +107,6 @@ object SettingsCatalog {
         car("climate_model_", Kind.TEXT, "", "smart climate learned model feel"),
         // What smart comfort has learned for a car (seats, wheel, defrost): synced, so every device comforts the same way.
         car("comfort_model_", Kind.TEXT, "", "smart comfort learned seats wheel defrost heat cool"),
-        // The two departures per car, and the starts they are suggested from: synced, so every device has them.
-        car("departures_", Kind.TEXT, "", "departure ready time schedule pre warm"),
-        car("start_history_", Kind.TEXT, "", "climate start history suggest departure"),
-        // The last day each departure ran here: this device only.
-        local("departure_last_", Scope.CAR),
         car("plate_", Kind.TEXT, "Licence plate", "plate licence registration"),
         car("platform_", Kind.CHOICE, "Head-unit generation", "gen5w ccnc platform generation"),
         car("ptrain_", Kind.CHOICE, "Powertrain", "ev gas hybrid phev"),

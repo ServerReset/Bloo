@@ -45,3 +45,6 @@ private val RxClockPhrase = Regex("""\b(at|for|by|until|till)?\s*\b(\d{1,2})(?::
 
 /** Minutes from [nowMinute] until the next [targetMinute], 0 to 1439: a time already past today means tomorrow. */
 fun minutesUntil(nowMinute: Int, targetMinute: Int): Int = ((targetMinute - nowMinute) % DAY_MIN + DAY_MIN) % DAY_MIN
+
+/** A minute of the day as HH:mm, for showing a time. */
+fun formatMinuteOfDay(minute: Int): String = String.format(java.util.Locale.US, "%02d:%02d", minute / 60, minute % 60)

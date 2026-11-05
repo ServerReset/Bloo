@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
 data class NaturalIntent(val intent: String = "none", val time: String? = null, val car: String? = null)
 
 /** The intents the model may answer with. Anything else is treated as [NaturalIntent] "none". */
-val NATURAL_INTENTS = setOf("climate_on", "climate_off", "lock", "unlock", "departure", "none")
+val NATURAL_INTENTS = setOf("climate_on", "climate_off", "lock", "unlock", "none")
 
 /**
  * The prompt for the on-device model: the request, the time now, and the car names it may refer to. It asks for JSON only, with the
@@ -20,7 +20,7 @@ val NATURAL_INTENTS = setOf("climate_on", "climate_off", "lock", "unlock", "depa
  */
 fun naturalIntentPrompt(query: String, nowHhmm: String, carNames: List<String>): String = """
 You classify a request about a car into JSON. Reply with the JSON object only.
-Intents: climate_on (start the climate), climate_off (stop the climate), lock, unlock, departure (have the car ready for a time, which sets the pre-run), none (anything else).
+Intents: climate_on (start the climate), climate_off (stop the climate), lock, unlock, none (anything else).
 Reply shape: {"intent": "<one intent>", "time": "HH:MM" in 24-hour time or null, "car": "<one of the car names>" or null}
 Use the 24-hour clock: 9 p.m. is "21:00", 9 in the morning is "09:00". Use null for time when the request names none.
 Car names: ${carNames.joinToString(", ").ifBlank { "none" }}
