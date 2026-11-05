@@ -89,6 +89,9 @@ class CanadaRepository(
     override suspend fun mintControlToken(s: CanadaSession, summary: CanadaVehicleSummary, pin: String): String =
         api.pinAuth(s, summary.id, pin)
 
+    /** The Bluelink Store's token for this car. It needs only the session, not the car's PIN, so it does not go through [withCommandAuth]. */
+    suspend fun storeAccess(v: Vehicle): StoreAccess = withSession { s -> api.storeAccess(s, summaryFor(s, v).id) }
+
     /** A 401 or 403 means the Canada session has expired. */
     override fun isSessionFailure(e: BlueLinkException, session: SessionStore.Session): Boolean = e.isUnauthorized()
 

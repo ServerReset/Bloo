@@ -25,7 +25,10 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.onClick
@@ -157,7 +160,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
             }
 
             PebbleSection("${v.brand.label} owners", Icons.Filled.Person, panel = false) {
-                OwnerLinks(v, state, context)
+                OwnerLinks(v, state, context, vm)
             }
         }
     }
@@ -168,8 +171,9 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
  * Each says where it goes; the phone icon dials, others open links.
  */
 @Composable
-internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
+internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppViewModel) {
     val links = v.brand.links
+    var showCarStore by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -206,9 +210,11 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context) {
                 MorphActionButton(
                     label = "Car store",
                     icon = Icons.Filled.Storefront,
-                    onClick = { openUrl(context, links.storeUrl) },
+                    // Hyundai Canada opens the store in the app (with its token); the other brands still open their site.
+                    onClick = { if (usesInAppStore(vm.brandOf(v))) showCarStore = true else openUrl(context, links.storeUrl) },
                 )
             }
+            if (showCarStore) CarStoreDialog(vm, v) { showCarStore = false }
         }
         group("Service") {
             MorphActionButton(

@@ -205,6 +205,25 @@ class CanadaApi(override val brand: Brand) : BrandEndpoints {
             ?: throw BlueLinkException("Incorrect service PIN")
     }
 
+    // --- Bluelink Store (features on demand) -----------------------------------
+
+    /**
+     * fod/gtfodacctkn: a token for the Bluelink Store, the web page that sells a car's features on demand. The official app asks only
+     * when the car lists "Fod"; this asks regardless, and Hyundai's page decides what can be bought. No PIN is needed.
+     */
+    suspend fun storeAccess(s: CanadaSession, vehicleId: String): StoreAccess = withContext(Dispatchers.IO) {
+        val body = buildJsonObject { }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url(apiUrl + "fod/gtfodacctkn").post(body).vehicleHeaders(s, vehicleId).build()
+        val result = call(req)
+        val token = result.path("result", "accessToken").str()
+            ?: throw BlueLinkException("Bluelink didn't hand out a store token for this car")
+        StoreAccess(
+            token = token,
+            expiresIn = result.path("result", "expiresIn").str()?.takeIf { it.isNotBlank() },
+            rerouteUrl = result.path("result", "rerouteUrl").str()?.takeIf { it.isNotBlank() },
+        )
+    }
+
     // --- Status / location -----------------------------------------------------
 
     /** Cached (or, if [refresh], freshly-woken) status. */
@@ -306,3 +325,6 @@ class CanadaApi(override val brand: Brand) : BrandEndpoints {
             (obj.path("error", "errorDesc") ?: obj["responseDesc"] ?: obj.path("status", "errorMessage"))?.str()
         }
 }
+
+/** What the Bluelink Store's web page needs: a short-lived token (its "t" cookie), how long it lasts, and the address Bluelink reroutes to, if any. */
+data class StoreAccess(val token: String, val expiresIn: String?, val rerouteUrl: String?)
