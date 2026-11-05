@@ -89,6 +89,13 @@ class CanadaRepository(
     override suspend fun mintControlToken(s: CanadaSession, summary: CanadaVehicleSummary, pin: String): String =
         api.pinAuth(s, summary.id, pin)
 
+    /** The account's paid charging sessions for this car between [start] and [end] (yyyyMMdd), newest first. */
+    suspend fun chargeOrders(v: Vehicle, start: String, end: String): List<ChargeOrder> = withSession { s ->
+        val profile = credentialStore.load(brand)?.email
+            ?: throw BlueLinkException("Sign in again to see charging history")
+        api.chargeOrders(s, summaryFor(s, v).id, profile, start, end)
+    }
+
     /** The Bluelink Store's token for this car. It needs only the session, not the car's PIN, so it does not go through [withCommandAuth]. */
     suspend fun storeAccess(v: Vehicle): StoreAccess = withSession { s -> api.storeAccess(s, summaryFor(s, v).id) }
 

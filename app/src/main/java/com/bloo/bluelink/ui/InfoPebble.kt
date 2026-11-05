@@ -174,6 +174,7 @@ internal fun InfoPebble(v: Vehicle, status: VehicleStatus?, state: UiState, vm: 
 internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppViewModel) {
     val links = v.brand.links
     var showCarStore by remember { mutableStateOf(false) }
+    var showChargeHistory by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -215,6 +216,14 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showCarStore) CarStoreDialog(vm, v) { showCarStore = false }
+            if (usesInAppStore(vm.brandOf(v))) {
+                MorphActionButton(
+                    label = "Charging history",
+                    icon = AppIcons.Bolt,
+                    onClick = { showChargeHistory = true },
+                )
+            }
+            if (showChargeHistory) ChargeHistoryDialog(vm, v) { showChargeHistory = false }
         }
         group("Service") {
             MorphActionButton(
