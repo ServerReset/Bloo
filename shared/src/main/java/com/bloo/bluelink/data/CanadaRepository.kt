@@ -101,6 +101,27 @@ class CanadaRepository(
         api.chargingStations(s, summaryFor(s, v).id, lat, lon, radiusKm)
     }
 
+    /** The price and payment details for charging at [chargerId] of station [poiId]. Reads only: nothing is charged. */
+    suspend fun chargeOffer(v: Vehicle, poiId: String, chargerId: String): ChargeOffer = withSession { s ->
+        api.chargeOffer(s, summaryFor(s, v).id, poiId, chargerId)
+    }
+
+    /** Starts a paid charge, which spends money. Returns null when Bluelink accepted it, or its reason. */
+    suspend fun startCharge(v: Vehicle, paymentId: String, poiId: String, payCardId: String?): String? = withSession { s ->
+        api.startCharge(s, summaryFor(s, v).id, paymentId, poiId, payCardId)
+    }
+
+    /** Stops a paid charge. Returns null when Bluelink accepted it, or its reason. */
+    suspend fun stopCharge(v: Vehicle, paymentId: String, poiId: String): String? = withSession { s ->
+        api.stopCharge(s, summaryFor(s, v).id, paymentId, poiId)
+    }
+
+    /** The live numbers for a charge in progress. */
+    suspend fun chargeStatus(v: Vehicle, paymentId: String): ChargeStatus = withSession { s ->
+        val summary = summaryFor(s, v)
+        api.chargeStatus(s, summary.id, summary.vin, paymentId)
+    }
+
     /** The Bluelink Store's token for this car. It needs only the session, not the car's PIN, so it does not go through [withCommandAuth]. */
     suspend fun storeAccess(v: Vehicle): StoreAccess = withSession { s -> api.storeAccess(s, summaryFor(s, v).id) }
 

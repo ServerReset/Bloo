@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.Request
@@ -83,6 +84,8 @@ data class ChargingStation(
     val available: Int?,
     val total: Int?,
     val maxKw: Double?,
+    /** The chargers at the station, by their IDs; a paid charge is started at one of them. */
+    val chargerIds: List<String> = emptyList(),
 ) {
     companion object {
         fun from(e: JsonElement): ChargingStation? {
@@ -109,6 +112,7 @@ data class ChargingStation(
                 available = sum("numberOfAvailableConnectors"),
                 total = sum("numberOfConnectors"),
                 maxKw = maxKw?.takeIf { it > 0 },
+                chargerIds = (e.path("chargers") as? JsonArray).orEmpty().mapNotNull { it.path("id").str() },
             )
         }
     }
@@ -129,4 +133,119 @@ suspend fun CanadaApi.chargingStations(s: CanadaSession, vehicleId: String, lat:
         val req = Request.Builder().url(apiUrl + "iac/csList").post(body).vehicleHeaders(s, vehicleId).build()
         val list = call(req).path("result", "chargingStations") as? JsonArray ?: JsonArray(emptyList())
         list.mapNotNull { ChargingStation.from(it) }.sortedBy { it.distanceKm ?: Double.MAX_VALUE }
+    }
+
+// --- Paid charging: start and stop a charge at a public charger, and watch it. Money is spent by startCharge, so the app only calls it
+// after the person confirms the price on screen. Ported from open-blue-android; not verified against a live account.
+
+/** The price and payment details for one charger, from iac/productInfo. [paymentId] is what the charge is started and stopped with. */
+data class ChargeOffer(
+    val paymentId: String,
+    val productName: String?,
+    val priceLines: List<String>,
+    val cardId: String?,
+    val cardLabel: String?,
+)
+
+/** Live numbers for a charge in progress, from iac/chargeStatus. */
+data class ChargeStatus(val kwh: Double?, val powerKw: Double?, val cost: Double?, val currency: String?, val charging: Boolean?)
+
+/** The genType the official app sends; upstream reads it from the car's service info and falls back to this value. */
+private const val GEN_TYPE = "3"
+
+private fun JsonElement?.firstItem(): JsonElement? = (this as? JsonArray)?.firstOrNull()
+
+/** Price, payment ID and cards for charging at [chargerId] of station [poiId] (iac/productInfo). */
+suspend fun CanadaApi.chargeOffer(s: CanadaSession, vehicleId: String, poiId: String, chargerId: String): ChargeOffer =
+    withContext(Dispatchers.IO) {
+        val product = java.util.Base64.getUrlEncoder().encodeToString(chargerId.toByteArray())
+        val body = buildJsonObject {
+            putJsonArray("storeInfo") {
+                add(buildJsonObject {
+                    put("storeId", "CHARGEPOINT")
+                    put("poiId", poiId)
+                    put("productId", product)
+                    put("storeType", "E001")
+                })
+            }
+            put("genType", GEN_TYPE)
+        }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url(apiUrl + "iac/productInfo").post(body).vehicleHeaders(s, vehicleId).build()
+        val r = call(req).path("result") as? JsonObject ?: throw BlueLinkException("Bluelink gave no price for this charger")
+        val chargingProduct = r["storeInfo"].firstItem()?.let { (it as? JsonObject)?.get("chargingProductList").firstItem() } as? JsonObject
+        val lines = ((chargingProduct?.get("priceElements") as? JsonArray).orEmpty()).flatMap { el ->
+            ((el as? JsonObject)?.get("priceComponents") as? JsonArray).orEmpty().mapNotNull { pc ->
+                val price = pc.path("price").dbl() ?: return@mapNotNull null
+                when (pc.path("type").str()?.uppercase()) {
+                    "ENERGY" -> "$%.2f per kWh".format(price)
+                    "TIME" -> "$%.2f per hour".format(price)
+                    "PARKING_TIME" -> "$%.2f per hour parked".format(price)
+                    "FLAT" -> "$%.2f per session".format(price)
+                    else -> "$%.2f %s".format(price, pc.path("type").str()?.lowercase().orEmpty())
+                }
+            }
+        }.distinct()
+        val card = r["payCardList"].firstItem()
+        ChargeOffer(
+            paymentId = r["paymentId"].str() ?: throw BlueLinkException("Bluelink gave no payment ID for this charger"),
+            productName = chargingProduct?.get("productName").str(),
+            priceLines = lines,
+            cardId = card.path("cardId").str(),
+            cardLabel = listOfNotNull(card.path("cardName").str(), card.path("cardNumber").str()).joinToString(" ").ifBlank { null },
+        )
+    }
+
+/**
+ * Starts a paid charge (iac/startCharge). Returns null when Bluelink accepted it, or the reason it gave when it did not.
+ */
+suspend fun CanadaApi.startCharge(s: CanadaSession, vehicleId: String, paymentId: String, poiId: String, payCardId: String?): String? =
+    withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("paymentId", paymentId)
+            put("storeId", "CHARGEPOINT")
+            put("poiId", poiId)
+            putJsonObject("orderInfo") { put("payCardId", payCardId.orEmpty()) }
+            put("tncAgree", true)
+            put("genType", GEN_TYPE)
+        }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url(apiUrl + "iac/startCharge").post(body).vehicleHeaders(s, vehicleId).build()
+        val result = call(req).path("result")
+        val code = result.path("resultCode").intLoose()
+        if (code == null || code == 0) null else result.path("errorCaseId").str() ?: result.path("resultMsg").str() ?: "Bluelink did not start the charge"
+    }
+
+/** Stops a paid charge (iac/stopCharge). Returns null when Bluelink accepted it, or the reason it gave when it did not. */
+suspend fun CanadaApi.stopCharge(s: CanadaSession, vehicleId: String, paymentId: String, poiId: String): String? =
+    withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("paymentId", paymentId)
+            put("storeId", "CHARGEPOINT")
+            put("poiId", poiId)
+            put("genType", GEN_TYPE)
+        }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url(apiUrl + "iac/stopCharge").post(body).vehicleHeaders(s, vehicleId).build()
+        val result = call(req).path("result")
+        val code = result.path("resultCode").intLoose()
+        if (code == null || code == 0) null else result.path("errorCaseId").str() ?: result.path("resultMsg").str() ?: "Bluelink did not stop the charge"
+    }
+
+/** The live numbers for a charge in progress (iac/chargeStatus). */
+suspend fun CanadaApi.chargeStatus(s: CanadaSession, vehicleId: String, vin: String, paymentId: String): ChargeStatus =
+    withContext(Dispatchers.IO) {
+        val body = buildJsonObject {
+            put("vin", vin)
+            put("genType", GEN_TYPE)
+            put("paymentId", paymentId)
+            put("needToRefresh", false)
+            put("needBWData", true)
+        }.toString().toRequestBody(jsonMedia)
+        val req = Request.Builder().url(apiUrl + "iac/chargeStatus").post(body).vehicleHeaders(s, vehicleId).build()
+        val r = call(req).path("result")
+        ChargeStatus(
+            kwh = r.path("bwStatus", "kwh").dbl(),
+            powerKw = r.path("bwStatus", "power").dbl(),
+            cost = r.path("bwStatus", "totalCost").dbl(),
+            currency = r.path("bwStatus", "currency").str(),
+            charging = r.path("evStatus", "batteryCharge").bool(),
+        )
     }
