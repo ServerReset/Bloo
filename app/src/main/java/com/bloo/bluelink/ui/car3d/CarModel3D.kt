@@ -12,9 +12,11 @@ import android.view.TextureView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -534,6 +536,10 @@ fun Car3D(pose: CarPose, modifier: Modifier = Modifier, body: CarBody = CarBody.
             },
             modifier = Modifier.fillMaxSize(),
         )
+        // The air and charge overlay, projected with the same camera the renderer uses.
+        renderer?.let { r ->
+            CarEffects(r.camera, pose.climate, pose.defrost, pose.charging, { r.cablePlugged }, Modifier.fillMaxSize(), shape = shape)
+        }
     } }
 }
 
