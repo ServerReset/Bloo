@@ -138,9 +138,16 @@ enum class Brand(
             inAppCharging = true, store = true, surroundView = true, surround3D = true,
             chargeLimitsSetOnly = true, chargePortAndPreconditioning = true,
         )
-        GENESIS, KIA, HYUNDAI_EU -> BrandCapabilities(chargeLimits = true)
-        // Genesis and Kia Canada share the Canada API but are not checked against a real account yet, so they start with everything off.
-        GENESIS_CA, KIA_CA -> BrandCapabilities()
+        // Genesis US rides the Hyundai-shaped BlueLink API, so its photos and 3D view and charge limits are served there.
+        GENESIS -> BrandCapabilities(surroundView = true, surround3D = true, chargeLimits = true)
+        // Kia US rides its own API (KiaRepository), which has charge limits only; the photos and in-app features are not in it.
+        KIA -> BrandCapabilities(chargeLimits = true)
+        HYUNDAI_EU -> BrandCapabilities(chargeLimits = true)
+        // Genesis and Kia Canada share the Canada API with Hyundai Canada, so they get the same features there.
+        GENESIS_CA, KIA_CA -> BrandCapabilities(
+            inAppCharging = true, store = true, surroundView = true, surround3D = true,
+            chargeLimitsSetOnly = true, chargePortAndPreconditioning = true,
+        )
     }
 
     /**

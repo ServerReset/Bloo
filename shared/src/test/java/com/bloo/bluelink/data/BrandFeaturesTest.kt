@@ -19,18 +19,24 @@ class BrandFeaturesTest {
         assertFalse(c.inAppCharging || c.store || c.chargePortAndPreconditioning)
     }
 
-    @Test fun kiaAndGenesisUsStartWithOnlyChargeLimits() {
-        for (b in listOf(Brand.KIA, Brand.GENESIS)) {
-            val c = b.capabilities
-            assertTrue(c.chargeLimits, "$b reads and writes its limits")
-            assertFalse(c.inAppCharging || c.store || c.surroundView || c.surround3D || c.chargePortAndPreconditioning, "$b is unverified")
-        }
+    @Test fun genesisUsHasTheBlueLinkFeatures() {
+        val c = Brand.GENESIS.capabilities
+        assertTrue(c.surroundView && c.surround3D && c.chargeLimits)
+        assertFalse(c.inAppCharging || c.store || c.chargePortAndPreconditioning)
     }
 
-    @Test fun kiaAndGenesisCanadaStartWithEverythingOff() {
+    @Test fun kiaUsHasOnlyChargeLimits() {
+        val c = Brand.KIA.capabilities
+        assertTrue(c.chargeLimits)
+        assertFalse(c.inAppCharging || c.store || c.surroundView || c.surround3D || c.chargePortAndPreconditioning)
+    }
+
+    @Test fun kiaAndGenesisCanadaShareTheHyundaiCanadaFeatures() {
         for (b in listOf(Brand.KIA_CA, Brand.GENESIS_CA)) {
             val c = b.capabilities
-            assertFalse(c.inAppCharging || c.store || c.surroundView || c.chargeLimits || c.chargeLimitsSetOnly, "$b is unverified")
+            assertTrue(c.inAppCharging && c.store && c.surroundView && c.surround3D && c.chargePortAndPreconditioning, "$b")
+            assertTrue(c.chargeLimitsSetOnly, "$b")
         }
     }
+}
 }
