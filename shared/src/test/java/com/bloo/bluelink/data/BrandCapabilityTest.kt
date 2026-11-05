@@ -69,10 +69,10 @@ class BrandCapabilityTest {
     @Test
     fun `charge limits are excluded for Canada only`() {
         for (b in Brand.entries.filter { it.isCanada }) {
-            assertFalse(b.supportsChargeLimits, "$b cannot read charge targets")
+            assertFalse(b.capabilities.chargeLimits, "$b cannot read charge targets")
         }
-        assertTrue(Brand.HYUNDAI_EU.supportsChargeLimits, "EU reads and writes charge targets")
-        assertTrue(Brand.HYUNDAI.supportsChargeLimits)
+        assertTrue(Brand.HYUNDAI_EU.capabilities.chargeLimits, "EU reads and writes charge targets")
+        assertTrue(Brand.HYUNDAI.capabilities.chargeLimits)
     }
 
     /**

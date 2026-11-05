@@ -213,16 +213,17 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
             // Features-on-Demand store (themes, lighting patterns…): ccNC-era head units only -
             // older Gen5W cars have nothing to buy. Honours the user's own confirmed generation
             // over the raw API guess.
+            val caps = vm.brandOf(v).capabilities
             if (state.supportsConnectedStoreEffective(v)) {
                 MorphActionButton(
                     label = "Car store",
                     icon = Icons.Filled.Storefront,
-                    // Hyundai Canada opens the store in the app (with its token); the other brands still open their site.
-                    onClick = { if (usesInAppStore(vm.brandOf(v))) showCarStore = true else openUrl(context, links.storeUrl) },
+                    // Where the store can open in the app (with its token), it does; the other brands open their site.
+                    onClick = { if (caps.store) showCarStore = true else openUrl(context, links.storeUrl) },
                 )
             }
             if (showCarStore) CarStoreDialog(vm, v) { showCarStore = false }
-            if (usesInAppStore(vm.brandOf(v))) {
+            if (caps.inAppCharging) {
                 MorphActionButton(
                     label = "Charging history",
                     icon = AppIcons.Bolt,
@@ -232,7 +233,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
             if (showChargeHistory) ChargeHistoryDialog(vm, v) { showChargeHistory = false }
             // Nearby chargers need the car's position; they are offered once the car has reported one.
             val at = state.locations[v.vin]
-            if (usesInAppStore(vm.brandOf(v)) && at != null) {
+            if (caps.inAppCharging && at != null) {
                 MorphActionButton(
                     label = "Chargers nearby",
                     icon = AppIcons.Bolt,
@@ -240,7 +241,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showChargers && at != null) ChargersNearbyDialog(vm, v, at) { showChargers = false }
-            if (usesInAppStore(vm.brandOf(v)) && at != null) {
+            if (caps.inAppCharging && at != null) {
                 MorphActionButton(
                     label = "Plan a trip",
                     icon = AppIcons.Bolt,
@@ -248,15 +249,17 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showTrip && at != null) TripPlannerDialog(vm, v, at) { showTrip = false }
-            // Charge port and preconditioning: Hyundai Canada electric cars only (the reference has no US endpoint for them).
-            if (vm.brandOf(v) == Brand.HYUNDAI_CA && v.isEv) {
+            // Charge limits and the charge port, for electric cars whose brand has them (see BrandCapabilities).
+            if (caps.chargeLimitsSetOnly && v.isEv) {
                 MorphActionButton(label = "Charge limits", icon = AppIcons.Bolt, onClick = { showLimits = true })
+            }
+            if (caps.chargePortAndPreconditioning && v.isEv) {
                 MorphActionButton(label = "Open charge port", icon = AppIcons.Bolt, onClick = { vm.setChargePort(v, true) })
                 MorphActionButton(label = "Close charge port", icon = AppIcons.Bolt, onClick = { vm.setChargePort(v, false) })
                 MorphActionButton(label = "Precondition battery", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, true) })
                 MorphActionButton(label = "Stop preconditioning", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, false) })
             }
-            if (vm.brandOf(v) == Brand.HYUNDAI || vm.brandOf(v) == Brand.HYUNDAI_CA) {
+            if (caps.surroundView) {
                 MorphActionButton(
                     label = "Surround view",
                     icon = AppIcons.Bolt,
@@ -271,9 +274,9 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 onClick = { show3D = true },
             )
             if (show3D) Car3DDialog(v, state.statusFor(v)) { show3D = false }
-            if (showLimits) ChargeLimitsCanadaDialog(vm, v) { showLimits = false }
+            if (showLimits) ChargeLimitsSetOnlyDialog(vm, v) { showLimits = false }
             // The 3D surroundings are built from the newest surround-view set, so they are offered where that set can be had.
-            if (vm.brandOf(v) == Brand.HYUNDAI || vm.brandOf(v) == Brand.HYUNDAI_CA) {
+            if (caps.surround3D) {
                 MorphActionButton(label = "3D surroundings", icon = AppIcons.DirectionsCar, onClick = { show3DSurround = true })
             }
             if (show3DSurround) Surround3DDialog(v) { show3DSurround = false }

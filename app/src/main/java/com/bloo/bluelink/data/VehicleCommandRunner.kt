@@ -62,7 +62,7 @@ object VehicleCommandRunner {
             CarAction.SET_CHARGE_LIMITS -> {
                 // Canada can't read its charge targets, so it must not write one either: setChargeTargets would POST the unverified
                 // evc/setsoc "level" field.
-                if (!v.brand.supportsChargeLimits) error("Charge limit isn't available on ${v.name}")
+                if (!v.brand.capabilities.chargeLimits) error("Charge limit isn't available on ${v.name}")
                 val pct = target.toIntOrNull()?.coerceIn(CHARGE_LIMIT_RANGE) ?: error("Bad charge limit")
                 base.copy(acLimit = pct, dcLimit = pct)
             }

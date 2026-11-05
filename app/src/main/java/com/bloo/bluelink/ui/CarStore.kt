@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.data.StoreAccess
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.Vehicle
@@ -135,5 +134,3 @@ private fun setStoreCookie(cookies: CookieManager, url: String, access: StoreAcc
     cookies.setCookie("${u.scheme ?: "https"}://$host", "$STORE_COOKIE=${access.token}$age;Domain=$host; Path=/")
 }
 
-/** Whether the in-app store is offered for [brand]; the other brands keep opening their store in the browser. */
-internal fun usesInAppStore(brand: Brand): Boolean = brand == Brand.HYUNDAI_CA

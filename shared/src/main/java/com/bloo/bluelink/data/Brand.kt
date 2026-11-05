@@ -127,12 +127,21 @@ enum class Brand(
     val isCanada: Boolean get() = this == HYUNDAI_CA || this == GENESIS_CA || this == KIA_CA
 
     /**
-     * Whether this brand can report AC/DC charge-limit targets, and therefore whether the editable
-     * charge-limit controls are worth showing. False for Canada: [CanadaApi] has no verified read
-     * endpoint for the targets, so `EvStatus.reservChargeInfos` is always null on those cars (see
-     * the KNOWN-GAP comment in CanadaApi.parseStatus).
+     * What this brand's account can do in the app: the one place a region or brand decides a feature. Screens ask for a feature by its
+     * name, not by brand. A feature is on only once its backend has been checked for that brand.
      */
-    val supportsChargeLimits: Boolean get() = !isCanada
+    val capabilities: BrandCapabilities get() = when (this) {
+        HYUNDAI -> BrandCapabilities(surroundView = true, surround3D = true, chargeLimits = true)
+        // Hyundai Canada: the in-app charging API, the store, and the car's photos, plus a set-only limit control (the car's current
+        // targets are not read on Canadian cars).
+        HYUNDAI_CA -> BrandCapabilities(
+            inAppCharging = true, store = true, surroundView = true, surround3D = true,
+            chargeLimitsSetOnly = true, chargePortAndPreconditioning = true,
+        )
+        GENESIS, KIA, HYUNDAI_EU -> BrandCapabilities(chargeLimits = true)
+        // Genesis and Kia Canada share the Canada API but are not checked against a real account yet, so they start with everything off.
+        GENESIS_CA, KIA_CA -> BrandCapabilities()
+    }
 
     /**
      * True for the Europe (CCAPI/CCS2) brands, served by [EuApi]/[EuRepository]. Only Hyundai EU
@@ -344,3 +353,24 @@ val Brand.supportsHornLights: Boolean
  */
 val Vehicle.supportsHornLights: Boolean
     get() = brand.supportsHornLights
+
+/**
+ * What an account can do in the app. Each flag is one feature; a new brand starts with all of them off and gains a flag once its backend
+ * has been checked for that feature.
+ */
+data class BrandCapabilities(
+    /** Public chargers, charging history, paid charging and trip planning with charging stops (the in-app charging API). */
+    val inAppCharging: Boolean = false,
+    /** The Bluelink Store for features on demand, opened in the app. */
+    val store: Boolean = false,
+    /** Asking the car for surround-view photos, and reading the stored sets. */
+    val surroundView: Boolean = false,
+    /** The 3D surroundings built from those photos. */
+    val surround3D: Boolean = false,
+    /** Charge limits that also show the car's current targets. */
+    val chargeLimits: Boolean = false,
+    /** Charge limits that are only set: the car's current targets are not read. */
+    val chargeLimitsSetOnly: Boolean = false,
+    /** Opening and closing the charge port, and battery preconditioning. */
+    val chargePortAndPreconditioning: Boolean = false,
+)

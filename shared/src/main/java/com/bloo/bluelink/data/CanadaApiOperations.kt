@@ -46,7 +46,7 @@ internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStat
         ),
         // KNOWN GAP: reservChargeInfos (the AC/DC charge-LIMIT targets) is left null for
         // Canada. Because of that, the UI now hides the editable charge-limit controls on
-        // CA cars (Brand.supportsChargeLimits = !isCanada) rather than show sliders seeded
+        // CA cars (Brand.capabilities.chargeLimits is off) rather than show sliders seeded
         // from the 80/90 defaults, and every reading surface self-hides on the null too. So
         // this is currently a graceful "feature absent", not a broken control -- but the
         // underlying data is still missing. The CA status body (rltmvhclsts / lstvhclsts)
@@ -60,7 +60,7 @@ internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStat
         // contract. To re-enable the controls: confirm evc/selsoc's response against a real
         // CA account, merge it in status() with the same runCatching best-effort wrapper
         // KiaUsaApi uses (a bad path then degrades to today's behaviour), and flip
-        // Brand.supportsChargeLimits back on.
+        // Brand.capabilities.chargeLimits back on.
     )
     return VehicleStatus(
         doorLock = vs["doorLock"].flag(),

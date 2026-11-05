@@ -54,7 +54,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
     var dcLimit by remember(v.vin) { mutableIntStateOf(DEFAULT_DC_CHARGE_LIMIT_PCT) }
     // Seeded independently, one latch each, so a car that reports AC before DC still picks up the
     // DC target. Canada never reports reservChargeInfos, so its pills are hidden (see
-    // Brand.supportsChargeLimits).
+    // Brand.capabilities.chargeLimits).
     var acSeeded by remember(v.vin) { mutableStateOf(false) }
     var dcSeeded by remember(v.vin) { mutableStateOf(false) }
     // Keying on the VIN alone ran this exactly once, at first composition -- which is almost always
@@ -98,7 +98,7 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         // read-only ChargeFuelBar state). ChargeFuelBar itself only renders in a forced-open
         // context for a brand that cannot report limits at all (Canada) -- there would otherwise be
         // nothing to show.
-        if (LocalForceExpanded.current && !v.brand.supportsChargeLimits) {
+        if (LocalForceExpanded.current && !v.brand.capabilities.chargeLimits) {
             ChargeFuelBar(
                 status,
                 state.hasBattery(v),
@@ -115,8 +115,8 @@ internal fun ChargePebble(v: Vehicle, status: VehicleStatus?, enabled: Boolean, 
         // Shown only for brands that can actually report the targets. Canada can't
         // (reservChargeInfos is always null), so the sliders would sit on the 80/90 display
         // defaults and "Set" would push a value the user never chose to the car -- so we hide them
-        // entirely there. See Brand.supportsChargeLimits.
-        if (v.brand.supportsChargeLimits) {
+        // entirely there. See Brand.capabilities.chargeLimits.
+        if (v.brand.capabilities.chargeLimits) {
             ChargeLimitPill(
                 label = "AC (home) limit",
                 icon = Icons.Filled.Power,

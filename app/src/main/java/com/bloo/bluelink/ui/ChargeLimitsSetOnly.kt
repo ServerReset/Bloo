@@ -25,7 +25,7 @@ import com.bloo.bluelink.data.Vehicle
  * Bloo, so the dialog starts at 80 and does not show what the car has now. Setting them is the same PIN command the upstream app sends.
  */
 @Composable
-internal fun ChargeLimitsCanadaDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> Unit) {
+internal fun ChargeLimitsSetOnlyDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> Unit) {
     var ac by remember(v.vin) { mutableIntStateOf(80) }
     var dc by remember(v.vin) { mutableIntStateOf(80) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = true)) {
