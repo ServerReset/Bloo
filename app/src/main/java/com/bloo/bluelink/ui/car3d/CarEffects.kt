@@ -45,7 +45,6 @@ fun CarEffects(
     shape: CarShape = CarShape.IONIQ5,
 ) {
     val flows = Flows.of(shape)
-    val colors = AppTheme.colors
     // Fade each effect in and out rather than popping.
     val air = remember { Animatable(if (climate != null) 1f else 0f) }
     val power = remember { Animatable(if (charging) 1f else 0f) }
@@ -72,11 +71,11 @@ fun CarEffects(
         }
         val t = time
         if (air.value > 0f) {
-            val tint = lerp(colors.heat, colors.cool, airColor)
+            val tint = lerp(OverlayColors.heat, OverlayColors.cool, airColor)
             val heat = airColor < 0.5f
             drawAirflow(flows, camera, t, tint, air.value, heat, defrost)
         }
-        if (power.value > 0f) drawCharging(flows, camera, t, colors.charge, power.value * cablePlugged().coerceIn(0f, 1f))
+        if (power.value > 0f) drawCharging(flows, camera, t, OverlayColors.charge, power.value * cablePlugged().coerceIn(0f, 1f))
     }
 }
 
@@ -304,4 +303,11 @@ private fun DrawScope.drawCharging(Flows: Flows, cam: CarCamera, t: Float, green
         drawCircle(Brush.radialGradient(listOf(green.copy(alpha = 0.55f * a * fade), Color.Transparent), c, glow), glow, c)
         drawCircle(bright.copy(alpha = a * fade), (ppm * 0.016).toFloat().coerceAtLeast(1.5f), c)
     }
+}
+
+/** The colours of the air and charge effects, as the app's dark theme gives them. */
+private object OverlayColors {
+    val heat = Color(0xFFFF7A4D)
+    val cool = Color(0xFF55B6EE)
+    val charge = Color(0xFF44D58C)
 }
