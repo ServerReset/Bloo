@@ -89,6 +89,10 @@ internal fun ChargersNearbyDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation,
                     Text("Chargers nearby", style = MaterialTheme.typography.titleLarge)
                     TextButton(onClick = onDismiss) { Text("Close") }
                 }
+                // The map is Google Maps, centred on the car, searching for EV charging: the same hand-off the trip planner uses.
+                TextButton(onClick = { openUrl(context, "https://www.google.com/maps/search/EV+charging+stations/@${at.latitude},${at.longitude},13z") }) {
+                    Text("Show on map")
+                }
                 Text(
                     "Public chargers within $NEARBY_RADIUS_KM km of the car, nearest first. Tap one to start a paid charge.",
                     style = MaterialTheme.typography.bodySmall,
