@@ -179,6 +179,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
     var showTrip by remember { mutableStateOf(false) }
     var showSurround by remember { mutableStateOf(false) }
     var show3D by remember { mutableStateOf(false) }
+    var showLimits by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -248,6 +249,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
             if (showTrip && at != null) TripPlannerDialog(vm, v, at) { showTrip = false }
             // Charge port and preconditioning: Hyundai Canada electric cars only (the reference has no US endpoint for them).
             if (vm.brandOf(v) == Brand.HYUNDAI_CA && v.isEv) {
+                MorphActionButton(label = "Charge limits", icon = AppIcons.Bolt, onClick = { showLimits = true })
                 MorphActionButton(label = "Open charge port", icon = AppIcons.Bolt, onClick = { vm.setChargePort(v, true) })
                 MorphActionButton(label = "Close charge port", icon = AppIcons.Bolt, onClick = { vm.setChargePort(v, false) })
                 MorphActionButton(label = "Precondition battery", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, true) })
@@ -268,6 +270,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 onClick = { show3D = true },
             )
             if (show3D) Car3DDialog(v, state.statusFor(v)) { show3D = false }
+            if (showLimits) ChargeLimitsCanadaDialog(vm, v) { showLimits = false }
         }
         group("Service") {
             MorphActionButton(
