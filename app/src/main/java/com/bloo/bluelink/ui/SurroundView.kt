@@ -41,18 +41,23 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> Unit) {
-    var captures by remember(v.vin) { mutableStateOf<List<SurroundCapture>?>(null) }
+    val context = LocalContext.current
+    // What is already on the phone shows at once; a refresh adds whatever the car has sent since.
+    var captures by remember(v.vin) { mutableStateOf<List<SurroundCapture>?>(SurroundHistory.load(context, v.vin)) }
     var note by remember(v.vin) { mutableStateOf<String?>(null) }
     var busy by remember(v.vin) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val repo = vm.repoFor(v)
 
     fun refresh() {
         busy = true
         scope.launch {
             runCatching { repo.lastSurroundView(v) }
-                .onSuccess { captures = it; note = if (it.isEmpty()) "No photos stored for this car yet." else null }
+                .onSuccess {
+                    SurroundHistory.save(context, v.vin, it)
+                    captures = SurroundHistory.load(context, v.vin)
+                    note = if (captures.isNullOrEmpty()) "No photos stored for this car yet." else null
+                }
                 .onFailure { note = it.message ?: "Bluelink wouldn't give the photos." }
             busy = false
         }
