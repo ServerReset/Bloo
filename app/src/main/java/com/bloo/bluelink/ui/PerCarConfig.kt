@@ -18,6 +18,7 @@ import com.bloo.bluelink.data.licensePlate
 import com.bloo.bluelink.data.onboardingSeen
 import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.powertrain
+import com.bloo.bluelink.data.surroundView
 import com.bloo.bluelink.data.seatConfig
 import com.bloo.bluelink.data.sectionOrder
 import com.bloo.bluelink.data.serviceIntervalMiles
