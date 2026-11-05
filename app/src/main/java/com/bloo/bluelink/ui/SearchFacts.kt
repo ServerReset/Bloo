@@ -113,21 +113,35 @@ internal fun carFacts(state: UiState, appearance: SettingsStore.Appearance): Lis
     }
 }
 
-/** The facts [tokens] ask for, best first: the same ranking every other result uses, so a fact and a setting compete fairly. */
-internal fun rankFacts(tokens: List<String>, facts: List<CarFact>): List<CarFact> {
+/**
+ * The key a piece of a car's page is known by, in the usage store and on its search pill. A pebble is its own piece per section; every
+ * other topic is one piece per car, so its label is empty.
+ */
+internal fun pieceKey(vin: String, topic: FactTopic, label: String): String = "piece:$vin:$topic:$label"
+
+/** The usage key of the piece this fact belongs to (see [pieceKey]). */
+internal fun CarFact.usageKey(): String = pieceKey(vin, topic, if (topic == FactTopic.PEBBLE) label else "")
+
+/**
+ * The facts [tokens] ask for, best first: the same ranking every other result uses, so a fact and a setting compete fairly. Among equal
+ * matches, the ones the person has picked most often (per [usage]) come first.
+ */
+internal fun rankFacts(tokens: List<String>, facts: List<CarFact>, usage: (CarFact) -> Int = { 0 }): List<CarFact> {
     if (tokens.isEmpty()) return emptyList()
     fun scored(fuzzy: Boolean) = facts.mapNotNull { f ->
         searchScore(tokens, SearchEntry(f.title, f.haystack) {}, fuzzy)?.let { f to it }
     }
-    return scored(fuzzy = false).ifEmpty { scored(fuzzy = true) }.sortedByDescending { it.second }.map { it.first }
+    return scored(fuzzy = false).ifEmpty { scored(fuzzy = true) }
+        .sortedWith(compareByDescending<Pair<CarFact, Int>> { it.second }.thenByDescending { usage(it.first) })
+        .map { it.first }
 }
 
 /** One piece of UI to lift into the results: a car's [topic], found by the words that matched its facts. */
 internal class SearchPiece(val vin: String, val car: String, val topic: FactTopic, val label: String = "")
 
 /** The pieces [tokens] ask for, best first: each (car, topic) once, in the order its best fact ranked. */
-internal fun rankPieces(tokens: List<String>, facts: List<CarFact>): List<SearchPiece> =
-    rankFacts(tokens, facts)
+internal fun rankPieces(tokens: List<String>, facts: List<CarFact>, usage: (CarFact) -> Int = { 0 }): List<SearchPiece> =
+    rankFacts(tokens, facts, usage)
         // A pebble is its own piece for each section; every other topic is one piece per car.
         .distinctBy { if (it.topic == FactTopic.PEBBLE) Triple(it.vin, it.topic, it.label) else Triple(it.vin, it.topic, "") }
         .map { SearchPiece(it.vin, it.car, it.topic, if (it.topic == FactTopic.PEBBLE) it.label else "") }

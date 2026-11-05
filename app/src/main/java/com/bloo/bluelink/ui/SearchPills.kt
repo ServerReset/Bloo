@@ -11,7 +11,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -158,13 +163,36 @@ internal fun SearchPillList(
     listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
-    LazyColumn(
-        modifier = modifier,
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(GapRow),
-        contentPadding = PaddingValues(vertical = GapSection),
-        content = content,
-    )
+    // Every pill in the list reports its presses to the usage store, so the app learns what the person opens (see pillItem).
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val usage = remember(context) { SearchUsage(context) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalSearchUsage provides usage) {
+        LazyColumn(
+            modifier = modifier,
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(GapRow),
+            contentPadding = PaddingValues(vertical = GapSection),
+            content = content,
+        )
+    }
+}
+
+/** The on-device usage store for the search list on screen; null outside a list, where nothing is recorded. */
+internal val LocalSearchUsage = androidx.compose.runtime.compositionLocalOf<SearchUsage?> { null }
+
+/**
+ * Counts a press on a pill, under the pill's own key (its "cmd:", "set:" or "piece:" key). It only observes the press, in the
+ * Initial pass, and never consumes it, so the pill still gets its tap. A press that turns into a scroll is not counted.
+ */
+@Composable
+private fun Modifier.recordPress(key: String): Modifier {
+    val usage = LocalSearchUsage.current ?: return this
+    return pointerInput(key, usage) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (waitForUpOrCancellation(PointerEventPass.Initial) != null) usage.record(key)
+        }
+    }
 }
 
 /**
@@ -172,7 +200,7 @@ internal fun SearchPillList(
  * (flattening, narrowing and fading), so a pill leaves and arrives instead of being cut off by the edge.
  */
 internal fun LazyListScope.pillItem(key: Any, listState: LazyListState, content: @Composable () -> Unit) {
-    item(key = key) { Box(Modifier.animateItem().pillEdgeFocus(listState, key)) { content() } }
+    item(key = key) { Box(Modifier.animateItem().pillEdgeFocus(listState, key).recordPress(key.toString())) { content() } }
 }
 
 private fun Modifier.pillEdgeFocus(state: LazyListState, key: Any): Modifier = graphicsLayer {

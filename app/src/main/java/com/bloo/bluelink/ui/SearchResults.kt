@@ -57,16 +57,21 @@ internal fun SettingsSearchResults(
             buildSettingsSearchEntries(state, appearance, notif, vm, canBio, prefs)
         }
     }
+    // What the person has picked, per result, on this device (SearchUsage). Every pill reports its presses under its own key, so this
+    // store learns across the whole search list: commands, settings and the pieces of a car's page. Among equal matches, the most
+    // picked rise to the top.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val usage = remember(context) { SearchUsage(context) }
     val facts = remember(state, appearance) { carFacts(state, appearance) }
-    val pieces = remember(facts, tokens) { rankPieces(tokens, facts) }
+    val pieces = remember(facts, tokens) { rankPieces(tokens, facts) { usage.count(it.usageKey()) } }
     val settings = remember(entries, tokens, limit) {
         val strict = entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = false)?.let { e to it } }
         val scored = strict.ifEmpty { entries.mapNotNull { e -> searchScore(tokens, e, fuzzy = true)?.let { e to it } } }
-        scored.sortedByDescending { it.second }.map { it.first }.let { if (it.size > limit) it.take(limit) else it }
+        scored
+            .sortedWith(compareByDescending<Pair<SearchEntry, Int>> { it.second }.thenByDescending { usage.count("set:${it.first.title}") })
+            .map { it.first }
+            .let { if (it.size > limit) it.take(limit) else it }
     }
-    // The commands the person picks most rise to the top among equal matches. Counted on this device (SearchUsage).
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val usage = remember(context) { SearchUsage(context) }
     val suggestedCommands = remember(query, state.vehicles) {
         if (query.isNotBlank()) {
             searchCommands(query, state.vehicles, fuzzy = false).sortedByDescending { usage.count("cmd:${it.id}") }.take(3)
@@ -106,7 +111,7 @@ internal fun SettingsSearchResults(
             if (pieces.isNotEmpty()) {
                 pillItem("head:cars", listState) { SearchHeading(if (pieces.size > 1) "From your cars · ${pieces.size}" else "From your cars", hazeState) }
                 // Pieces of the car's own page, lifted out: the charge bar, the lock buttons, the climate switch, the map.
-                pieces.forEach { p -> pillItem("piece:${p.vin}:${p.topic}:${p.label}", listState) { SearchPieceView(p, state, vm, appearance, hazeState) } }
+                pieces.forEach { p -> pillItem(pieceKey(p.vin, p.topic, p.label), listState) { SearchPieceView(p, state, vm, appearance, hazeState) } }
             }
             if (suggestedCommands.isNotEmpty()) {
                 pillItem("head:actions", listState) { SearchHeading("Actions", hazeState) }
@@ -114,7 +119,6 @@ internal fun SettingsSearchResults(
                     pillItem("cmd:${cmd.id}", listState) {
                         // Runs it, unless it needs a value first ("set charge limit"): then it just fills the box.
                         ActionPill(cmd.icon, cmd.title, cmd.description, MaterialTheme.colorScheme.secondary, hazeState) {
-                            usage.record("cmd:${cmd.id}")
                             onPick(if (cmd.requiresArg) cmd.title + " " else cmd.title, !cmd.requiresArg)
                         }
                     }
