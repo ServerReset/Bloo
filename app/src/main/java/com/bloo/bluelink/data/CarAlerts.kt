@@ -256,8 +256,51 @@ object CarAlerts {
                 }
             }
         }
+        // 12 V battery: a low reading alerts once per low spell, and re-arms when the battery recovers.
+        if (prefs.low12V && status != null) {
+            val level = status.battery?.level
+            val key = "low12v_${v.vin}"
+            if (level != null) {
+                if (level < LOW_12V_PERCENT) {
+                    if (canDeliver && !settings.alertFired(key)) {
+                        out += Alert(
+                            low12vId(v),
+                            "${v.name}: 12V battery is low",
+                            "The car's 12V battery is at $level%. Start the car or charge it before it goes flat.",
+                            channelId = Notifications.CHANNEL_EVENTS,
+                        )
+                        settings.setAlertFired(key, true)
+                    }
+                } else if (settings.alertFired(key)) {
+                    settings.setAlertFired(key, false)
+                }
+            }
+        }
+        // Tyre pressure: the car's own warning lamp alerts once per warning, and re-arms when the lamp goes out.
+        if (prefs.tirePressure && status != null) {
+            val key = "tire_${v.vin}"
+            // Canada and Hyundai US report the warning lamp; Kia reports the same 0/1 indicator as tirePressure.all.
+            if (status.tirePressureLamp?.tirePressureWarningLampAll == 1 || status.tirePressure?.all == 1) {
+                if (canDeliver && !settings.alertFired(key)) {
+                    out += Alert(
+                        tireId(v),
+                        "${v.name}: tyre pressure warning",
+                        "The car is showing a tyre pressure warning. Check the tyres when you can.",
+                        channelId = Notifications.CHANNEL_EVENTS,
+                    )
+                    settings.setAlertFired(key, true)
+                }
+            } else if (settings.alertFired(key)) {
+                settings.setAlertFired(key, false)
+            }
+        }
         return out
     }
+
+    /** Below this percentage the 12 V battery is treated as low. */
+    private const val LOW_12V_PERCENT = 30
+    private fun low12vId(v: Vehicle) = ("low12v" + v.vin).hashCode()
+    private fun tireId(v: Vehicle) = ("tire" + v.vin).hashCode()
 
     // Stable per-VIN notification ids, one distinct id per alert *kind* so the three alert types
     // for the same car never overwrite each other's notification (each hashes a kind-prefixed

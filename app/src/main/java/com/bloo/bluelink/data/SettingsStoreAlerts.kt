@@ -21,6 +21,8 @@ internal fun SettingsStore.decodeNotificationPrefs(p: Preferences): SettingsStor
         carStarted = p[booleanPreferencesKey(AlertKeys.CAR_STARTED)] ?: true,
         chargeComplete = p[booleanPreferencesKey(AlertKeys.CHARGE_COMPLETE)] ?: true,
         watchLowBattery = p[booleanPreferencesKey(AlertKeys.WATCH_LOW_BATTERY)] ?: true,
+        low12V = p[booleanPreferencesKey(AlertKeys.LOW_12V)] ?: true,
+        tirePressure = p[booleanPreferencesKey(AlertKeys.TIRE_PRESSURE)] ?: true,
     )
 
 /**
@@ -48,6 +50,8 @@ suspend fun SettingsStore.setNotifyAutoLock(v: Boolean) = putSwitch(AlertKeys.AU
 suspend fun SettingsStore.setNotifyCarStarted(v: Boolean) = putSwitch(AlertKeys.CAR_STARTED, v)
 suspend fun SettingsStore.setNotifyChargeComplete(v: Boolean) = putSwitch(AlertKeys.CHARGE_COMPLETE, v)
 suspend fun SettingsStore.setNotifyWatchLowBattery(v: Boolean) = putSwitch(AlertKeys.WATCH_LOW_BATTERY, v)
+suspend fun SettingsStore.setNotifyLow12V(v: Boolean) = putSwitch(AlertKeys.LOW_12V, v)
+suspend fun SettingsStore.setNotifyTirePressure(v: Boolean) = putSwitch(AlertKeys.TIRE_PRESSURE, v)
 
 // Mechanism: when AlertWorker (see work/AlertWorker.kt) first observes a door open (or engine
 // running), it stamps "door_since_$vin"/"engine_since_$vin" with the current time via the setters

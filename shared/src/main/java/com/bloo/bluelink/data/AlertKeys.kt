@@ -17,4 +17,6 @@ object AlertKeys {
     const val CAR_STARTED = "notify_start"
     const val CHARGE_COMPLETE = "notify_charge_complete"
     const val WATCH_LOW_BATTERY = "notify_watch_low"
+    const val LOW_12V = "notify_low_12v"
+    const val TIRE_PRESSURE = "notify_tire"
 }

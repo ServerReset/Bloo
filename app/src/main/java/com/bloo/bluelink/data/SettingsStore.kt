@@ -239,6 +239,10 @@ class SettingsStore(internal val context: Context) {
         val chargeComplete: Boolean = true,
         /** The watch's own "battery is low" notification (the phone has no equivalent). */
         val watchLowBattery: Boolean = true,
+        /** The car's own 12 V starter battery, when it drops low. */
+        val low12V: Boolean = true,
+        /** The car's tyre-pressure warning lamp. */
+        val tirePressure: Boolean = true,
     )
 
     /**

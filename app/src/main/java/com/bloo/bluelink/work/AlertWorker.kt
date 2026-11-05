@@ -75,7 +75,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
         // Every alert type CarAlerts.evaluate handles: car started and charge complete too, or a user who kept only
         // those on never got them with the app closed.
         if (!prefs.service && !prefs.doorOpen && !prefs.running && !prefs.unlocked && !prefs.charging &&
-            !prefs.carStarted && !prefs.chargeComplete
+            !prefs.carStarted && !prefs.chargeComplete && !prefs.low12V && !prefs.tirePressure
         ) {
             return Result.success()
         }

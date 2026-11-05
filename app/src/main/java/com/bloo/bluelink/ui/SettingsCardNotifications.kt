@@ -100,6 +100,16 @@ internal fun NotificationsCardContent(
                 notif.chargeComplete,
                 description = "When a charge session finishes.",
             ) { vm.setNotifyChargeComplete(it) }
+            ToggleRow(
+                "12V battery low",
+                notif.low12V,
+                description = "When the car's 12V battery drops under 30%.",
+            ) { vm.setNotifyLow12V(it) }
+            ToggleRow(
+                "Tyre pressure warning",
+                notif.tirePressure,
+                description = "When the car shows a tyre-pressure warning.",
+            ) { vm.setNotifyTirePressure(it) }
             val hasWatchApp by com.bloo.bluelink.wear.WatchPresence.hasApp.collectAsStateWithLifecycle()
             PopVisible(visible = hasWatchApp) {
                 ToggleRow(

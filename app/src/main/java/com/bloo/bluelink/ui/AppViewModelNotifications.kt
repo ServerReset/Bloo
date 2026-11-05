@@ -5,6 +5,8 @@ import com.bloo.bluelink.data.LiveCharge
 import com.bloo.bluelink.data.setNotifyChargeComplete
 import com.bloo.bluelink.data.setNotifyCharging
 import com.bloo.bluelink.data.setNotifyWatchLowBattery
+import com.bloo.bluelink.data.setNotifyLow12V
+import com.bloo.bluelink.data.setNotifyTirePressure
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -45,3 +47,7 @@ fun AppViewModel.setNotifyWatchLowBattery(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyWatchLowBattery(v)
     com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
 }
+
+fun AppViewModel.setNotifyLow12V(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyLow12V(v) }
+
+fun AppViewModel.setNotifyTirePressure(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyTirePressure(v) }
