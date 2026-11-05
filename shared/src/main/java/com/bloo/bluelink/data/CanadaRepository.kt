@@ -122,6 +122,14 @@ class CanadaRepository(
         api.chargeStatus(s, summary.id, summary.vin, paymentId)
     }
 
+    /** A route from the car's position to ([toLat], [toLon]) with its charging stops (iac/rp). Reads only: nothing is started. */
+    suspend fun tripPlan(v: Vehicle, fromLat: Double, fromLon: Double, toLat: Double, toLon: Double, chargerSoc: Int, destinationSoc: Int): TripPlan =
+        withSession { s ->
+            val summary = summaryFor(s, v)
+            val vendor = api.chargeVendorNum(s, summary.id, summary.model, summary.year)
+            api.tripPlan(s, summary.id, summary.vin, fromLat, fromLon, toLat, toLon, chargerSoc, destinationSoc, vendor)
+        }
+
     /** The Bluelink Store's token for this car. It needs only the session, not the car's PIN, so it does not go through [withCommandAuth]. */
     suspend fun storeAccess(v: Vehicle): StoreAccess = withSession { s -> api.storeAccess(s, summaryFor(s, v).id) }
 

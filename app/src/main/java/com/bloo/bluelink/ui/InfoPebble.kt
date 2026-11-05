@@ -176,6 +176,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
     var showCarStore by remember { mutableStateOf(false) }
     var showChargeHistory by remember { mutableStateOf(false) }
     var showChargers by remember { mutableStateOf(false) }
+    var showTrip by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -235,6 +236,14 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showChargers && at != null) ChargersNearbyDialog(vm, v, at) { showChargers = false }
+            if (usesInAppStore(vm.brandOf(v)) && at != null) {
+                MorphActionButton(
+                    label = "Plan a trip",
+                    icon = AppIcons.Bolt,
+                    onClick = { showTrip = true },
+                )
+            }
+            if (showTrip && at != null) TripPlannerDialog(vm, v, at) { showTrip = false }
         }
         group("Service") {
             MorphActionButton(

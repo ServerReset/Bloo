@@ -249,3 +249,111 @@ suspend fun CanadaApi.chargeStatus(s: CanadaSession, vehicleId: String, vin: Str
             charging = r.path("evStatus", "batteryCharge").bool(),
         )
     }
+
+// --- Trip planning: a route from the car to a destination, with the charging stops it needs (iac/rp). Ported from open-blue-android;
+// not verified against a live account. Only the route's stops and totals are read here; the drawn line is not used yet.
+
+/** A charging stop on a planned trip. Times in minutes, distances in metres, charge levels in percent. */
+data class TripStop(
+    val name: String,
+    val network: String?,
+    val lat: Double,
+    val lon: Double,
+    val arriveSoc: Int?,
+    val targetSoc: Int?,
+    val chargeMinutes: Int?,
+    val distanceM: Int?,
+    val powerKw: Int?,
+)
+
+/** One way to get there: its length, its time, the stops, and whether the car reaches the destination. */
+data class TripRoute(
+    val distanceM: Int,
+    val minutes: Int,
+    val stops: List<TripStop>,
+    val arriveSoc: Int?,
+    val reachable: Boolean,
+)
+
+/** What the route planner said. [status] 0 is a plan; anything else failed. */
+data class TripPlan(val status: Int, val routes: List<TripRoute>)
+
+/**
+ * The vendor number the route planner needs, from iac/serviceInfo. [year] is the model year the account lists for the car. Upstream
+ * sends the car's model code too; this sends the model name in its place, which may not match what Bluelink expects.
+ */
+suspend fun CanadaApi.chargeVendorNum(s: CanadaSession, vehicleId: String, model: String, year: Int?): Int = withContext(Dispatchers.IO) {
+    val body = buildJsonObject {
+        putJsonObject("vehicleInfo") {
+            put("modelCode", model)
+            put("modelYear", year?.toString().orEmpty())
+            put("brand", "H")
+        }
+    }.toString().toRequestBody(jsonMedia)
+    val req = Request.Builder().url(apiUrl + "iac/serviceInfo").post(body).vehicleHeaders(s, vehicleId).build()
+    call(req).path("result", "vendorNum").intLoose() ?: 0
+}
+
+/**
+ * Plans a route from ([fromLat], [fromLon]) to ([toLat], [toLon]) with charging stops: the car reaches each charger with at least
+ * [chargerSoc] percent and the destination with [destinationSoc] percent. Route option 22 is what the official app always asks for.
+ */
+suspend fun CanadaApi.tripPlan(
+    s: CanadaSession,
+    vehicleId: String,
+    vin: String,
+    fromLat: Double,
+    fromLon: Double,
+    toLat: Double,
+    toLon: Double,
+    chargerSoc: Int,
+    destinationSoc: Int,
+    vendorNum: Int,
+): TripPlan = withContext(Dispatchers.IO) {
+    val body = buildJsonObject {
+        put("version", "1.0")
+        put("clientType", 6)
+        put("id", vin)
+        putJsonObject("origin") { put("lat", fromLat); put("lon", fromLon) }
+        putJsonObject("destination") {
+            putJsonArray("points") { add(buildJsonObject { put("lat", toLat); put("lon", toLon) }) }
+        }
+        put("evChargingStationCandidates", 0)
+        putJsonArray("route") { add(buildJsonObject { put("routeOption", 22) }) }
+        putJsonObject("vehicleInfo") {
+            put("chargerType", 37)
+            put("chargerSpeed", 7)
+            put("destinationArrivalSoc", destinationSoc)
+            put("chargingStationArrivalSoc", chargerSoc)
+            put("genType", GEN_TYPE)
+            put("vendorNum", vendorNum)
+        }
+    }.toString().toRequestBody(jsonMedia)
+    val req = Request.Builder().url(apiUrl + "iac/rp").post(body).vehicleHeaders(s, vehicleId).build()
+    val result = call(req).path("result")
+    val routes = (result.path("route") as? JsonArray).orEmpty().map { rt ->
+        TripRoute(
+            distanceM = rt.path("totalDistance").intLoose() ?: 0,
+            minutes = (rt.path("totalTime").intLoose() ?: 0) / 60,
+            stops = (rt.path("evStation") as? JsonArray).orEmpty().mapNotNull { st ->
+                val lat = st.path("vertex", "lat").dbl() ?: return@mapNotNull null
+                val lon = st.path("vertex", "lon").dbl() ?: return@mapNotNull null
+                TripStop(
+                    name = st.path("poiName").str() ?: "Charging stop",
+                    network = st.path("brandName").str(),
+                    lat = lat,
+                    lon = lon,
+                    arriveSoc = st.path("pointSoc").intLoose()?.takeIf { it in 0..100 },
+                    targetSoc = st.path("targetSoc").intLoose()?.takeIf { it in 0..100 },
+                    chargeMinutes = st.path("chargingTime").dbl()?.let { (it / 60).toInt() },
+                    distanceM = st.path("pointDistance").intLoose(),
+                    powerKw = st.path("pointChargerPower").intLoose(),
+                )
+            },
+            // 254 means unknown, as the official app shows it.
+            arriveSoc = rt.path("destination", "pointSoc").intLoose()?.takeIf { it in 0..100 },
+            reachable = (rt.path("reasonUnReachable").intLoose() ?: 0) == 0,
+        )
+    }
+    TripPlan(status = result.path("status").intLoose() ?: 0, routes = routes)
+}
