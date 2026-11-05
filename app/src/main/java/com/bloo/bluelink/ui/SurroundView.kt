@@ -85,7 +85,13 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
                             scope.launch {
                                 runCatching { repo.requestSurroundView(v) }
                                     .onSuccess { note = "Asked the car for new photos. Tap Refresh in a minute or two." }
-                                    .onFailure { note = it.message ?: "Bluelink didn't take the request." }
+                                    .onFailure {
+                                        // A refusal from Bluelink usually means this car cannot take surround-view photos. Say so, and keep the raw reason.
+                                        val raw = it.message ?: "Bluelink didn't take the request."
+                                        note = if (raw.contains("HTTP 4") || raw.contains("HTTP 5") || raw.contains("errorMessage"))
+                                            "This car doesn't seem to take surround-view photos (Bluelink refused the request). Details: $raw"
+                                        else raw
+                                    }
                                 busy = false
                             }
                         },
