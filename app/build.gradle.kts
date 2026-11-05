@@ -355,6 +355,10 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    // The 3D car (Filament renders it; gltfio loads the model). Same versions as open-blue-android.
+    implementation("com.google.android.filament:filament-android:1.54.5")
+    implementation("com.google.android.filament:gltfio-android:1.54.5")
+    implementation("com.google.android.filament:filament-utils-android:1.54.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // The Play flavor's update path: Play's own In-App Updates API. Play owns the download and the

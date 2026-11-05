@@ -1,0 +1,11 @@
+Model Information:
+* title:	2024 Hyundai Ioniq 5 N
+* source:	https://sketchfab.com/3d-models/2024-hyundai-ioniq-5-n-8d16325eb7974a948627b3cd77f30f52
+* author:	Ddiaz Design (https://sketchfab.com/ddiaz-design)
+
+Model License:
+* license type:	CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)
+* requirements:	Author must be credited. No commercial use.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "2024 Hyundai Ioniq 5 N" (https://sketchfab.com/3d-models/2024-hyundai-ioniq-5-n-8d16325eb7974a948627b3cd77f30f52) by Ddiaz Design (https://sketchfab.com/ddiaz-design) licensed under CC-BY-NC-4.0 (http://creativecommons.org/licenses/by-nc/4.0/)

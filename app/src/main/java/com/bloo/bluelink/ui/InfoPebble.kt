@@ -178,6 +178,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
     var showChargers by remember { mutableStateOf(false) }
     var showTrip by remember { mutableStateOf(false) }
     var showSurround by remember { mutableStateOf(false) }
+    var show3D by remember { mutableStateOf(false) }
 
     @Composable
     fun group(title: String, content: @Composable () -> Unit) {
@@ -253,6 +254,13 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showSurround) SurroundViewDialog(vm, v) { showSurround = false }
+            // The 3D car works for any car with a status, so it is offered for every brand.
+            MorphActionButton(
+                label = "3D car",
+                icon = AppIcons.DirectionsCar,
+                onClick = { show3D = true },
+            )
+            if (show3D) Car3DDialog(v, state.statusFor(v)) { show3D = false }
         }
         group("Service") {
             MorphActionButton(
