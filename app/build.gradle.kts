@@ -359,6 +359,8 @@ dependencies {
     implementation("com.google.android.filament:filament-android:1.54.5")
     implementation("com.google.android.filament:gltfio-android:1.54.5")
     implementation("com.google.android.filament:filament-utils-android:1.54.5")
+    // The on-device models for the 3D surroundings (depth, detection, inpainting), run by ONNX Runtime. Same version as open-blue-android.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // The Play flavor's update path: Play's own In-App Updates API. Play owns the download and the

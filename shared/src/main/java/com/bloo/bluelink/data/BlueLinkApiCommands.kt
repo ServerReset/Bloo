@@ -1,6 +1,8 @@
 package com.bloo.bluelink.data
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -126,7 +128,8 @@ suspend fun BlueLinkApi.svmLatest(token: String, username: String, pin: String, 
     SurroundCapture(
         utcTime = detail["gpsDetail"]?.jsonObject?.get("time")?.jsonPrimitive?.contentOrNull,
         jpeg = jpeg,
-        imageSize = emptyList(),
+        // The composite's layout: frame and top-view sizes, which the 3D scene reads.
+        imageSize = (detail["imageSize"] as? JsonArray).orEmpty().mapNotNull { it.jsonPrimitive.intOrNull },
     )
 }
 
