@@ -82,6 +82,10 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
         Icons.Filled.Memory, "${carName ?: "Your car"}: head unit",
         "Which generation of infotainment it has.",
     )
+    OnboardingStepKind.CAR_SURROUND -> OnboardingCardSpec(
+        AppIcons.DirectionsCar, "${carName ?: "Your car"}: surround view",
+        "Which cars show the 360 camera photos: limited trims, every car, or none.",
+    )
     OnboardingStepKind.CAR_CLIMATE -> OnboardingCardSpec(
         Icons.Filled.AcUnit, "${carName ?: "Your car"}: seats and climate",
         "Which seats heat or cool, and whether the wheel does.",
@@ -103,7 +107,7 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
     return when (kind) {
         OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.FEATURES -> scheme.primary
         OnboardingStepKind.RESTORE, OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM,
-        OnboardingStepKind.CAR_CLIMATE -> scheme.tertiary
+        OnboardingStepKind.CAR_SURROUND, OnboardingStepKind.CAR_CLIMATE -> scheme.tertiary
         OnboardingStepKind.LOOK, OnboardingStepKind.TIPS, OnboardingStepKind.ALERTS, OnboardingStepKind.WATCH -> scheme.secondary
     }
 }

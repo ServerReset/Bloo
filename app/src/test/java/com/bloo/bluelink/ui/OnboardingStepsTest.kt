@@ -65,12 +65,12 @@ class OnboardingStepsTest {
         assertEquals(
             firstRunHead +
                 // A US Hyundai has a head unit to confirm; a US Kia does not.
-                listOf(OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM, OnboardingStepKind.CAR_CLIMATE) +
+                listOf(OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM, OnboardingStepKind.CAR_SURROUND, OnboardingStepKind.CAR_CLIMATE) +
                 listOf(OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_CLIMATE) + tail,
             kinds(steps),
         )
         assertEquals(
-            listOf(usHyundai.vin, usHyundai.vin, usHyundai.vin, usKia.vin, usKia.vin),
+            listOf(usHyundai.vin, usHyundai.vin, usHyundai.vin, usHyundai.vin, usKia.vin, usKia.vin),
             steps.filter { it.kind.isCarCard() }.map { it.vin },
         )
     }

@@ -178,7 +178,6 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
     var showChargers by remember { mutableStateOf(false) }
     var showTrip by remember { mutableStateOf(false) }
     var showSurround by remember { mutableStateOf(false) }
-    var show3D by remember { mutableStateOf(false) }
     var showLimits by remember { mutableStateOf(false) }
     var show3DSurround by remember { mutableStateOf(false) }
 
@@ -259,7 +258,7 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 MorphActionButton(label = "Precondition battery", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, true) })
                 MorphActionButton(label = "Stop preconditioning", icon = AppIcons.Bolt, onClick = { vm.setBatteryPreconditioning(v, false) })
             }
-            if (caps.surroundView) {
+            if (state.surroundOn(v, caps.surroundView)) {
                 MorphActionButton(
                     label = "Surround view",
                     icon = AppIcons.Bolt,
@@ -267,16 +266,9 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
                 )
             }
             if (showSurround) SurroundViewDialog(vm, v) { showSurround = false }
-            // The 3D car works for any car with a status, so it is offered for every brand.
-            MorphActionButton(
-                label = "3D car",
-                icon = AppIcons.DirectionsCar,
-                onClick = { show3D = true },
-            )
-            if (show3D) Car3DDialog(v, state.statusFor(v)) { show3D = false }
             if (showLimits) ChargeLimitsSetOnlyDialog(vm, v) { showLimits = false }
             // The 3D surroundings are built from the newest surround-view set, so they are offered where that set can be had.
-            if (caps.surround3D) {
+            if (state.surroundOn(v, caps.surround3D)) {
                 MorphActionButton(label = "3D surroundings", icon = AppIcons.DirectionsCar, onClick = { show3DSurround = true })
             }
             if (show3DSurround) Surround3DDialog(v) { show3DSurround = false }

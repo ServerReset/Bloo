@@ -17,6 +17,8 @@ import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setSectionOrder
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.setTextClearPhoto
+import com.bloo.bluelink.data.setSurroundView
+import com.bloo.bluelink.data.SurroundViewAccess
 import com.bloo.bluelink.data.learnClimate
 import com.bloo.bluelink.data.learnComfort
 import com.bloo.bluelink.data.SmartClimateMode
@@ -98,6 +100,11 @@ fun AppViewModel.setPlatform(v: Vehicle, value: VehiclePlatform) {
     // persistSnapshots writes the EFFECTIVE (override-applied) generation number into the synced
     // VehicleSnapshot -- see snapshotOf.
     viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
+}
+
+fun AppViewModel.setSurroundView(v: Vehicle, value: SurroundViewAccess) {
+    _state.update { it.copy(surroundViews = it.surroundViews.withCar(v.vin, value)) }
+    viewModelScope.launch { settingsStore.setSurroundView(v.vin, value) }
 }
 
 /** Pin or unpin a pebble in the dual-column hot spot. */

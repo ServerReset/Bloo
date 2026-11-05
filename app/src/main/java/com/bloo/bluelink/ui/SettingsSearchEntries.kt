@@ -115,6 +115,11 @@ internal fun buildSettingsSearchEntries(
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
         }
+        if (vm.brandOf(v).capabilities.surroundView) {
+            add("Surround view · ${v.name}", "surround view 360 cameras photos limited trims always off ${v.name}") {
+                SurroundViewPicker(current = state.surroundAccessOf(v)) { a -> vm.setSurroundView(v, a) }
+            }
+        }
         add("Last service · ${v.name}", "service maintenance mileage ${v.name}") {
             MilesField(state.lastServiceMiles[v.vin], "Last service (mi)", Modifier.fillMaxWidth()) {
                 vm.setLastServiceMiles(v.vin, it)

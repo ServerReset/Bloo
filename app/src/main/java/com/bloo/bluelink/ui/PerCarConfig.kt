@@ -54,6 +54,7 @@ internal suspend fun AppViewModel.perCarConfig(
     val seatConfigs = vehicles.perCarAll { settingsStore.seatConfig(it, prefs) }
     val powertrains = vehicles.perCar { settingsStore.powertrain(it, prefs) }
     val platforms = vehicles.perCar { settingsStore.platform(it, prefs) }
+    val surroundViews = vehicles.perCar { settingsStore.surroundView(it, prefs) }
     val sectionOrders = vehicles.perCarAll { settingsStore.sectionOrder(it, prefs) }
     val stored = vehicles.perCar { settingsStore.imageUrl(it, prefs) }
     // A car with no picture of its own gets the bundled one for its model and paint, once, when the account tells us both. It is
@@ -79,6 +80,7 @@ internal suspend fun AppViewModel.perCarConfig(
                 seatConfigs = seatConfigs,
                 powertrains = powertrains,
                 platforms = platforms,
+                surroundViews = surroundViews,
                 sectionOrders = sectionOrders,
                 imageUrls = images,
                 textClearPhotos = textClear,

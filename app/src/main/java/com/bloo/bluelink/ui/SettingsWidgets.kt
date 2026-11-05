@@ -142,6 +142,17 @@ internal fun PlatformPicker(current: VehiclePlatform, onSelect: (VehiclePlatform
     label = { when (it) { VehiclePlatform.GEN5W -> "Gen5W"; VehiclePlatform.CCNC -> "ccNC" } },
 )
 
+/** Which cars show the surround-view features: limited ccNC trims (the default), every car the brand has them on, or none. */
+@Composable
+internal fun SurroundViewPicker(current: com.bloo.bluelink.data.SurroundViewAccess, onSelect: (com.bloo.bluelink.data.SurroundViewAccess) -> Unit) = EnumSegmented(
+    com.bloo.bluelink.data.SurroundViewAccess.entries, current, onSelect = onSelect,
+    label = { when (it) {
+        com.bloo.bluelink.data.SurroundViewAccess.AUTO -> "Limited trims"
+        com.bloo.bluelink.data.SurroundViewAccess.ON -> "Always"
+        com.bloo.bluelink.data.SurroundViewAccess.OFF -> "Off"
+    } },
+)
+
 /** The three theme modes as segment options, defined once for every call site. */
 val ThemeModeOptions = ThemeMode.entries.map { SegmentOption(it.name, it.name.lowercase().replaceFirstChar(Char::uppercase), null) }
 

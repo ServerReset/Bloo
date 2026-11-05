@@ -312,6 +312,14 @@ suspend fun SettingsStore.setPlatform(vin: String, value: VehiclePlatform) {
     editTracked { it[stringPreferencesKey("platform_$vin")] = value.name }
 }
 
+fun SettingsStore.surroundView(vin: String, p: Preferences): SurroundViewAccess? =
+    p[stringPreferencesKey("surround_$vin")]
+        ?.let { runCatching { SurroundViewAccess.valueOf(it) }.getOrNull() }
+
+suspend fun SettingsStore.setSurroundView(vin: String, value: SurroundViewAccess) {
+    editTracked { it[stringPreferencesKey("surround_$vin")] = value.name }
+}
+
 // Remaining global appearance setters (theme/font/dynamic-color/palette):
 // each stores its enum's name() (or, for dynamicColor, a "true"/"false"
 // string) under its fixed SettingsStore.Keys.* entry; decoding happens once, centrally,

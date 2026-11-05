@@ -98,6 +98,12 @@ internal fun CarSettingsCard(
                 BodySmallText("Confirm this car's head unit.")
                 PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
             }
+            // Surround view is a brand feature (see BrandCapabilities); the choice then decides per car, by trim.
+            if (vm.brandOf(v).capabilities.surroundView) {
+                SecondaryText("Surround view")
+                BodySmallText("Limited trims: ccNC limited cars only. Always: every car that takes the photos. Off: hidden.")
+                SurroundViewPicker(current = state.surroundAccessOf(v)) { a -> vm.setSurroundView(v, a) }
+            }
         }
 
         SettingsGroup("Climate") {

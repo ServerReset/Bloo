@@ -36,6 +36,16 @@ internal fun OnboardingPlatformPage(vehicle: com.bloo.bluelink.data.Vehicle, sta
 }
 
 /**
+ * The car's surround-view choice: limited trims, every car the brand has it on, or none. The default needs no answer.
+ */
+@Composable
+internal fun OnboardingSurroundPage(vehicle: com.bloo.bluelink.data.Vehicle, state: UiState, vm: AppViewModel) {
+    SurroundViewPicker(current = state.surroundAccessOf(vehicle)) { a ->
+        vm.setSurroundView(vehicle, a)
+    }
+}
+
+/**
  * Card 3 of a car: which seats heat or cool, and whether the wheel heats, so the climate controls
  * match.
  */
