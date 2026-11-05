@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
  */
 class UpdateCheckWorker(context: Context, params: WorkerParameters) : BlooWorker(context, params) {
     /**
-     * WorkManager's entry point, invoked on each ~12-hour periodic tick.
+     * WorkManager's entry point, invoked on each ~6-hour periodic tick.
      *
      * Mechanism, in order:
      * 1. Delegates the actual "is there a newer build" logic entirely to
@@ -51,7 +51,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : BlooWorker
      *    notification rather than adding one.
      */
     override suspend fun run(): Result {
-        if (skipWhenLean(applicationContext, "update", 12 * 60 * 60_000L)) return Result.success()
+        if (skipWhenLean(applicationContext, "update", 6 * 60 * 60_000L)) return Result.success()
 
         val ctx = applicationContext
         val result = UpdateChecker.checkPhone(ctx, force = false)
@@ -80,14 +80,19 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters) : BlooWorker
         private const val NAME = "bloo_update_check"
         private const val NOTIF_ID = 90210 // arbitrary, distinct from per-VIN alert IDs
 
-        /** Matches UpdateChecker's own ~12h intended cadence; the checker's
-         *  internal debounce/snooze gates still apply on top of this.
-         *  Requires a connected network (WorkManager-level constraint) since an
-         *  update check is inherently a network call to GitHub and there's no
-         *  point waking the worker up when there's clearly no connectivity to use.
+        /** Every ~6 hours; the checker's internal debounce/snooze gates still apply on top of this.
+         *  Requires an unmetered (Wi-Fi) network: the check is a GitHub call and a build is large,
+         *  so it should not run on mobile data.
          *  Registered as unique periodic work with KEEP so re-invoking schedule()
          *  (e.g. on every app start) doesn't reset the already-running periodic
          *  timer. */
-        fun schedule(context: Context) = enqueuePeriodic<UpdateCheckWorker>(context, NAME, 12, TimeUnit.HOURS)
+        fun schedule(context: Context) = enqueuePeriodic<UpdateCheckWorker>(context, NAME, 6, TimeUnit.HOURS) {
+            // Wi-Fi only: a build is large, and the check should not spend mobile data in the background.
+            setConstraints(
+                androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.UNMETERED)
+                    .build(),
+            )
+        }
     }
 }
