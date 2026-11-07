@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.uicommon.GapSection
@@ -25,15 +24,6 @@ internal fun OnboardingPowertrainPage(vehicle: com.bloo.bluelink.data.Vehicle, s
     }
 }
 
-/**
- * Card 2 of a Hyundai/Genesis US car: its head-unit generation, which the API can't always tell.
- */
-@Composable
-internal fun OnboardingPlatformPage(vehicle: com.bloo.bluelink.data.Vehicle, state: UiState, vm: AppViewModel) {
-    PlatformPicker(current = state.platformOf(vehicle)) { pt ->
-        vm.setPlatform(vehicle, pt)
-    }
-}
 
 /**
  * The car's surround-view choice: limited trims, every car the brand has it on, or none. The default needs no answer.

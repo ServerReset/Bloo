@@ -15,11 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.SettingsCatalog
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.lastServiceMiles
-import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.setLastServiceMiles
 import com.bloo.bluelink.data.setLicensePlate
-import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setServiceIntervalMiles
 import com.bloo.bluelink.data.settingsMode
@@ -107,13 +105,6 @@ internal fun buildSettingsSearchEntries(
         }
         add("Powertrain · ${v.name}", "powertrain ev gas hybrid phev ${v.name}") {
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
-        }
-        // Same gate CarSettingsCard's own group uses -- nothing to confirm for a vehicle where this
-        // picker would have no effect either way.
-        if (v.platformOverridable) {
-            add("Head-unit generation · ${v.name}", "gen5w ccnc platform generation trips ${v.name}") {
-                PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
-            }
         }
         if (vm.brandOf(v).capabilities.surroundView) {
             add("Surround view · ${v.name}", "surround view 360 cameras photos limited trims always off ${v.name}") {

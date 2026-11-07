@@ -292,7 +292,6 @@ internal fun OnboardingScreen(vm: AppViewModel, mode: OnboardingMode = Onboardin
                                         OnboardingStepKind.ALERTS -> OnboardingAlertsPage(notif, vm)
                                         OnboardingStepKind.WATCH -> OnboardingWatchPage()
                                         OnboardingStepKind.CAR_POWERTRAIN -> vehicle?.let { OnboardingPowertrainPage(it, state, vm) }
-                                        OnboardingStepKind.CAR_PLATFORM -> vehicle?.let { OnboardingPlatformPage(it, state, vm) }
                                         OnboardingStepKind.CAR_SURROUND -> vehicle?.let { OnboardingSurroundPage(it, state, vm) }
                                         OnboardingStepKind.CAR_CLIMATE -> vehicle?.let { OnboardingClimatePage(it, state, vm) }
                                         OnboardingStepKind.TIPS -> OnboardingTipsPage()

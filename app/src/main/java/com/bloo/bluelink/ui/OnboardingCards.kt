@@ -78,10 +78,6 @@ internal fun onboardingCardSpec(kind: OnboardingStepKind, carName: String?, newC
         AppIcons.DirectionsCar, "${carName ?: "Your car"}: what powers it",
         if (newCar) "A new car. Gas, hybrid, plug-in or electric?" else "Gas, hybrid, plug-in or electric?",
     )
-    OnboardingStepKind.CAR_PLATFORM -> OnboardingCardSpec(
-        Icons.Filled.Memory, "${carName ?: "Your car"}: head unit",
-        "Which generation of infotainment it has.",
-    )
     OnboardingStepKind.CAR_SURROUND -> OnboardingCardSpec(
         AppIcons.DirectionsCar, "${carName ?: "Your car"}: surround view",
         "Which cars show the 360 camera photos: limited trims, every car, or none.",
@@ -106,7 +102,7 @@ internal fun onboardingAccent(kind: OnboardingStepKind): Color {
     val scheme = MaterialTheme.colorScheme
     return when (kind) {
         OnboardingStepKind.WELCOME, OnboardingStepKind.SETUP, OnboardingStepKind.FEATURES -> scheme.primary
-        OnboardingStepKind.RESTORE, OnboardingStepKind.CAR_POWERTRAIN, OnboardingStepKind.CAR_PLATFORM,
+        OnboardingStepKind.RESTORE, OnboardingStepKind.CAR_POWERTRAIN,
         OnboardingStepKind.CAR_SURROUND, OnboardingStepKind.CAR_CLIMATE -> scheme.tertiary
         OnboardingStepKind.LOOK, OnboardingStepKind.TIPS, OnboardingStepKind.ALERTS, OnboardingStepKind.WATCH -> scheme.secondary
     }

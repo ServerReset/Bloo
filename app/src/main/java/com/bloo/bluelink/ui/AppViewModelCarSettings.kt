@@ -11,7 +11,6 @@ import com.bloo.bluelink.data.setHotspots
 import com.bloo.bluelink.data.setImageUrl
 import com.bloo.bluelink.data.setLastServiceMiles
 import com.bloo.bluelink.data.setLicensePlate
-import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setSectionOrder
@@ -96,12 +95,6 @@ fun AppViewModel.setPowertrain(v: Vehicle, value: Powertrain) {
     viewModelScope.launch { settingsStore.setPowertrain(v.vin, value); persistSnapshots() }
 }
 
-fun AppViewModel.setPlatform(v: Vehicle, value: VehiclePlatform) {
-    _state.update { it.copy(platforms = it.platforms.withCar(v.vin, value)) }
-    // persistSnapshots writes the EFFECTIVE (override-applied) generation number into the synced
-    // VehicleSnapshot -- see snapshotOf.
-    viewModelScope.launch { settingsStore.setPlatform(v.vin, value); persistSnapshots() }
-}
 
 fun AppViewModel.setSurroundView(v: Vehicle, value: SurroundViewAccess) {
     _state.update { it.copy(surroundViews = it.surroundViews.withCar(v.vin, value), surroundRefused = it.surroundRefused - v.vin) }

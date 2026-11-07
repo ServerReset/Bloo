@@ -37,12 +37,9 @@ class SnapshotOfTest {
     // --- effective generation honours the user override ----------------------
 
     @Test
-    fun generation_carriesEffectiveOverrideNotRawApiValue() {
-        // No override: raw "5" is stored as "3" for a modern ccNC unit.
+    fun generation_carriesTheDetectedHeadUnit() {
+        // Raw "5" is stored as "3" for a modern ccNC unit; the head unit is detected from the car, not set by hand.
         assertEquals("3", snapshot().generation)
-        // Forced Gen5W -> stored as "2".
-        val gen5 = UiState(platforms = mapOf("V1" to VehiclePlatform.GEN5W))
-        assertEquals("2", snapshot(gen5).generation)
     }
 
     @Test

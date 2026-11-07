@@ -16,7 +16,6 @@ import com.bloo.bluelink.data.setImageUrl
 import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.licensePlate
 import com.bloo.bluelink.data.onboardingSeen
-import com.bloo.bluelink.data.platform
 import com.bloo.bluelink.data.powertrain
 import com.bloo.bluelink.data.surroundRefused
 import com.bloo.bluelink.data.surroundView
@@ -55,7 +54,6 @@ internal suspend fun AppViewModel.perCarConfig(
 ): PerCarConfig = withContext(Dispatchers.Default) {
     val seatConfigs = vehicles.perCarAll { settingsStore.seatConfig(it, prefs) }
     val powertrains = vehicles.perCar { settingsStore.powertrain(it, prefs) }
-    val platforms = vehicles.perCar { settingsStore.platform(it, prefs) }
     val surroundViews = vehicles.perCar { settingsStore.surroundView(it, prefs) }
     // Only the cars Bluelink refused are in the map; the rest read as not refused.
     val surroundRefused = vehicles.perCar { settingsStore.surroundRefused(it, prefs).takeIf { refused -> refused } }
@@ -83,7 +81,6 @@ internal suspend fun AppViewModel.perCarConfig(
             it.copy(
                 seatConfigs = seatConfigs,
                 powertrains = powertrains,
-                platforms = platforms,
                 surroundViews = surroundViews,
                 surroundRefused = surroundRefused,
                 sectionOrders = sectionOrders,

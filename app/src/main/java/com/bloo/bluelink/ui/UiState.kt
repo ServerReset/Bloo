@@ -68,8 +68,6 @@ data class UiState(
     val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
-    /** User-confirmed head-unit generation, by VIN -- see [platformOf]. */
-    val platforms: Map<String, VehiclePlatform> = emptyMap(),
     /** Per car: the surround-view choice. Absent means the default, [com.bloo.bluelink.data.SurroundViewAccess.AUTO]. */
     val surroundViews: Map<String, com.bloo.bluelink.data.SurroundViewAccess> = emptyMap(),
     /** Per car: Bluelink refused a surround-view request, so the car does not take the photos. */
@@ -296,7 +294,7 @@ data class UiState(
      * [com.bloo.bluelink.data.platformOverridable] is false.
      */
     fun platformOf(v: Vehicle): VehiclePlatform =
-        platforms[v.vin] ?: if (v.isGen5W) VehiclePlatform.GEN5W else VehiclePlatform.CCNC
+        if (v.isGen5W) VehiclePlatform.GEN5W else VehiclePlatform.CCNC
 
     /** The person's surround-view choice for [v]. */
     fun surroundAccessOf(v: Vehicle): com.bloo.bluelink.data.SurroundViewAccess =

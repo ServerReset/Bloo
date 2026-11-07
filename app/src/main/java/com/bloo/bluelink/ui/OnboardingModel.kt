@@ -1,14 +1,13 @@
 package com.bloo.bluelink.ui
 
 import com.bloo.bluelink.data.brand
-import com.bloo.bluelink.data.platformOverridable
 
 internal enum class OnboardingStepKind {
     WELCOME, RESTORE, SETUP, LOOK, ALERTS, WATCH,
     /**
      * The three per-car questions. Each one blocks until it is answered: see [needsConfirmation].
      */
-    CAR_POWERTRAIN, CAR_PLATFORM, CAR_SURROUND, CAR_CLIMATE,
+    CAR_POWERTRAIN, CAR_SURROUND, CAR_CLIMATE,
     TIPS, FEATURES,
 }
 
@@ -94,8 +93,6 @@ internal fun buildOnboardingSteps(
 ): List<OnboardingStep> = buildList {
     fun carCards(v: com.bloo.bluelink.data.Vehicle) {
         add(OnboardingStep(OnboardingStepKind.CAR_POWERTRAIN, v.vin))
-        // Only Hyundai/Genesis US cars have a head-unit generation to confirm.
-        if (v.platformOverridable) add(OnboardingStep(OnboardingStepKind.CAR_PLATFORM, v.vin))
         // Only brands with surround view get the card; the limited-trim default needs no answer, so the card does not block.
         if (v.brand.capabilities.surroundView) add(OnboardingStep(OnboardingStepKind.CAR_SURROUND, v.vin))
         add(OnboardingStep(OnboardingStepKind.CAR_CLIMATE, v.vin))

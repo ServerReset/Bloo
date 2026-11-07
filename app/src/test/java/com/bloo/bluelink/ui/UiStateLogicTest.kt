@@ -142,16 +142,15 @@ class UiStateLogicTest {
     }
 
     @Test
-    fun platformOverrideFlipsTheGenerationGateForKia() {
-        val s = UiState(platforms = mapOf("V2" to VehiclePlatform.CCNC))
-        assertEquals(VehiclePlatform.CCNC, s.platformOf(usKia))
-        assertFalse(s.isGen5WEffective(usKia))
+    fun kiaIsAlwaysCcncFromTheCar() {
+        assertEquals(VehiclePlatform.CCNC, UiState().platformOf(usKia))
+        assertFalse(UiState().isGen5WEffective(usKia))
     }
 
     @Test
-    fun gen5wEffective_followsPlatformOverride() {
-        assertTrue(UiState(platforms = mapOf(usKiaGen3.vin to VehiclePlatform.GEN5W)).isGen5WEffective(usKiaGen3))
-        assertFalse(UiState(platforms = mapOf(usKiaGen3.vin to VehiclePlatform.CCNC)).isGen5WEffective(usKiaGen3))
+    fun gen5wFollowsTheCarsGeneration() {
+        assertTrue(UiState().isGen5WEffective(oldHyundai))
+        assertFalse(UiState().isGen5WEffective(usHyundai))
     }
 
     // --- seat fallback -------------------------------------------------------
@@ -223,12 +222,6 @@ class UiStateLogicTest {
         assertFalse(UiState().isSectionAvailable(oldHyundai, "trips"))
         // Kia Canada -> no endpoint.
         assertFalse(UiState().isSectionAvailable(kiaCanada, "trips"))
-        // A forced GEN5W override kills it for the Hyundai too, same as the
-        // hardware truth -- these all read isGen5WEffective, not the raw gen.
-        assertFalse(
-            UiState(platforms = mapOf(usHyundai.vin to VehiclePlatform.GEN5W))
-                .isSectionAvailable(usHyundai, "trips"),
-        )
     }
 
     @Test

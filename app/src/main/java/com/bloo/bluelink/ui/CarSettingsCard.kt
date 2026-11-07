@@ -18,12 +18,10 @@ import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.climatePresets
 import com.bloo.bluelink.data.lastServiceMiles
-import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.setDefaultClimatePreset
 import com.bloo.bluelink.data.setLastServiceMiles
 import com.bloo.bluelink.data.setLicensePlate
-import com.bloo.bluelink.data.setPlatform
 import com.bloo.bluelink.data.setPowertrain
 import com.bloo.bluelink.data.setSeatFlag
 import com.bloo.bluelink.data.setServiceIntervalMiles
@@ -90,20 +88,15 @@ internal fun CarSettingsCard(
         SettingsGroup("Car") {
             SecondaryText("Powertrain")
             PowertrainPicker(current = state.powertrainOf(v)) { pt -> vm.setPowertrain(v, pt) }
-            // Only Hyundai/Genesis US vehicles have a real head-unit generation to confirm -- see
-            // Vehicle.platformOverridable. Everywhere else it resolves the same way regardless, so
-            // a picker there would be a control with no effect.
-            if (v.platformOverridable) {
-                SecondaryText("Head unit")
-                BodySmallText("Confirm this car's head unit.")
-                PlatformPicker(current = state.platformOf(v)) { pt -> vm.setPlatform(v, pt) }
-            }
+            // The head unit is detected from the car's own generation; there is nothing to set.
+            SecondaryText("Head unit")
+            BodySmallText(if (state.isGen5WEffective(v)) "Gen5W, detected from the car." else "ccNC, detected from the car.")
             // Surround view is a brand feature (see BrandCapabilities); the choice then decides per car, by trim.
             if (vm.brandOf(v).capabilities.surroundView) {
                 SecondaryText("Surround view")
                 BodySmallText("Limited trims: ccNC limited cars only. Always: every ccNC car that takes the photos. Off: hidden.")
                 if (state.isGen5WEffective(v)) {
-                    BodySmallText("Needs a ccNC head unit. Set Head unit above if this car has one.")
+                    BodySmallText("Needs a ccNC head unit. This car's head unit is Gen5W, so the feature stays hidden.")
                 }
                 if (state.surroundRefused[v.vin] == true) {
                     BodySmallText("Bluelink refused this car's photo request, so the feature is hidden. Choose a setting to try again.")

@@ -43,18 +43,9 @@ class VehiclePlatformTest {
     }
 
     @Test
-    fun platformOf_userOverrideWinsOverApiInference() {
-        val v = hyundai("2") // API says Gen5W
-        val overridden = UiState(platforms = mapOf(v.vin to VehiclePlatform.CCNC))
-        assertEquals(VehiclePlatform.CCNC, overridden.platformOf(v))
-    }
-
-    @Test
-    fun isGen5WEffective_reflectsTheOverride() {
-        val v = hyundai("2") // API says Gen5W
-        assertTrue(UiState().isGen5WEffective(v))
-        val corrected = UiState(platforms = mapOf(v.vin to VehiclePlatform.CCNC))
-        assertFalse(corrected.isGen5WEffective(v))
+    fun isGen5WEffective_followsTheCarsOwnGeneration() {
+        assertTrue(UiState().isGen5WEffective(hyundai("2")))
+        assertFalse(UiState().isGen5WEffective(hyundai("3")))
     }
 
     @Test
