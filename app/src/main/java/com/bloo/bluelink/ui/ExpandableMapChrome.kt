@@ -305,10 +305,12 @@ internal fun MapTopBar(
                     var totalX = 0f
                     var totalY = 0f
                     var claimed = false
+                    var lastPosition = down.position
                     while (true) {
                         val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) break
-                        val delta = change.positionChange()
+                        val delta = change.position - lastPosition
+                        lastPosition = change.position
                         totalX += delta.x
                         totalY += delta.y
                         if (!claimed) {
@@ -546,13 +548,15 @@ internal fun Modifier.pullToRefreshOrDismiss(
         var totalX = 0f
         var totalY = 0f
         var claimed = false
+        var lastPosition = down.position
         while (true) {
             val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) {
                 if (claimed) onEnd()
                 break
             }
-            val delta = change.positionChange()
+            val delta = change.position - lastPosition
+            lastPosition = change.position
             totalX += delta.x
             totalY += delta.y
             if (!claimed) {
