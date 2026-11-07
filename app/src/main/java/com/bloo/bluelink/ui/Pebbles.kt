@@ -254,10 +254,23 @@ internal class KeyedSlice(val state: UiState, private val key: Any?) {
  */
 @Composable
 internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState) -> Any?): UiState {
+    // Diagnostic: which part of the slice changed, so a performance log names what keeps a pebble recomposing. Rate-limited per row.
+    val lastKey = remember(contextKey) { arrayOfNulls<Any?>(1) }
+    val lastLogAt = remember(contextKey) { longArrayOf(0L) }
     val slice by remember(state, contextKey) {
         derivedStateOf {
             val s = state.value
-            KeyedSlice(s, keys(s))
+            val key = keys(s)
+            val before = lastKey[0]
+            lastKey[0] = key
+            if (before != null && before != key && System.currentTimeMillis() - lastLogAt[0] > 5_000L) {
+                lastLogAt[0] = System.currentTimeMillis()
+                val a = (before as? List<*>)
+                val b = (key as? List<*>)
+                val changed = if (a != null && b != null) a.indices.filter { a[it] != b.getOrNull(it) }.joinToString(",") else "key"
+                com.bloo.bluelink.data.AppLog.log("slice[$contextKey] changed: $changed")
+            }
+            KeyedSlice(s, key)
         }
     }
     return slice.state
