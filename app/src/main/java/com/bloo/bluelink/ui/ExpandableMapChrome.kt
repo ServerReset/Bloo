@@ -82,6 +82,7 @@ import com.bloo.uicommon.Haptics
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import kotlinx.coroutines.CoroutineScope
 
@@ -306,11 +307,14 @@ internal fun MapTopBar(
                     var totalY = 0f
                     var claimed = false
                     var lastPosition = down.position
+                    var appliedSlide = slideX.value
                     while (true) {
                         val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) break
-                        val delta = change.position - lastPosition
+                        // The pill is moved by slideX, so its own coordinates have shifted by what the last event applied; add it back.
+                        val local = change.position - lastPosition
                         lastPosition = change.position
+                        val delta = local + Offset(slideX.value - appliedSlide, 0f)
                         totalX += delta.x
                         totalY += delta.y
                         if (!claimed) {
@@ -322,7 +326,8 @@ internal fun MapTopBar(
                         change.consume()
                         val sign = if (totalX < 0f) 1 else -1
                         if (sign != swipeSign) swipeSign = sign
-                        barScope.launch { slideX.snapTo(totalX) }
+                        slideX.snapTo(totalX)
+                        appliedSlide = slideX.value
                     }
                     if (!claimed) return@awaitEachGesture
                     val dir = when {
@@ -510,18 +515,20 @@ internal fun Modifier.pullToRefreshOrDismiss(
     var raw = 0f
     var lastNotch = 0
 
-    fun onDrag(amount: Float) {
+    // Applied straight away, not in a launched coroutine: the next finger event must see these offsets already in place, or the bar's
+    // own coordinates would lag the sheet and the bar would step back and forth against the finger.
+    suspend fun onDrag(amount: Float) {
         if (raw > 0f || (amount < 0f && dragPx.value <= 0f)) {
             raw = (raw - amount).coerceAtLeast(0f)
             // 1:1 up to the top of the screen, then a short rubber band past it.
             val over = (raw - gapPx).coerceAtLeast(0f)
             val travel = minOf(raw, gapPx) + overPx * over / (over + overPx)
-            scope.launch { pull.up.snapTo(travel) }
+            pull.up.snapTo(travel)
             val notch = (raw / notchPx).toInt()
             if (notch > lastNotch) haptics?.ramp(raw / gapPx)
             lastNotch = notch
         } else {
-            scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+            dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f))
         }
     }
 
@@ -549,14 +556,20 @@ internal fun Modifier.pullToRefreshOrDismiss(
         var totalY = 0f
         var claimed = false
         var lastPosition = down.position
+        var appliedDrag = dragPx.value
+        var appliedPull = pull.up.value
         while (true) {
             val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
             if (!change.pressed) {
                 if (claimed) onEnd()
                 break
             }
-            val delta = change.position - lastPosition
+            // The bar moves with the sheet and its pull, so its own coordinates have shifted by whatever the last event applied. Add that
+            // back: what is left is the finger's movement alone.
+            val local = change.position - lastPosition
             lastPosition = change.position
+            val carried = (dragPx.value - appliedDrag) - (pull.up.value - appliedPull)
+            val delta = local + Offset(0f, carried)
             totalX += delta.x
             totalY += delta.y
             if (!claimed) {
@@ -567,10 +580,14 @@ internal fun Modifier.pullToRefreshOrDismiss(
                 } else if (abs(totalX) > slopPx) {
                     return@awaitEachGesture
                 }
+                appliedDrag = dragPx.value
+                appliedPull = pull.up.value
                 continue
             }
             change.consume()
             onDrag(delta.y)
+            appliedDrag = dragPx.value
+            appliedPull = pull.up.value
         }
     }
 }

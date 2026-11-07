@@ -73,6 +73,12 @@ fun WearFaceHub(
                 ),
                 reduceMotion = false,
             )
+        }
+        // The state sits at the bottom of the hub, as in the phone app, so the value keeps the middle and no line runs into it.
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = size * 0.1f),
+        ) {
             // The car's state can run to two lines ("Parked · Locked · Climate on"); cut to one it read as "Parked · L…".
             // One short line per part of the state ("Parked", then "Locked"), so no line is wider than the hub and nothing is cut off.
             if (state.isNotBlank() && status == null) {
@@ -101,7 +107,8 @@ fun WearFaceHub(
 @Composable
 private fun HubLine(text: String, color: Color, hubSize: Dp) {
     val base = (hubSize.value * 0.15f).coerceIn(10f, 14f)
-    val fit = if (text.length > 14) base * 14f / text.length else base
+    // Shrink from a shorter length, and keep the line inside the circle's chord at the bottom, so nothing is cut off at the edge.
+    val fit = if (text.length > 11) base * 11f / text.length else base
     RevealText(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
@@ -113,7 +120,7 @@ private fun HubLine(text: String, color: Color, hubSize: Dp) {
         maxLines = 1,
         softWrap = false,
         overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
-        modifier = Modifier.width(hubSize * 0.84f),
+        modifier = Modifier.width(hubSize * 0.62f),
     )
 }
 
