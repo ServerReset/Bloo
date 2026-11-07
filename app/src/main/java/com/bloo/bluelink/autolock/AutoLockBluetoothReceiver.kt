@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.ui.hasPermission
 
 /**
@@ -30,6 +31,8 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
             // apart from "the Bluetooth event never arrived". See BootGate: after a reboot the app is
             // sealed until the user signs in again, and that seals this receiver with everything else.
             AppLog.log("AutoLock: ignoring $action - the app is sealed after a restart (BootGate), so no evaluation can run.")
+            // A departure that cannot be acted on must say so. Left silent, it looked exactly like auto-lock not working.
+            if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED) notifySealed(context, intent)
             return
         }
         @Suppress("DEPRECATION")
@@ -46,6 +49,13 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
             // AutoLock being broken, which is exactly how it gets reported.
             if (!context.hasPermission(android.Manifest.permission.BLUETOOTH_CONNECT, android.os.Build.VERSION_CODES.S)) {
                 AppLog.log("⚠ AutoLock: BLUETOOTH_CONNECT is not granted, so a car's Bluetooth disconnect cannot be matched to a car. Grant it from Settings, then AutoLock can see it.")
+                Notifications.post(
+                    context,
+                    id = PERMISSION_NOTIFICATION_ID,
+                    title = "AutoLock can't see your car's Bluetooth",
+                    text = "Bloo needs the Nearby devices permission to notice when you leave the car. Grant it in Settings.",
+                    clears = false,
+                )
             }
             return
         }
@@ -59,5 +69,25 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
         } else {
             AutoLockTrigger.onCarConnected(ctx, vin)
         }
+    }
+
+    /** Tells the person that a departure happened while the app is sealed after a restart, so auto-lock could not run. */
+    private fun notifySealed(context: Context, intent: Intent) {
+        @Suppress("DEPRECATION")
+        val device: BluetoothDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE) ?: return
+        val mac = runCatching { device.address }.getOrNull() ?: return
+        val vin = AutoLockAddresses.vinFor(context, mac) ?: return
+        Notifications.post(
+            context,
+            id = AutoLockNotification.notificationId(vin) + 3,
+            title = "AutoLock didn't run",
+            text = "Your car left, but Bloo has been waiting for you to unlock it since the phone restarted. Open Bloo and unlock it to turn AutoLock back on.",
+            clears = false,
+        )
+    }
+
+    private companion object {
+        /** Fixed, distinct from the per-car ids: a missing permission is about the phone, not one car. */
+        const val PERMISSION_NOTIFICATION_ID = 90301
     }
 }

@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import com.bloo.uicommon.RevealText
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.layout.layout
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalDensity
@@ -57,6 +58,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -292,41 +294,57 @@ internal fun MapTopBar(
             .pointerInput(carIndex, carCount) {
                 // A sideways swipe moves to the neighbouring car: the bar follows the finger, then goes off the screen on the side it was
                 // pushed, and the next car's bar comes in from the other side. At either end of the list it springs back.
+                //
+                // Read in the INITIAL pass, before the map and sheet behind the bar. Read in the main pass, the expanded map's own pan
+                // took every sideways drag over it first, so the bar never saw the swipe. A tap is untouched: nothing is claimed until
+                // the finger has moved past the slop.
                 val thresholdPx = 56.dp.toPx()
-                var total = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { total = 0f; swipeSign = 0 },
-                    onHorizontalDrag = { change, amount ->
+                val slopPx = 10.dp.toPx()
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    var totalX = 0f
+                    var totalY = 0f
+                    var claimed = false
+                    while (true) {
+                        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        val delta = change.positionChange()
+                        totalX += delta.x
+                        totalY += delta.y
+                        if (!claimed) {
+                            // Sideways only: a mostly vertical drag is the bar's pull, and is left to it.
+                            if (abs(totalX) > slopPx && abs(totalX) > abs(totalY)) claimed = true
+                            else if (abs(totalY) > slopPx) return@awaitEachGesture
+                            else continue
+                        }
                         change.consume()
-                        total += amount
-                        val sign = if (total < 0f) 1 else -1
+                        val sign = if (totalX < 0f) 1 else -1
                         if (sign != swipeSign) swipeSign = sign
-                        barScope.launch { slideX.snapTo(total) }
-                    },
-                    onDragEnd = {
-                        val dir = when {
-                            total <= -thresholdPx -> 1
-                            total >= thresholdPx -> -1
-                            else -> 0
-                        }
-                        val next = carIndex + dir
-                        val canMove = dir != 0 && next in 0 until carCount
-                        barScope.launch {
-                            if (!canMove) {
-                                slideX.animateTo(0f, tween(180))
-                                swipeSign = 0
-                                return@launch
-                            }
-                            swipeHandled[0] = true
-                            slideX.animateTo(-dir * screenWidthPx, tween(180))
-                            // The neighbour's bar was already drawn where the bar now comes to rest, so the new car takes its place
-                            // with no jump: the content changes off screen, then the bar is put back at rest, and the drawn copy goes.
-                            latestSwipe.value(dir)
-                            slideX.snapTo(0f)
+                        barScope.launch { slideX.snapTo(totalX) }
+                    }
+                    if (!claimed) return@awaitEachGesture
+                    val dir = when {
+                        totalX <= -thresholdPx -> 1
+                        totalX >= thresholdPx -> -1
+                        else -> 0
+                    }
+                    val next = carIndex + dir
+                    val canMove = dir != 0 && next in 0 until carCount
+                    barScope.launch {
+                        if (!canMove) {
+                            slideX.animateTo(0f, tween(180))
                             swipeSign = 0
+                            return@launch
                         }
-                    },
-                )
+                        swipeHandled[0] = true
+                        slideX.animateTo(-dir * screenWidthPx, tween(180))
+                        // The neighbour's bar was already drawn where the bar now comes to rest, so the new car takes its place
+                        // with no jump: the content changes off screen, then the bar is put back at rest, and the drawn copy goes.
+                        latestSwipe.value(dir)
+                        slideX.snapTo(0f)
+                        swipeSign = 0
+                    }
+                }
             }
             .graphicsLayer { scaleX = pillScale; scaleY = pillScale; translationX = slideX.value },
         hazeState = mapHazeState,
@@ -486,45 +504,71 @@ internal fun Modifier.pullToRefreshOrDismiss(
 ): Modifier = this.pointerInput(gapPx) {
     val overPx = with(density) { 28.dp.toPx() }
     val notchPx = (gapPx / 14f).coerceAtLeast(1f)
+    val slopPx = 10.dp.toPx()
     var raw = 0f
     var lastNotch = 0
-    detectVerticalDragGestures(
-        onVerticalDrag = { change, amount ->
-            change.consume()
-            if (raw > 0f || (amount < 0f && dragPx.value <= 0f)) {
-                raw = (raw - amount).coerceAtLeast(0f)
-                // 1:1 up to the top of the screen, then a short rubber band past it.
-                val over = (raw - gapPx).coerceAtLeast(0f)
-                val travel = minOf(raw, gapPx) + overPx * over / (over + overPx)
-                scope.launch { pull.up.snapTo(travel) }
-                val notch = (raw / notchPx).toInt()
-                if (notch > lastNotch) haptics?.ramp(raw / gapPx)
-                lastNotch = notch
-            } else {
-                scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+
+    fun onDrag(amount: Float) {
+        if (raw > 0f || (amount < 0f && dragPx.value <= 0f)) {
+            raw = (raw - amount).coerceAtLeast(0f)
+            // 1:1 up to the top of the screen, then a short rubber band past it.
+            val over = (raw - gapPx).coerceAtLeast(0f)
+            val travel = minOf(raw, gapPx) + overPx * over / (over + overPx)
+            scope.launch { pull.up.snapTo(travel) }
+            val notch = (raw / notchPx).toInt()
+            if (notch > lastNotch) haptics?.ramp(raw / gapPx)
+            lastNotch = notch
+        } else {
+            scope.launch { dragPx.snapTo((dragPx.value + amount).coerceAtLeast(0f)) }
+        }
+    }
+
+    fun onEnd() {
+        if (raw > 0f) {
+            if (raw >= gapPx * 0.8f) {
+                haptics?.diceRoll()
+                refresh()
             }
-        },
-        onDragEnd = {
-            if (raw > 0f) {
-                if (raw >= gapPx * 0.8f) {
-                    haptics?.diceRoll()
-                    refresh()
-                }
-                raw = 0f
-                lastNotch = 0
-                scope.launch { pull.up.animateTo(0f, bounceSpring(stiffness = Spring.StiffnessLow)) }
-            } else {
-                val thresholdPx = with(density) { 96.dp.toPx() }
-                if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }
-            }
-        },
-        onDragCancel = {
             raw = 0f
             lastNotch = 0
-            scope.launch { pull.up.animateTo(0f, spring) }
-            scope.launch { dragPx.animateTo(0f, spring) }
-        },
-    )
+            scope.launch { pull.up.animateTo(0f, bounceSpring(stiffness = Spring.StiffnessLow)) }
+        } else {
+            val thresholdPx = with(density) { 96.dp.toPx() }
+            if (dragPx.value > thresholdPx) close() else scope.launch { dragPx.animateTo(0f, spring) }
+        }
+    }
+
+    // Read in the INITIAL pass, like the sideways swipe: the expanded map's pan and the sheet behind the bar otherwise took the
+    // drag before this saw it, so the handle did not move. A tap never claims anything; a drag claims only once it is clearly
+    // vertical, and a sideways drag is left to the swipe above.
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var totalX = 0f
+        var totalY = 0f
+        var claimed = false
+        while (true) {
+            val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) {
+                if (claimed) onEnd()
+                break
+            }
+            val delta = change.positionChange()
+            totalX += delta.x
+            totalY += delta.y
+            if (!claimed) {
+                if (abs(totalY) > slopPx && abs(totalY) > abs(totalX)) {
+                    claimed = true
+                    change.consume()
+                    onDrag(totalY)
+                } else if (abs(totalX) > slopPx) {
+                    return@awaitEachGesture
+                }
+                continue
+            }
+            change.consume()
+            onDrag(delta.y)
+        }
+    }
 }
 
 /** The car's charge and its range for the map bar's end, each as its own line; null where it has none yet. */

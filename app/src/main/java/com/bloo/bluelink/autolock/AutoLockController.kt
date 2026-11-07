@@ -83,7 +83,12 @@ object AutoLockController {
 
     /** Bluetooth (or manual "simulate leaving") trigger: begin an evaluation for [vin]. */
     fun onTriggerFired(context: Context, vin: String) {
-        jobs[vin]?.cancel()
+        // A second disconnect while an evaluation is already running (the Bluetooth receiver and the service's watcher both see the
+        // same broadcast) must not restart its window: restarting it threw away the walk-away confirmation and pushed the lock back.
+        if (jobs[vin]?.isActive == true) {
+            AppLog.log("AutoLock: $vin is already evaluating - ignoring the duplicate disconnect.")
+            return
+        }
         jobs[vin] = scope.launch { runEvaluation(context.applicationContext, vin) }
     }
 
@@ -208,16 +213,16 @@ object AutoLockController {
                 // reader looking for a car that was there all along. A stale or empty snapshot (a
                 // fresh sign-in, or an app that has not been opened since) is the usual cause, and
                 // ensureVehicleCached has already gone to the account once before saying this.
-                fail(vin, "AutoLock can't find $vin in your account, so it can't check the car before locking.")
+                fail(context, vin, "AutoLock can't find $vin in your account, so it can't check the car before locking.")
                 return@withLock
             }
             val v = snapshot.toVehicle()
             val status = runCatching { statusFor(context, v) }.getOrElse {
-                fail(vin, "Couldn't read car status: ${it.message}")
+                fail(context, vin, "Couldn't read car status: ${it.message}")
                 return@withLock
             }
             if (status == null) {
-                fail(vin, "Couldn't read car status.")
+                fail(context, vin, "Couldn't read car status.")
                 return@withLock
             }
 
@@ -231,7 +236,7 @@ object AutoLockController {
         } catch (c: CancellationException) {
             throw c
         } catch (t: Throwable) {
-            fail(vin, "AutoLock hit an error: ${t.message ?: t.javaClass.simpleName}")
+            fail(context, vin, "AutoLock hit an error: ${t.message ?: t.javaClass.simpleName}")
         } finally {
             // NonCancellable: this cleanup must run even when the finally is reached because
             // cancel(vin) already cancelled this exact coroutine (a reconnect during the
@@ -314,11 +319,15 @@ object AutoLockController {
         // ONE retry, and only here. A walk-away lock is the moment to spend it: the alternative is
         // that a single network blip, or a token that expired a minute ago, leaves the car open and
         // reports an error. Nothing else in this flow is retried, and this is bounded at one.
+        // Up to three attempts in all, 2.5s and then 5s apart: a network blip, or a token that expired a minute ago, should not leave
+        // the car open. Every failed attempt is logged, so the last one's reason is never the only trace.
         var result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
-        if (result?.ok != true) {
-            AppLog.log("AutoLock: the lock command failed for $vin (${result?.message ?: "no response"}); trying once more.")
-            delay(2500)
+        var attempt = 1
+        while (result?.ok != true && attempt < 3) {
+            AppLog.log("AutoLock: lock attempt $attempt failed for $vin (${result?.message ?: "no response"}); trying again.")
+            delay(if (attempt == 1) 2_500L else 5_000L)
             result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+            attempt++
         }
         if (result?.ok == true) {
             AppLog.log("AutoLock: car locked automatically ($vin).")
@@ -331,14 +340,28 @@ object AutoLockController {
                 ))
             }
         } else {
-            fail(vin, "AutoLock: lock command failed${result?.message?.let { " - $it" } ?: ""}.")
+            // notifyLockFailed below is this failure's notification; fail() must not post a second one for it.
+            fail(context, vin, "AutoLock: lock command failed after $attempt attempts${result?.message?.let { " - $it" } ?: ""}.", notify = false)
             notifyLockFailed(context, vin, carName, result?.message)
         }
     }
 
-    private fun fail(vin: String, message: String) {
+    /**
+     * Records a failure that stopped an evaluation from locking the car, and tells the user about it. Before this, these went only to
+     * the log and the in-app line, so an evaluation that could not lock looked like one that never ran.
+     */
+    private fun fail(context: Context, vin: String, message: String, notify: Boolean = true) {
         AppLog.log("⚠ $message")
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR, lastOutcome = message)) }
+        if (notify) {
+            Notifications.post(
+                context,
+                id = AutoLockNotification.notificationId(vin) + 2,
+                title = "AutoLock couldn't lock your car",
+                text = message,
+                clears = false,
+            )
+        }
     }
 
     /**
