@@ -88,6 +88,27 @@ internal fun CollapsedGaragePager(
         // One virtual page per real item; the real item for a page is wrap.real(page).
         val wrap = rememberWrapPager(total, initialItem)
         val pager = wrap.pager
+        // The map bar's sideways drag drives this pager: the page follows the finger while the bar is held, then settles to the
+        // nearest car when the bar is let go (see BarSwipeState). Only the pager's own scroll is moved, never the car it shows.
+        LaunchedEffect(pager) {
+            var applied = 0f
+            snapshotFlow { BarSwipeState.active to BarSwipeState.px }.collect { (active, px) ->
+                if (active) {
+                    val step = applied - px
+                    applied = px
+                    if (step != 0f) pager.scroll(androidx.compose.foundation.MutatePriority.UserInput) { scrollBy(step) }
+                } else if (applied != 0f) {
+                    applied = 0f
+                    val frac = pager.currentPageOffsetFraction
+                    val nudge = when {
+                        frac > 0.5f -> 1
+                        frac < -0.5f -> -1
+                        else -> 0
+                    }
+                    pager.animateScrollToPage((pager.currentPage + nudge).coerceIn(0, pager.pageCount - 1))
+                }
+            }
+        }
         // Frames while a page is being swiped are their own line in the performance report.
         LaunchedEffect(pager) {
             snapshotFlow { pager.isScrollInProgress }.collect { if (it) com.bloo.bluelink.perf.PerfMonitor.scope("garage-swipe", 1_200) }

@@ -49,6 +49,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -85,6 +86,15 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import kotlinx.coroutines.CoroutineScope
+
+/**
+ * The map bar's sideways drag, shared with the car pager behind the map: while the bar is swiped, the pager follows the finger, and it
+ * settles to the nearest car when the bar is let go. [px] is the drag so far, in pixels, positive toward the previous car.
+ */
+internal object BarSwipeState {
+    var active by mutableStateOf(false)
+    var px by mutableFloatStateOf(0f)
+}
 
 /**
  * The "Me" button's action: centre the map on the phone. With no fix yet it asks for location (see
@@ -328,8 +338,13 @@ internal fun MapTopBar(
                         if (sign != swipeSign) swipeSign = sign
                         slideX.snapTo(totalX)
                         appliedSlide = slideX.value
+                        BarSwipeState.active = true
+                        BarSwipeState.px = totalX
                     }
                     if (!claimed) return@awaitEachGesture
+                    // Released: the pager settles itself (see CollapsedGaragePager), so the bar hands it back here.
+                    BarSwipeState.active = false
+                    BarSwipeState.px = 0f
                     val dir = when {
                         totalX <= -thresholdPx -> 1
                         totalX >= thresholdPx -> -1
