@@ -33,7 +33,7 @@ fun SettingsStore.autoLockConfig(vin: String, p: Preferences): AutoLockConfig {
     return AutoLockConfig(
         enabled = b("autolock_enabled_$vin", false), deviceAddress = s("autolock_device_addr_$vin"),
         deviceName = s("autolock_device_name_$vin"), graceSeconds = i("autolock_grace_$vin", 30),
-        dryRun = b("autolock_dry_run_$vin", true),
+        dryRun = b("autolock_dry_run_$vin", false),
     )
 }
 

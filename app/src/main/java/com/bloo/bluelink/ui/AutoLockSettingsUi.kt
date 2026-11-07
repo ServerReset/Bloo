@@ -176,9 +176,8 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
             vm,
             onPick = { device ->
                 // Choosing a device is what turns AutoLock ON for this car, not the toggle: the toggle cannot appear until this
-                // is done (see above), so the pick IS the enable. Dry run stays on (see AutoLockConfig), so the first walks only
-                // say "would have locked".
-                update(current.copy(deviceAddress = device.address, deviceName = device.name, enabled = true))
+                // is done (see above), so the pick IS the enable. Dry run is off (see AutoLockConfig): the car really locks.
+                update(current.copy(deviceAddress = device.address, deviceName = device.name, enabled = true, dryRun = false))
                 showDevicePicker = false
             },
             onDismiss = { showDevicePicker = false },

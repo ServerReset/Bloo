@@ -15,8 +15,9 @@ data class AutoLockConfig(
     val deviceName: String? = null,
     val graceSeconds: Int = 30,
     /** Runs the full detect -> verify flow but never sends the real lock command -- logs
-     *  "would have locked" instead. Defaults on; the user turns it off once they trust it. */
-    val dryRun: Boolean = true,
+     *  "would have locked" instead. Off by default: picking a car is the person turning auto-lock on, and a
+     *  dry run left on looks exactly like a lock that never happens. Settings can still turn it on to test. */
+    val dryRun: Boolean = false,
 ) {
     /** Whether this car has enough configured to ever actually trigger. */
     val isUsable: Boolean get() = deviceAddress != null
