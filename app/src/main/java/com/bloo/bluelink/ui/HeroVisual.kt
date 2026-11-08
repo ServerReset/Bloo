@@ -169,7 +169,13 @@ internal fun HeroPhotoBackdrop(
         Modifier.fillMaxWidth().layout { measurable, constraints ->
             val top = (HeroTextClearTop.toPx() * clearT.value).roundToInt()
             val bottom = (HeroTextClearBottom.toPx() * clearT.value).roundToInt()
-            val p = measurable.measure(constraints.offset(vertical = -(top + bottom)))
+            val inset = top + bottom
+            val p = measurable.measure(
+                constraints.copy(
+                    minHeight = (constraints.minHeight - inset).coerceAtLeast(0),
+                    maxHeight = if (constraints.hasBoundedHeight) (constraints.maxHeight - inset).coerceAtLeast(0) else constraints.maxHeight,
+                ),
+            )
             layout(p.width, p.height + top + bottom) { p.place(0, top) }
         },
     ) {
