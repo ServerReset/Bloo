@@ -72,18 +72,28 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     // Closed, the map sits on the card of the car the bar is showing: after a swipe to another car, that is the selected one, not the car
     // the map was opened from.
     val closeVin = centralMap.selectedVin ?: homeVin
-    val reportedClosed: Rect? = if (openVin == null && closeVin != null) centralMap.originBoundsFor(closeVin).value else null
+    // The gates below read the card's place WITHOUT subscribing: the layers read it live, in layout, so a card moving on screen does not
+    // recompose this host. Only "is there a place yet" matters here.
+    val reportedClosed: Rect? = if (openVin == null && closeVin != null) unobservedOrigin(centralMap, closeVin) else null
     if (reportedClosed != null) lastClosed[0] = reportedClosed
     val closedAt: Rect? = reportedClosed ?: lastClosed[0]
     if (hostVehicle == null || hostLocation == null) return
     val windowSize = LocalWindowInfo.current.containerSize
     // Open, the map grows from the car's own card; until that card has been on screen, from a box in the middle, so the map always opens.
     val fallback = Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
-    // Opening grows from the card it was opened from; closing shrinks onto the card of the car chosen on it.
-    val originBounds = if (openVin != null && centralMap.closingTo == null) {
-        centralMap.originBoundsFor(openVin).value ?: fallback
-    } else {
-        centralMap.closingTo?.let { centralMap.originBoundsFor(it).value } ?: closedAt ?: return
+    val closingTo = centralMap.closingTo
+    val opening = openVin != null && closingTo == null
+    if (!opening && (closingTo?.let { unobservedOrigin(centralMap, it) } ?: closedAt) == null) return
+    // Opening grows from the card it was opened from; closing shrinks onto the card of the car chosen on it. Read live where it is used.
+    val originBounds: () -> Rect = {
+        if (opening) {
+            centralMap.originBoundsFor(openVin!!).value ?: fallback
+        } else {
+            closingTo?.let { centralMap.originBoundsFor(it).value }
+                ?: closeVin?.let { centralMap.originBoundsFor(it).value }
+                ?: lastClosed[0]
+                ?: fallback
+        }
     }
 
     val locateHostVehicle = rememberLocateAction(vm, hostVehicle)
@@ -164,3 +174,7 @@ private fun barPreview(state: UiState, v: com.bloo.bluelink.data.Vehicle?, metri
 
 /** The longest the map waits for the car page to reach the car it collapses onto, before it collapses regardless. */
 private const val CloseWaitMs = 1_500L
+
+/** A card's place, read without making the composition that asks for it depend on it. Only for checks like "has it been placed yet". */
+private fun unobservedOrigin(centralMap: CentralMap, vin: String): Rect? =
+    androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { centralMap.originBoundsFor(vin).value }

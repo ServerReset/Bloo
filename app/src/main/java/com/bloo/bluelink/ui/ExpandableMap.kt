@@ -113,7 +113,8 @@ private val SheetCorner = 28.dp
 @Composable
 internal fun ExpandableMapLayer(
     isExpanded: Boolean,
-    originBounds: Rect,
+    /** Read where it is used (layout or a one-off launch), not in composition, so a card moving does not recompose the host. */
+    originBounds: () -> Rect,
     location: GeoLocation,
     vehicleName: String,
     /** The car's charge and range for the bar's end (see [mapChargeStats]). */
@@ -211,7 +212,7 @@ internal fun ExpandableMapLayer(
         // what carries the pin to the middle of the collapsed map.
         val root = rootPos ?: return@LaunchedEffect
         com.bloo.bluelink.data.AppLog.log("Map: placed at ${root.x.toInt()},${root.y.toInt()}, opening")
-        val o = originBounds.translate(-root.x, -root.y)
+        val o = originBounds().translate(-root.x, -root.y)
         val w = windowSize.width.toFloat()
         val h = windowSize.height.toFloat()
         val k = mapState.scale.coerceAtLeast(0.5f)
@@ -388,7 +389,7 @@ internal fun ExpandableMapLayer(
                     val sheetH = (h * 0.85f + pull.up.value).coerceIn(h * 0.85f, h)
                     val sheet = Rect(0f, h - sheetH + dragPx.value, w, h + dragPx.value)
                     val root = rootPos
-                    val origin = if (root == null) sheet else originBounds.translate(-root.x, -root.y)
+                    val origin = if (root == null) sheet else originBounds().translate(-root.x, -root.y)
                     val r = lerp(origin, sheet, progress())
                     val placeable = measurable.measure(
                         androidx.compose.ui.unit.Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
@@ -490,7 +491,7 @@ internal fun ExpandableMapLayer(
                             // Closed, the bar is full width at the top of the screen, not the card's width.
                             val p = if (isExpanded) progress().coerceIn(0f, 1f) else 1f
                             val root = rootPos ?: androidx.compose.ui.geometry.Offset.Zero
-                            val o = originBounds.translate(-root.x, -root.y)
+                            val o = originBounds().translate(-root.x, -root.y)
                             // With no car selected the bar is only its handle, centred; it widens to the single line as a car is selected.
                             val openLeft = lerp(o.left, barInsetPx, p)
                             val openRight = lerp(o.right, constraints.maxWidth - barInsetPx, p)
