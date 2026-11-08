@@ -117,6 +117,9 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("debug")
+            // A separate package, so a debug build installs next to the release app instead of replacing it (the release is signed with
+            // the real key, which a debug install cannot overwrite) and keeps its own settings and sign-in.
+            applicationIdSuffix = ".debug"
         }
         release {
             // Shrinking on, renaming off (-dontobfuscate lives in proguard-rules.pro,

@@ -17,6 +17,10 @@ on:
   # track that Play will not promote yet. Empty means build only, like a push.
   workflow_dispatch:
     inputs:
+      debug_build:
+        description: "Also build a debug APK and publish it as a pre-release, installable from the phone's browser. Off = nothing extra."
+        type: boolean
+        default: false
       play_track:
         description: "Also upload this build to a Play track (internal, alpha, beta). Empty = build only."
         type: string
@@ -311,6 +315,25 @@ jobs:
       # the update tile. Installs signed with the pre-Play key cannot install ANY newer build, and
       # the only symptom they get is the system installer saying "App not installed" -- so when they
       # tap Update on their own, this is the only place that can tell them why before it happens.
+      # A debug APK for installing from the phone itself, with no PC: set `debug_build` on a manual run. It is published as a pre-release
+      # under its own `debug-N` tag. The in-app updater only follows `build-N` releases that are not pre-releases, so it never offers
+      # this build, and the release build the phone already follows is left alone.
+      - name: Build the debug APK (manual runs with debug_build)
+        if: inputs.debug_build == true
+        run: ./gradlew :app:assembleSideloadDebug
+
+      - name: Publish the debug APK as a pre-release
+        if: inputs.debug_build == true
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          draft: false
+          target_commitish: ${{ github.sha }}
+          tag_name: debug-${{ github.run_number }}
+          name: Debug build ${{ github.run_number }}
+          body: "Debug build for trying on the phone. Open this page on the phone and tap the APK to install it. Not for the Play Store."
+          files: app/build/outputs/apk/sideload/debug/*.apk
+
       - name: Pick the release title
         id: title
         if: github.event_name == 'push' && github.ref_type == 'branch'
