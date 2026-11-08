@@ -301,16 +301,6 @@ suspend fun SettingsStore.setPowertrain(vin: String, value: Powertrain) {
     editTracked { it[stringPreferencesKey("ptrain_$vin")] = value.name }
 }
 
-suspend fun SettingsStore.platform(vin: String): VehiclePlatform? = platform(vin, context.settingsDataStore.data.first())
-
-fun SettingsStore.platform(vin: String, p: Preferences): VehiclePlatform? =
-
-    p[stringPreferencesKey("platform_$vin")]
-        ?.let { runCatching { VehiclePlatform.valueOf(it) }.getOrNull() }
-
-suspend fun SettingsStore.setPlatform(vin: String, value: VehiclePlatform) {
-    editTracked { it[stringPreferencesKey("platform_$vin")] = value.name }
-}
 
 fun SettingsStore.surroundView(vin: String, p: Preferences): SurroundViewAccess? =
     p[stringPreferencesKey("surround_$vin")]

@@ -132,15 +132,6 @@ internal fun PowertrainPicker(current: Powertrain, onSelect: (Powertrain) -> Uni
     icon = { when (it) { Powertrain.GAS -> Icons.Filled.LocalGasStation; Powertrain.HYBRID -> AppIcons.Bolt; Powertrain.PHEV -> Icons.Filled.Power; Powertrain.EV -> Icons.Filled.FlashOn } },
 )
 
-/**
- * A car's confirmed head-unit generation (Gen5W / ccNC). Only shown where [platformOverridable] is
- * true.
- */
-@Composable
-internal fun PlatformPicker(current: VehiclePlatform, onSelect: (VehiclePlatform) -> Unit) = EnumSegmented(
-    VehiclePlatform.entries, current, onSelect = onSelect,
-    label = { when (it) { VehiclePlatform.GEN5W -> "Gen5W"; VehiclePlatform.CCNC -> "ccNC" } },
-)
 
 /** Which cars show the surround-view features: limited ccNC trims (the default), every car the brand has them on, or none. */
 @Composable
