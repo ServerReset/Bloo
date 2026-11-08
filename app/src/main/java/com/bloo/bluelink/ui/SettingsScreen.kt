@@ -61,7 +61,13 @@ internal fun SettingsScreen(
     com.bloo.bluelink.perf.TrackRecompositions("SettingsScreen")
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsStateWithLifecycle()
-    val state by vm.state.collectAsStateWithLifecycle()
+    // The app state is read inside each card's own item (see below), so a change recomposes the card that shows it, not this whole page.
+    // The few values the page itself needs are derived, so the page only recomposes when one of those actually changes.
+    val stateRef = vm.state.collectAsStateWithLifecycle()
+    val advancedMode by remember { androidx.compose.runtime.derivedStateOf { stateRef.value.settingsMode == "advanced" } }
+    val settingsModeNow by remember { androidx.compose.runtime.derivedStateOf { stateRef.value.settingsMode } }
+    val aiSupportedNow by remember { androidx.compose.runtime.derivedStateOf { stateRef.value.aiSupported } }
+    val hasCars by remember { androidx.compose.runtime.derivedStateOf { stateRef.value.vehicles.isNotEmpty() } }
     // Keyed on the log's version counter: the snapshot (a list copy) is only taken when the log
     // actually changed, and only while this screen is collecting.
     val context = LocalContext.current
@@ -89,7 +95,7 @@ internal fun SettingsScreen(
         ) {
         // Hoisted out of the list content (not a composable scope) so an advanced-only card is
         // skipped as an item: an empty item still keeps its slot and item spacing.
-        val advVisible = rememberAdvancedVisibility(state.settingsMode == "advanced", ADVANCED_CARD_COUNT)
+        val advVisible = rememberAdvancedVisibility(advancedMode, ADVANCED_CARD_COUNT)
         // remember() needs a composable scope, so the gated-card transitions are hoisted here.
         val advTransition0 = rememberGridItemVisibility(advVisible[0])
         val advTransition1 = rememberGridItemVisibility(advVisible[1])
@@ -116,39 +122,39 @@ internal fun SettingsScreen(
             }
             // Page hero: app identity, version and build.
             item {
-                SettingsHeroCard(state, vm)
+                SettingsHeroCard(stateRef.value, vm)
             }
             run {
-                val advanced = state.settingsMode == "advanced"
+                val advanced = advancedMode
             // Advanced-only cards share expandEnter()/expandExit() with staggeredAdvancedVisible so
             // revealing many cascades instead of overshooting in lockstep.
             item {
             // Accounts (one per brand; Hyundai + Genesis can both be signed in).
-                AccountsCardContent(state, vm)
+                AccountsCardContent(stateRef.value, vm)
             }
             // Gates the item itself: an empty item still holds a slot and spacing.
-            if (state.aiSupported) item {
+            if (aiSupportedNow) item {
             // Only when the device supports Gemini Nano; always shown, not advanced-only.
             run {
-                AiCardContent(state, vm)
+                AiCardContent(stateRef.value, vm)
             }
             }
             if (advTransition0.targetState || !advTransition0.isIdle) item {
             // App-icon shortcuts (long-press the launcher icon)
             AnimatedVisibility(visibleState = advTransition0, enter = expandEnterSized(), exit = expandExitSized()) {
-                AppShortcutsCardContent(state, vm)
+                AppShortcutsCardContent(stateRef.value, vm)
             }
             }
             item {
             // Backup / Sync
-            BackupSyncCardContent(state, vm, context, advanced)
+            BackupSyncCardContent(stateRef.value, vm, context, advanced)
             }
             // Gates the item: with no cars yet it would still hold a slot and gap.
-            if (state.vehicles.isNotEmpty()) item {
+            if (hasCars) item {
             // Cars: drag to reorder, tap to expand setup + photo. Shown in Simple and Advanced;
             // power-user groups gate themselves.
             CarsCardContent(
-                state = state,
+                state = stateRef.value,
                 vm = vm,
                 pick = { vin -> vm.requestPhotoPick(vin) },
             )
@@ -157,7 +163,7 @@ internal fun SettingsScreen(
             // Debug -- device info and the activity log together, for support troubleshooting. A
             // power-user card, so it only exists in Advanced mode.
             AnimatedVisibility(visibleState = advTransition1, enter = expandEnterSized(), exit = expandExitSized()) {
-            DebugCardContent(vm, clipboardScope, clipboard, state.aiAvailability)
+            DebugCardContent(vm, clipboardScope, clipboard, stateRef.value.aiAvailability)
             }
             }
             item {
@@ -175,7 +181,7 @@ internal fun SettingsScreen(
             }
             item {
             // Notifications
-            NotificationsCardContent(notif, state, advanced, vm)
+            NotificationsCardContent(notif, stateRef.value, advanced, vm)
             }
             item {
             // Security
@@ -213,7 +219,7 @@ internal fun SettingsScreen(
         // No StatusBarScrim or back arrow: the garage pager already draws one over every page, and
         // leaving is a swipe. Simple/Advanced tab hanging from the status bar, top-right.
         SettingsModeTab(
-            settingsMode = state.settingsMode,
+            settingsMode = settingsModeNow,
             onSettingsModeChange = { vm.setSettingsMode(it) },
             hazeState = hazeState,
         )
