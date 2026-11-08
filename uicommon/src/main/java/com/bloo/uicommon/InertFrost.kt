@@ -4,14 +4,30 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
-/** Real backdrop blur: API 31+ (a real RenderEffect; no-op below) and the policy allows it. */
+/**
+ * Whether something is moving that the glass must not blur under right now: a car page being swiped or settled, or the map bar being
+ * dragged. While it is set, glass keeps its tint and drops its backdrop blur, so no backdrop is re-blurred on every frame of the motion.
+ * Set by the surface that moves (see the garage pager), not by each glass surface.
+ */
+object BlurSuspension {
+    var suspended by mutableStateOf(false)
+}
+
+/**
+ * Real backdrop blur: API 31+ (a real RenderEffect; no-op below), the policy allows it, and nothing is moving under it (see
+ * [BlurSuspension]).
+ */
 @Composable
 fun canBlurBackdrops(): Boolean =
-    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && LocalPowerPolicy.current.blurBackdrops
+    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+        LocalPowerPolicy.current.blurBackdrops &&
+        !BlurSuspension.suspended
 
 /**
  * The app's one inert (disabled) treatment: soften and fade whatever is inert, leaving its own
