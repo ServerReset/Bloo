@@ -83,7 +83,11 @@ import com.bloo.uicommon.Haptics
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.ui.unit.Density
+import androidx.compose.runtime.State
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.geometry.Size
 import kotlinx.coroutines.CoroutineScope
 
@@ -168,6 +172,15 @@ private class BlendCornerSize(private val detailsT: Float) : CornerSize {
     }
 }
 
+/**
+ * The bar's corner, read at draw time from the animated value. A shape built from a value read in composition recomposed the whole bar
+ * on every frame of the details spring; this one reads the value only when its outline is drawn.
+ */
+private class BlendedBarShape(private val detailsT: State<Float>) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        RoundedCornerShape(BlendCornerSize(detailsT.value)).createOutline(size, layoutDirection, density)
+}
+
 /** The handle-only bar's width: the handle with a little glass around it. The bar grows from this to the single line when a car is selected. */
 internal val MapBarHandleWidth = 64.dp
 
@@ -218,7 +231,9 @@ internal fun MapTopBar(
     LaunchedEffect(selected) { if (!selected) onDetailsOpenChange(false) }
     // The same spring as the grow from the handle (see ExpandableMap), so the details, the corners and the grow land together.
     val spring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
-    val detailsT by animateFloatAsState(targetValue = if (detailsOpen) 1f else 0f, animationSpec = spring, label = "mapBarDetails")
+    // Read as a State, never as a value in composition: the bar's shape and its reveal read it at draw and layout time only.
+    val detailsTState = animateFloatAsState(targetValue = if (detailsOpen) 1f else 0f, animationSpec = spring, label = "mapBarDetails")
+    val barShape = remember(detailsTState) { BlendedBarShape(detailsTState) }
     // Press-and-hold pop on the whole pill. requireUnconsumed = false observes down/up without consuming, so the drag and the tap still
     // receive the touch.
     var pillPressed by remember { mutableStateOf(false) }
@@ -257,7 +272,7 @@ internal fun MapTopBar(
     if (swipeSign != 0) {
         (if (swipeSign > 0) nextBar else prevBar)?.let { neighbour ->
             GlassSurface(
-                shape = RoundedCornerShape(BlendCornerSize(detailsT)),
+                shape = barShape,
                 liquid = true,
                 modifier = Modifier.matchParentSize().graphicsLayer {
                     translationX = slideX.value + (if (swipeSign > 0) screenWidthPx else -screenWidthPx)
@@ -289,7 +304,7 @@ internal fun MapTopBar(
     }
     GlassSurface(
         // The corners ease between the pill and the rounded details panel on the same spring.
-        shape = RoundedCornerShape(BlendCornerSize(detailsT)),
+        shape = barShape,
         // The bar is liquid glass: the refraction and specular sheen of the app's floating glass, drawn over the map behind it.
         liquid = true,
         // The whole bar pulls up and down, the pill and its details alike, not only the handle.
@@ -485,7 +500,7 @@ internal fun MapTopBar(
                     .clipToBounds()
                     .layout { measurable, constraints ->
                         val full = measurable.measure(constraints.copy(minHeight = 0))
-                        val shown = (full.height * detailsT).roundToInt()
+                        val shown = (full.height * detailsTState.value).roundToInt()
                         layout(full.width, shown) { full.place(0, 0) }
                     },
             ) {
