@@ -279,16 +279,19 @@ internal fun CollapsedGaragePager(
                         // In the grid this card's hero swaps its own expand chevron for the
                         // full-screen button -- the one thing worth opening once several cars share
                         // the window; on a single column there is nothing to open, so it is absent.
-                        val heroAction = if (multiColumn || fullScreen) {
-                            PebbleHeaderAction(
-                                label = "",
-                                icon = if (fullScreen) AppIcons.FullscreenExit else AppIcons.Fullscreen,
-                                onClick = { onToggleFullScreen(real) },
-                                active = fullScreen,
-                                contentDescription = if (fullScreen) "Exit full screen" else "Full screen",
-                            )
-                        } else {
-                            null
+                        // Remembered on what it depends on, so the car page sees the same instance and can skip when nothing it shows changed.
+                        val heroAction = remember(multiColumn, fullScreen, real, onToggleFullScreen) {
+                            if (multiColumn || fullScreen) {
+                                PebbleHeaderAction(
+                                    label = "",
+                                    icon = if (fullScreen) AppIcons.FullscreenExit else AppIcons.Fullscreen,
+                                    onClick = { onToggleFullScreen(real) },
+                                    active = fullScreen,
+                                    contentDescription = if (fullScreen) "Exit full screen" else "Full screen",
+                                )
+                            } else {
+                                null
+                            }
                         }
                         ExpandedCar(
                             vehicles[real], state, vm,

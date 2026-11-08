@@ -50,10 +50,13 @@ internal fun GarageScreen(
 
     // Reading it in THIS composable is fine and intended -- this is one of the few places that
     // genuinely needs it, and it is above the pages.
-    val currentIndex by vm.currentIndex.collectAsStateWithLifecycle()
+    // Read as a State and only through the derived vehicle below: a settle that picks the same car does not recompose the garage.
+    val currentIndexState = vm.currentIndex.collectAsStateWithLifecycle()
     // lastIndex.coerceAtLeast(0): lastIndex is -1 on an empty list, and coerceIn(0, -1) throws (min
     // > max) before getOrNull ever gets a chance to just return null for it.
-    val currentVehicle = vehicles.getOrNull(currentIndex.coerceIn(0, vehicles.lastIndex.coerceAtLeast(0)))
+    val currentVehicle by remember(vehicles) {
+        derivedStateOf { vehicles.getOrNull(currentIndexState.value.coerceIn(0, vehicles.lastIndex.coerceAtLeast(0))) }
+    }
     val currentFetchedAt by remember(currentVehicle?.vin) {
         derivedStateOf { currentVehicle?.let { state.value.fetchedAt(it) } }
     }
