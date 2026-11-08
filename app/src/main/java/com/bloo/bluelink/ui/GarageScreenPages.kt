@@ -102,8 +102,11 @@ internal fun CollapsedGaragePager(
             var applied = 0f
             snapshotFlow { BarSwipeState.active to BarSwipeState.px }.collect { (active, px) ->
                 if (active) {
-                    val step = applied - px
-                    applied = px
+                    // One flick, one page: the follow never travels past one page's width, so a hold at the edge cannot keep paging.
+                    val limit = windowWidthPx.toFloat()
+                    val target = px.coerceIn(-limit, limit)
+                    val step = applied - target
+                    applied = target
                     if (step != 0f) pager.scroll(androidx.compose.foundation.MutatePriority.UserInput) { scrollBy(step) }
                 } else if (applied != 0f) {
                     applied = 0f

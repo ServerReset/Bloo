@@ -69,7 +69,10 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     // Closed, the map sits on its home card, so it needs that card's place on screen. Until the card has been placed, nothing is drawn.
     // A swipe to a car whose card has not been placed yet keeps the last place the map was drawn in, rather than drawing nothing.
     val lastClosed = remember { arrayOfNulls<Rect>(1) }
-    val reportedClosed: Rect? = if (openVin == null && homeVin != null) centralMap.originBoundsFor(homeVin).value else null
+    // Closed, the map sits on the card of the car the bar is showing: after a swipe to another car, that is the selected one, not the car
+    // the map was opened from.
+    val closeVin = centralMap.selectedVin ?: homeVin
+    val reportedClosed: Rect? = if (openVin == null && closeVin != null) centralMap.originBoundsFor(closeVin).value else null
     if (reportedClosed != null) lastClosed[0] = reportedClosed
     val closedAt: Rect? = reportedClosed ?: lastClosed[0]
     if (hostVehicle == null || hostLocation == null) return
