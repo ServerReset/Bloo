@@ -224,7 +224,8 @@ internal fun CollapsedGaragePager(
             // over the reflow's own fraction of two columns. Continuous, so a car widening to full screen grows its blocks
             // with the page; read nowhere in composition, so the animation never recomposes the car.
             val columnWidthOf: () -> androidx.compose.ui.unit.Dp = remember(density, perPageAnim, expandedT) {
-                { with(density) { (boxWidthPx / perPageAnim.value.coerceAtLeast(1f) / (1f + expandedT.value)).toDp() } }
+                // Same width source as the reflow fraction (ColumnReflow reads the window width): the two cannot disagree mid-change.
+                { with(density) { (windowWidthPx / perPageAnim.value.coerceAtLeast(1f) / (1f + expandedT.value)).toDp() } }
             }
             // One column per car, `perPage` of them side by side: a car never grows to swallow the
             // pager any more -- the layout INSIDE the page scales (one column or two) with the
