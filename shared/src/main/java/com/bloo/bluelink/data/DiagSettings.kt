@@ -34,7 +34,7 @@ object DiagSettings {
      * TEMPORARY, for one build: advanced logging is on by default, so the performance report is recorded without anyone turning it on.
      * Set this to false to go back to logging being off until the person turns it on.
      */
-    private const val TEMP_LOGGING_ON_BY_DEFAULT = false
+    private const val TEMP_LOGGING_ON_BY_DEFAULT = true
 
     /** Reads the saved switches. Call once, early, before anything logs. Off unless the person chose otherwise (or the temporary default is on). */
     fun load(context: Context) {

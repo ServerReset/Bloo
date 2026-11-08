@@ -161,6 +161,16 @@ internal object StallStacks {
         val via = samples.first()
             .filter { f -> interesting.any { f.className.startsWith(it) } }
             .take(6).joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}" }
-        return if (via.isEmpty()) places else "$places [via $via]"
+        // The app's own frames, across every sample and with line numbers: the framework frames above say WHAT was running, these say
+        // which of our code asked for it. Names survive the build (renaming is off), so this names the composable or function.
+        val app = samples.flatMap { sample ->
+            sample.filter { it.className.startsWith("com.bloo") }
+                .map { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
+                .distinct()
+        }
+        val appPlaces = app.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }
+            .take(5).joinToString(", ") { "${it.key} x${it.value}" }
+        val appPart = if (appPlaces.isEmpty()) "" else " [app: $appPlaces]"
+        return (if (via.isEmpty()) places else "$places [via $via]") + appPart
     }
 }
