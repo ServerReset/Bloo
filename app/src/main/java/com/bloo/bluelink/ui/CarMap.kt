@@ -467,12 +467,17 @@ internal fun BoxScope.CarIconLayer(
         val pin = edge.pin(at.x, at.y, viewport)
         CarMarker(car.vin, pin.x, pin.y, pin.scale, abs(pin.x - at.x) > 0.5f || abs(pin.y - at.y) > 0.5f)
     }
+    // Which car leads each pill. It changes only when cars merge or split, not on every pan or pinch frame: a derived value that only
+    // invalidates its readers when the grouping itself changes (a list, so equal groupings compare equal).
+    // Keyed on what markers() captures that is not state (the zoom and the map centre's tile), so it is rebuilt when those change.
+    val leaders by remember(cars, radiusPx, zoom, xTileF, yTileF, tilePx) {
+        derivedStateOf { pillLeaders(markers(), radiusPx).toList() }
+    }
     Box(Modifier.matchParentSize().onSizeChanged { viewport = it })
     for ((index, car) in cars.withIndex()) {
         key(car.vin) {
-            val leaderOf = { pillLeaders(markers(), radiusPx) }
-            val isFollower = { val l = leaderOf(); l[index] != index }
-            val isPillLeader = { val l = leaderOf(); l[index] == index && l.count { it == index } > 1 }
+            val isFollower = { leaders[index] != index }
+            val isPillLeader = { leaders[index] == index && leaders.count { it == index } > 1 }
             val tileModifier = Modifier.align(Alignment.Center)
                 .offset {
                     // The icon's visible half-size, at its scale, keeps it whole inside the map, whatever the window says.
@@ -496,7 +501,7 @@ internal fun BoxScope.CarIconLayer(
                 }
             if (isPillLeader()) {
                 CarPillCluster(
-                    photos = (cars.indices).filter { leaderOf()[it] == index }.map { cars[it].photo },
+                    photos = (cars.indices).filter { leaders[it] == index }.map { cars[it].photo },
                     tint = tint,
                     onClick = { onCarTap(car.vin) },
                     anchor = { markers()[index].let { Offset(it.x, it.y) } },
