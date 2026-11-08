@@ -103,7 +103,7 @@ internal fun BoxScope.HeroBackground(
                 animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
             ) { with(heroPhotoDensity) { -HeroPhotoSlideDistance.roundToPx() } } +
             scaleOut(targetScale = 0.9f, animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec())) {
-        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f, clearT = clearT.value, contained = !clearOfText)
+        HeroPhotoBackdrop(v, imageUrl, height, aspectRatio = 16f / 9f, clearT = clearT, contained = !clearOfText)
     }
     // The expanded readout at the BOTTOM of the card: a sibling of the photo, not a child, so it
     // does not inherit the photo's scale settle (text should not zoom).

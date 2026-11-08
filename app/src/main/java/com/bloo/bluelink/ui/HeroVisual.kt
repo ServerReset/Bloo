@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.foundation.layout.padding
+import kotlin.math.roundToInt
 import com.bloo.bluelink.data.StartupTrace
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -158,11 +159,20 @@ internal fun HeroPhotoBackdrop(
      * How far the name and charge have moved off the photo, 0 (on it) to 1 (clear of it). The photo is inset by that share of the gap, so
      * the header and the readout land in the space above and below it. The caller animates it; this only lays it out.
      */
-    clearT: Float = 0f,
+    clearT: androidx.compose.runtime.State<Float>,
     /** True while the photo is inside the card (not floating): a cut-out is then clipped to the card like any other photo. */
     contained: Boolean = false,
 ) {
-    Box(Modifier.fillMaxWidth().padding(top = HeroTextClearTop * clearT, bottom = HeroTextClearBottom * clearT)) {
+    // The inset is read in LAYOUT, not composition: the animated value changes every frame of the text's move, and a padding built from
+    // it recomposed the photo on each of those frames. Same inset as the padding it replaces.
+    Box(
+        Modifier.fillMaxWidth().layout { measurable, constraints ->
+            val top = (HeroTextClearTop.toPx() * clearT.value).roundToInt()
+            val bottom = (HeroTextClearBottom.toPx() * clearT.value).roundToInt()
+            val p = measurable.measure(constraints.offset(vertical = -(top + bottom)))
+            layout(p.width, p.height + top + bottom) { p.place(0, top) }
+        },
+    ) {
         HeroVisual(v, imageUrl, height, corner, aspectRatio = aspectRatio, contained = contained)
     }
 }
