@@ -187,7 +187,13 @@ private fun BlurredBehindMap(centralMap: CentralMap, content: @Composable () -> 
         Modifier.fillMaxSize().graphicsLayer {
             // The drag toward closing fades the blur out (see CentralMap.dismissFade), and the release brings it back.
             val px = MapBlurDp * density * amount * (1f - centralMap.dismissFade)
-            renderEffect = if (amount > 0.01f) androidx.compose.ui.graphics.BlurEffect(px, px) else null
+            // Decal edges: the blur fades to transparent at the layer's edge instead of smearing its edge pixels, so a blurred background
+            // never picks up dark bands. With the blur off, nothing is applied and the background shows as it is.
+            renderEffect = if (amount > 0.01f) {
+                androidx.compose.ui.graphics.BlurEffect(px, px, androidx.compose.ui.graphics.TileMode.Decal)
+            } else {
+                null
+            }
         },
     ) {
         content()
