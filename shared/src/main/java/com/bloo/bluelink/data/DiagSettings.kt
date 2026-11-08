@@ -30,11 +30,17 @@ object DiagSettings {
 
     private const val PREFS = "bloo_diag"
 
-    /** Reads the saved switches. Call once, early, before anything logs. Off unless the person chose otherwise. */
+    /**
+     * TEMPORARY, for one build: advanced logging is on by default, so the performance report is recorded without anyone turning it on.
+     * Set this to false to go back to logging being off until the person turns it on.
+     */
+    private const val TEMP_LOGGING_ON_BY_DEFAULT = true
+
+    /** Reads the saved switches. Call once, early, before anything logs. Off unless the person chose otherwise (or the temporary default is on). */
     fun load(context: Context) {
         val p = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        logging = p.getBoolean("logging", false)
-        advanced = logging && p.getBoolean("advanced", false)
+        logging = p.getBoolean("logging", TEMP_LOGGING_ON_BY_DEFAULT)
+        advanced = logging && p.getBoolean("advanced", TEMP_LOGGING_ON_BY_DEFAULT)
     }
 
     /** Sets the whole choice at once: Off, Simple, or Advanced. */
