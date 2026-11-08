@@ -4,7 +4,6 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.runtime.State
-import androidx.compose.material3.Text
 import com.bloo.uicommon.RevealText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

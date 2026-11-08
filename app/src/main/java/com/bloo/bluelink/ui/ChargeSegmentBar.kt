@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.lowPowerAwareSpring
-import com.bloo.uicommon.SoftDamping
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 

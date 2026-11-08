@@ -48,7 +48,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import com.bloo.uicommon.RevealText
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
@@ -64,8 +63,6 @@ import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.hypot
-import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.currentCoroutineContext

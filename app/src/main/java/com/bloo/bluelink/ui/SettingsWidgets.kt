@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SettingsStore
-import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.collapsedSections
 import com.bloo.uicommon.ButtonIcon
 import com.bloo.uicommon.SecondaryTextStyle

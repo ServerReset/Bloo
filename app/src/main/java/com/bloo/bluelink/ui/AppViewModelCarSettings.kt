@@ -4,7 +4,6 @@ import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.Vehicle
-import com.bloo.bluelink.data.VehiclePlatform
 import com.bloo.bluelink.data.lastServiceMiles
 import com.bloo.bluelink.data.serviceIntervalMiles
 import com.bloo.bluelink.data.setHotspots
