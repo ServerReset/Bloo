@@ -6,7 +6,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -44,9 +43,7 @@ internal fun GarageScreen(
     // DERIVED reads, not body reads of `state.value`.
     val vehicles by remember { derivedStateOf { state.value.vehicles } }
     val refreshing by remember { derivedStateOf { state.value.refreshing } }
-    val deviceLocation by remember { derivedStateOf { state.value.deviceLocation } }
     val showSettingsHint by remember { derivedStateOf { state.value.showSettingsHint } }
-    val appearance = LocalAppearance.current
 
     // Reading it in THIS composable is fine and intended -- this is one of the few places that
     // genuinely needs it, and it is above the pages.
