@@ -44,9 +44,6 @@ import com.bloo.uicommon.GapGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.background
 import androidx.compose.ui.semantics.Role
-import androidx.compose.material3.Icon
-import com.bloo.uicommon.AppIcons
-import com.bloo.uicommon.SecondaryTextStyle
 import androidx.compose.foundation.clickable
 
 /**
