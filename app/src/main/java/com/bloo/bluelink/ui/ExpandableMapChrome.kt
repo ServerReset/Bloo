@@ -308,7 +308,7 @@ internal fun MapTopBar(
             }
             .pointerInput(carIndex, carCount) {
                 // A sideways swipe moves to the neighbouring car: the bar follows the finger, then goes off the screen on the side it was
-                // pushed, and the next car's bar comes in from the other side. At either end of the list it springs back.
+                // pushed, and the next car's bar comes in from the other side. The list wraps, so there is no end to spring back from.
                 //
                 // Read in the INITIAL pass, before the map and sheet behind the bar. Read in the main pass, the expanded map's own pan
                 // took every sideways drag over it first, so the bar never saw the swipe. A tap is untouched: nothing is claimed until
@@ -357,8 +357,9 @@ internal fun MapTopBar(
                         totalX >= thresholdPx -> -1
                         else -> 0
                     }
-                    val next = carIndex + dir
-                    val canMove = dir != 0 && next in 0 until carCount
+                    // Infinite, like the car cards: past the last car the bar comes round to the first, and back again.
+                    val canMove = dir != 0 && carCount > 1
+                    val next = wrapIndex(carIndex + dir, carCount.coerceAtLeast(1))
                     barScope.launch {
                         if (!canMove) {
                             slideX.animateTo(0f, tween(180))

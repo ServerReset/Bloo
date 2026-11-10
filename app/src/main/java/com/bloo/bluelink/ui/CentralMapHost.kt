@@ -120,14 +120,17 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         onDeselect = { centralMap.selectedVin = null },
         carIndex = vehicles.indexOfFirst { it.vin == barVehicle.vin }.coerceAtLeast(0),
         carCount = vehicles.size,
-        prevBar = barPreview(state.value, vehicles.getOrNull(vehicles.indexOfFirst { it.vin == barVehicle.vin } - 1), appearance.metricDistance),
-        nextBar = barPreview(state.value, vehicles.getOrNull(vehicles.indexOfFirst { it.vin == barVehicle.vin } + 1), appearance.metricDistance),
+        // The bar is an infinite carousel, like the car cards: the car before the first is the last, and the one after the last is the first.
+        prevBar = wrappedNeighbourBar(state.value, vehicles, barVehicle.vin, -1, appearance.metricDistance),
+        nextBar = wrappedNeighbourBar(state.value, vehicles, barVehicle.vin, 1, appearance.metricDistance),
         // A swipe on the bar moves to the neighbouring car the same way a tap on its icon does: the bar, the map and the car page follow.
         onSwipeCar = { dir ->
             val list = state.value.vehicles
             val cur = list.indexOfFirst { it.vin == barVehicle.vin }
-            val next = (cur + dir).coerceIn(0, list.lastIndex)
-            if (cur >= 0 && next != cur) centralMap.tapPin(list[next].vin)
+            if (cur >= 0 && list.size > 1) {
+                val next = wrapIndex(cur + dir, list.size)
+                centralMap.tapPin(list[next].vin)
+            }
         },
         onDismissDrag = { centralMap.dismissFade = it },
         deviceLocation = deviceLocation,
@@ -162,6 +165,27 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             centralMap.closingTo = null
         },
     )
+}
+
+/** [index] wrapped into 0 until [size]: past either end, the list continues from the other end, as the car pager does. */
+internal fun wrapIndex(index: Int, size: Int): Int = ((index % size) + size) % size
+
+/**
+ * The bar's look for the car [delta] steps from [vin] in the list, wrapping at the ends. Null with fewer than two cars (nothing to swipe
+ * to) or when [vin] is not in the list.
+ */
+@Composable
+private fun wrappedNeighbourBar(
+    state: UiState,
+    vehicles: List<com.bloo.bluelink.data.Vehicle>,
+    vin: String,
+    delta: Int,
+    metric: Boolean,
+): BarPreview? {
+    val n = vehicles.size
+    val cur = vehicles.indexOfFirst { it.vin == vin }
+    if (n < 2 || cur < 0) return null
+    return barPreview(state, vehicles[wrapIndex(cur + delta, n)], metric)
 }
 
 /** The bar's look for a neighbouring car, so a swipe can show it coming in. Null for no car on that side. */
