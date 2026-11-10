@@ -87,6 +87,9 @@ import kotlinx.coroutines.CoroutineScope
 internal object BarSwipeState {
     var active by mutableStateOf(false)
     var px by mutableFloatStateOf(0f)
+
+    /** The car move the bar committed on release: +1 or -1, or 0 for a spring-back. The pager reads it, so it settles only on a spring-back. */
+    var committed = 0
 }
 
 /**
@@ -337,9 +340,6 @@ internal fun MapTopBar(
                         BarSwipeState.px = totalX
                     }
                     if (!claimed) return@awaitEachGesture
-                    // Released: the pager settles itself (see CollapsedGaragePager), so the bar hands it back here.
-                    BarSwipeState.active = false
-                    BarSwipeState.px = 0f
                     val dir = when {
                         totalX <= -thresholdPx -> 1
                         totalX >= thresholdPx -> -1
@@ -348,6 +348,11 @@ internal fun MapTopBar(
                     // Infinite, like the car cards: past the last car the bar comes round to the first, and back again.
                     val canMove = dir != 0 && carCount > 1
                     val next = wrapIndex(carIndex + dir, carCount.coerceAtLeast(1))
+                    // Released: the bar alone decides the car move (below), and the pager only follows it. The pager must not also settle a
+                    // page of its own, or one flick moves two or three cars. Set before the drag ends, so the pager reads it on that release.
+                    BarSwipeState.committed = if (canMove) dir else 0
+                    BarSwipeState.active = false
+                    BarSwipeState.px = 0f
                     barScope.launch {
                         if (!canMove) {
                             slideX.animateTo(0f, tween(180))

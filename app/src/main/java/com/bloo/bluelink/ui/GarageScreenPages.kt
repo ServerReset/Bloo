@@ -110,13 +110,10 @@ internal fun CollapsedGaragePager(
                     if (step != 0f) pager.scroll(androidx.compose.foundation.MutatePriority.UserInput) { scrollBy(step) }
                 } else if (applied != 0f) {
                     applied = 0f
-                    val frac = pager.currentPageOffsetFraction
-                    val nudge = when {
-                        frac > 0.5f -> 1
-                        frac < -0.5f -> -1
-                        else -> 0
-                    }
-                    pager.animateScrollToPage((pager.currentPage + nudge).coerceIn(0, pager.pageCount - 1))
+                    // A committed bar swipe changes the car, and the pager follows that change (see currentIndex). Only a spring-back
+                    // settles here, back to the page it was on, so one flick moves exactly one car.
+                    if (BarSwipeState.committed == 0) pager.animateScrollToPage(pager.currentPage)
+                    BarSwipeState.committed = 0
                 }
             }
         }
