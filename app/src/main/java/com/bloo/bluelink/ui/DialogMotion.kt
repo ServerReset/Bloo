@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.GapBlock
+import com.bloo.uicommon.blurCapable
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.content
 
@@ -126,7 +127,7 @@ private fun DialogEntryView(host: DialogHost, entry: DialogEntry, isTop: Boolean
                 hazeState = host.hazeState,
                 // Frosted rather than clear: enough of the theme's surface over the blur that the
                 // text reads whatever is behind. Denser where the blur is unavailable.
-                tint = scheme.surfaceContainerHigh.copy(alpha = if (canBlurBackdrops()) 0.58f else 0.97f),
+                tint = scheme.surfaceContainerHigh.copy(alpha = if (blurCapable()) 0.58f else 0.97f),
                 modifier = Modifier.padding(horizontal = GapBlock).widthIn(max = 560.dp).fillMaxWidth()
                     .focusRequester(cardFocus)
                     .focusable()

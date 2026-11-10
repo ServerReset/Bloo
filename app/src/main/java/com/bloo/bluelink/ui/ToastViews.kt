@@ -60,6 +60,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.blurCapable
 import com.bloo.uicommon.canBlurBackdrops
 import androidx.compose.ui.graphics.TransformOrigin
 
@@ -276,7 +277,7 @@ private fun ToastCard(
         hazeState = hazeState,
         // A pile fans out or folds when tapped.
         onClick = onTap,
-        tint = scheme.surface.copy(alpha = if (canBlurBackdrops()) 0.16f else 0.96f),
+        tint = scheme.surface.copy(alpha = if (blurCapable()) 0.16f else 0.96f),
         modifier = Modifier.fillMaxWidth()
             // At least the search element's height: normally it is exactly the bar it emerged
             // from, but a long message may wrap to a second line and grow past it.

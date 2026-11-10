@@ -30,6 +30,16 @@ fun canBlurBackdrops(): Boolean =
         !BlurSuspension.suspended
 
 /**
+ * Whether this device can blur glass at all: API 31+ and the power policy allows it. Unlike [canBlurBackdrops], it does NOT drop out while
+ * something moves, so a glass surface's tint never changes with the motion. Only its blur does. Tint choices use this: when the blur is
+ * suspended, glass keeps its translucent tint and goes transparent behind it, instead of jumping to the opaque fallback and reading as black.
+ */
+@Composable
+fun blurCapable(): Boolean =
+    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+        LocalPowerPolicy.current.blurBackdrops
+
+/**
  * The app's one inert (disabled) treatment: soften and fade whatever is inert, leaving its own
  * (morphing) shape alone. Disabled buttons, sliders and locked-out control groups all wear this, so
  * "disabled" looks identical everywhere instead of each deriving its own blur.

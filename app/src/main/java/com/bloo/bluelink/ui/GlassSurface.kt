@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import dev.chrisbanes.haze.HazeState
+import com.bloo.uicommon.blurCapable
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.glassTint
 import com.bloo.uicommon.content
@@ -33,7 +34,7 @@ internal fun GlassSurface(
     shape: Shape,
     modifier: Modifier = Modifier,
     hazeState: HazeState? = null,
-    tint: Color = glassTint(hazeState != null && canBlurBackdrops()),
+    tint: Color = glassTint(hazeState != null && blurCapable()),
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: (() -> Unit)? = null,
     contentDescription: String? = null,

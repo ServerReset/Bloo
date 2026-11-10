@@ -43,6 +43,7 @@ import com.bloo.bluelink.data.SettingsStore
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.ButtonTargetHeight
 import com.bloo.uicommon.ButtonLabelStyle
+import com.bloo.uicommon.blurCapable
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.glassTint
@@ -193,7 +194,7 @@ internal fun FloatingIcon(
             }
             .ambientRing(CircleShape),
         hazeState = hazeState,
-        tint = containerColor ?: glassTint(hazeState != null && canBlurBackdrops()),
+        tint = containerColor ?: glassTint(hazeState != null && blurCapable()),
         contentColor = contentColor,
         contentDescription = description,
         interactionSource = interaction,

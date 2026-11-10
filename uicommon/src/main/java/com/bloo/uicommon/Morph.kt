@@ -163,7 +163,7 @@ fun MorphButton(
                 // Disabled = the app's standard frosted glass, not a washed-out tonal pill: the shared glass
                 // tint (translucent, blur-aware) with a matching rim, so a dimmed button reads as an inert
                 // pane of glass in the layout rather than a broken button.
-                disabledContainerColor = glassTint(canBlurBackdrops()),
+                disabledContainerColor = glassTint(blurCapable()),
                 disabledBorder = BorderStroke(1.dp, hairlineColor()),
                 interactionSource = interactionSource,
                 onLongClick = onLongClick,
