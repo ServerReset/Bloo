@@ -258,37 +258,25 @@ internal fun MapTopBar(
     }
     Box(Modifier.fillMaxWidth()) {
     // The neighbouring car's bar, drawn while the bar is swiped: it comes in from its side as this one goes off, so both move together.
+    // The neighbour is the REAL bar, not a copy of its look: the same composable, given that car's data, with no gestures of its own
+    // and no neighbours of its own. It grows with the same lineProgress and shows the same mode, so the two bars move as one.
     if (swipeSign != 0) {
         (if (swipeSign > 0) nextBar else prevBar)?.let { neighbour ->
-            GlassSurface(
-                shape = barShape,
-                liquid = true,
-                modifier = Modifier.matchParentSize().graphicsLayer {
+            MapTopBar(
+                vehicleName = neighbour.name,
+                mapHazeState = mapHazeState,
+                modifier = Modifier.graphicsLayer {
                     translationX = slideX.value + (if (swipeSign > 0) screenWidthPx else -screenWidthPx)
                 },
-                hazeState = mapHazeState,
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapRow),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(GapGroup),
-                ) {
-                    neighbour.photo?.let {
-                        AsyncImage(
-                            model = rememberPhotoModel(it),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(width = 48.dp, height = 36.dp).clip(RoundedCornerShape(10.dp)),
-                        )
-                    } ?: Icon(AppIcons.DirectionsCar, contentDescription = null, modifier = Modifier.size(24.dp))
-                    Box(Modifier.weight(1f)) {
-                        RevealText(neighbour.name, style = PrimaryTextStyle(), fontWeight = FontWeight.Bold, maxLines = 1)
-                    }
-                    neighbour.charge?.let {
-                        RevealText(it, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    }
-                }
-            }
+                dragModifier = Modifier,
+                carIndex = wrapIndex(carIndex + swipeSign, carCount),
+                carCount = carCount,
+                photo = neighbour.photo,
+                chargePercent = neighbour.charge,
+                chargeRange = neighbour.range,
+                mode = if (mode == MapBarMode.Details) MapBarMode.Line else mode,
+                lineProgress = lineProgress,
+            )
         }
     }
     GlassSurface(
