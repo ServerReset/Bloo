@@ -56,7 +56,7 @@ internal class CentralMap {
     /** The car whose Location card shows the map while it is closed: the garage's current car. */
     var homeVin by mutableStateOf<String?>(null)
 
-    /** The car the app is on: the garage's current car. Mirrored from the garage by the host, and changed only through [select]. */
+    /** The car the app is on: the garage's current car. Mirrored from the garage by the host; changed by [open] and [select] only. */
     var currentVin by mutableStateOf<String?>(null)
 
     /** Whether the open map's bar shows the current car's line. False shows only its handle (the car was deselected on the map). */
@@ -133,13 +133,18 @@ internal class CentralMap {
         homeVin = car
     }
 
-    /** Opens the map on [vin], showing that car in the bar. A map already open is not switched under the person. */
+    /**
+     * Opens the map on [vin], showing that car in the bar. A map already open is not switched under the person. The garage is not moved:
+     * the map grows out of this car's card, which must stay where it is while it does (on a wide screen it can be any column, not only
+     * the first). The garage moves once a swipe or a pin tap chooses another car.
+     */
     fun open(vin: String) {
         if (this.vin != null) return
         com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
         this.vin = vin
         barShown = true
-        select(vin, glide = false)
+        currentVin = vin
+        homeVin = vin
     }
 
     /** Closes the map: the bar and the anchor clear, and the map goes back to the card it rests in. */
