@@ -132,7 +132,7 @@ internal fun Modifier.liquidRim(shape: Shape, dark: Boolean = appIsDarkTheme()):
             drawOutline(outline, rim, style = Stroke(line))
             // Not while the garage moves: the sheen is lost in a swipe anyway, and drawing it there redrew every card's edge (two new
             // brushes each) and dirtied the blur sources behind the status bar and the search bubble on every tilt sample.
-            if (tilt != null && !com.bloo.uicommon.BlurSuspension.suspended) {
+            if (tilt != null) {
                 // A shimmer that lives on the edge: the rim catches the light as the phone is turned, a soft broad glow along it with a brighter core
                 // inside the glow, sliding over the whole pebble. Nothing is painted on the face; the card's own glass stays as it is.
                 val centre = sheenCentre(tilt.holdX, tilt.holdY)
@@ -297,10 +297,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
     val ultra = LocalAppearance.current.ultraGlass
     val blur = LocalPagerBlur.current
     val drawBlur = androidx.compose.runtime.remember(blur) { androidx.compose.runtime.derivedStateOf { blur() > 0.01f } }
-    // blurCapable, not canBlurBackdrops: the pause while the garage moves (BlurSuspension) is honoured in DRAW below. Read here, in
-    // composition, it recomposed every card on every page at the start and end of each swipe, and switched this branch, so every card's
-    // blur was torn down as the swipe began and built again (shaders and all) on the settle frame, with the tint jumping to the opaque
-    // fallback in between.
+    // The card keeps its blur while the garage moves; the blur's own fade and the tint are the only things that change.
     if (haze != null && blurCapable()) {
         Box(
             Modifier.matchParentSize()
@@ -312,7 +309,7 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
                     alpha = blur()
                     compositingStrategy = CompositingStrategy.ModulateAlpha
                 }
-                .drawWithContent { if (drawBlur.value && !com.bloo.uicommon.BlurSuspension.suspended) drawContent() }
+                .drawWithContent { if (drawBlur.value) drawContent() }
                 .clip(shape)
                 // ALWAYS the cheap blur, even in Ultra glass. A card is large and flat: the liquid
                 // refraction's edge bend is lost across it, but the displacement + chromatic pass is

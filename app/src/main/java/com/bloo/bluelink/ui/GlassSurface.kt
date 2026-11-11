@@ -96,7 +96,6 @@ internal fun GlassSurface(
         if (canBlur) {
             Box(
                 Modifier.matchParentSize().clip(shape)
-                    .drawWithContent { if (!com.bloo.uicommon.BlurSuspension.suspended) drawContent() }
                     // Floating glass refracts what is behind it; a nested panel or card keeps the flat blur.
                     .then(
                         when {

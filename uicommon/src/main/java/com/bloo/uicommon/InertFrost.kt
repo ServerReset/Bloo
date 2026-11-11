@@ -11,28 +11,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 
 /**
- * Whether something is moving that the glass must not blur under right now: a car page being swiped or settled, or the map bar being
- * dragged. While it is set, glass keeps its tint and drops its backdrop blur, so no backdrop is re-blurred on every frame of the motion.
- * Set by the surface that moves (see the garage pager), not by each glass surface.
- */
-object BlurSuspension {
-    var suspended by mutableStateOf(false)
-}
-
-/**
- * Real backdrop blur: API 31+ (a real RenderEffect; no-op below), the policy allows it, and nothing is moving under it (see
- * [BlurSuspension]).
+ * Real backdrop blur: API 31+ (a real RenderEffect; no-op below) and the power policy allows it. Glass keeps its blur while things move.
  */
 @Composable
-fun canBlurBackdrops(): Boolean =
-    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
-        LocalPowerPolicy.current.blurBackdrops &&
-        !BlurSuspension.suspended
+fun canBlurBackdrops(): Boolean = blurCapable()
 
 /**
- * Whether this device can blur glass at all: API 31+ and the power policy allows it. Unlike [canBlurBackdrops], it does NOT drop out while
- * something moves, so a glass surface's tint never changes with the motion. Only its blur does. Tint choices use this: when the blur is
- * suspended, glass keeps its translucent tint and goes transparent behind it, instead of jumping to the opaque fallback and reading as black.
+ * Whether this device can blur glass at all: API 31+ and the power policy allows it. Glass keeps its blur while things move.
  */
 @Composable
 fun blurCapable(): Boolean =
@@ -57,7 +42,7 @@ fun Modifier.inertButtonFrost(inert: Boolean): Modifier {
         val a = amount.value
         if (a > 0.001f) {
             val r = InertBlurRadius.toPx() * a
-            renderEffect = if (canBlur && !BlurSuspension.suspended) softBlur(r) else null
+            renderEffect = if (canBlur) softBlur(r) else null
             alpha = 1f - (if (canBlur) 0.08f else 0.4f) * a
         } else {
             renderEffect = null

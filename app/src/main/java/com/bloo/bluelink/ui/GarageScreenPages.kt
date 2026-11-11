@@ -88,14 +88,6 @@ internal fun CollapsedGaragePager(
         // One virtual page per real item; the real item for a page is wrap.real(page).
         val wrap = rememberWrapPager(total, initialItem)
         val pager = wrap.pager
-        // While the pager moves, glass drops its backdrop blur (see BlurSuspension), so no backdrop is blurred again on every frame of the
-        // motion. It is set when the motion starts and stops, not per frame.
-        LaunchedEffect(pager) {
-            snapshotFlow { pager.isScrollInProgress }
-                .distinctUntilChanged()
-                .collect { com.bloo.uicommon.BlurSuspension.suspended = it }
-        }
-        DisposableEffect(pager) { onDispose { com.bloo.uicommon.BlurSuspension.suspended = false } }
         // The map's top bar does NOT drive this pager's scroll. A swipe on the bar changes the current car by exactly one (see CentralMap),
         // and the pager travels one page to follow it, through currentIndex like any other car change. Driving the scroll from the finger
         // as well let the pager settle on its own pages mid-drag, and those settles changed the car again: one flick moved two or three.

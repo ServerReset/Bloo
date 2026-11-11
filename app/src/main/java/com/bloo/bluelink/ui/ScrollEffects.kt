@@ -115,7 +115,7 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
             scaleY = 1f - 0.22f * t
             scaleX = 1f - 0.07f * t
             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
-            renderEffect = if (blurOk && t > 0.03f && !com.bloo.uicommon.BlurSuspension.suspended) {
+            renderEffect = if (blurOk && t > 0.03f) {
                 // Rounded to quarter pixels, so a slow scroll does not build a new blur effect on every frame for a change no one sees.
                 softBlur(kotlin.math.round(maxBlurPx * t * 4f) / 4f)
             } else {
