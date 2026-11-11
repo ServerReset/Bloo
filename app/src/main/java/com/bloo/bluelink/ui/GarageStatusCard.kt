@@ -122,7 +122,6 @@ internal fun GarageStatusCard(state: State<UiState>, vm: AppViewModel, hazeState
             // The shared GlassSurface card shell, blurring the real Aurora behind it.
             GlassSurface(
                 shape = ExtraLargeShape,
-                liquid = false,
                 modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth()
                     .graphicsLayer {
                         alpha = contentAlpha.value

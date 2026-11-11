@@ -22,6 +22,7 @@ import com.bloo.uicommon.blurCapable
 import androidx.compose.ui.draw.drawWithContent
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.glassTint
+import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.content
 
 /**
@@ -47,14 +48,14 @@ internal fun GlassSurface(
      * Floating elements want it; nested panels and large cards want the flat blur, so it follows
      * [shadow] by default.
      */
-    liquid: Boolean = shadow,
+    liquid: Boolean = !LocalPowerPolicy.current.lean,
     /**
      * A plain, small-radius blur instead of the liquid refraction. For the many SMALL surfaces (the
      * status chips on every car): the refraction's bend is invisible at that size, but it costs a
      * displacement + chromatic pass on top of the blur -- and these are the most numerous glass
      * nodes on screen, so it is the one place the cheap path is worth more than the look.
      */
-    cheap: Boolean = false,
+    cheap: Boolean = LocalPowerPolicy.current.lean,
     /** Bare glass (see [appGlassEffect]): the caller passes a transparent [tint] too. */
     clear: Boolean = false,
     content: @Composable () -> Unit = {},

@@ -75,8 +75,6 @@ internal fun SearchGlassPill(
         onClick = onClick,
         contentDescription = contentDescription,
         contentAlignment = Alignment.CenterStart,
-        liquid = false,
-        cheap = true,
         content = content,
     )
 }
@@ -142,8 +140,6 @@ internal fun SearchHeading(text: String, hazeState: HazeState?) {
         shape = CircleShape,
         hazeState = hazeState,
         shadow = false,
-        liquid = false,
-        cheap = true,
         tint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
     ) {
         RevealText(

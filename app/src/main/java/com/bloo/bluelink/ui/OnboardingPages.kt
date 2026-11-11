@@ -307,7 +307,6 @@ internal fun OnboardingPebbleDemo() {
     var open by remember { mutableStateOf(false) }
     GlassSurface(
         shape = StandardShape,
-        liquid = false,
         shadow = false,
         onClick = {
             open = !open
