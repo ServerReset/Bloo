@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.blurCapable
+import androidx.compose.ui.draw.drawWithContent
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.glassTint
 import com.bloo.uicommon.content
@@ -58,7 +59,9 @@ internal fun GlassSurface(
     clear: Boolean = false,
     content: @Composable () -> Unit = {},
 ) {
-    val canBlur = hazeState != null && canBlurBackdrops()
+    // blurCapable, not canBlurBackdrops: the pause while the garage moves is honoured in draw (below), so a swipe starting or ending
+    // neither recomposes this surface nor tears down and rebuilds its blur.
+    val canBlur = hazeState != null && blurCapable()
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     Box(
         modifier = modifier
@@ -88,20 +91,25 @@ internal fun GlassSurface(
             ),
         contentAlignment = contentAlignment,
     ) {
-        // One node for blur+tint: both draw in the Box's own modifier chain (blur first, tint on
-        // top).
+        // The blur, under the tint. Kept attached while the garage moves and only not DRAWN then (a draw-phase read of the pause), so
+        // the glass goes clear for the moment of a swipe, with its tint still on, and is back on the settle frame without being rebuilt.
+        if (canBlur) {
+            Box(
+                Modifier.matchParentSize().clip(shape)
+                    .drawWithContent { if (!com.bloo.uicommon.BlurSuspension.suspended) drawContent() }
+                    // Floating glass refracts what is behind it; a nested panel or card keeps the flat blur.
+                    .then(
+                        when {
+                            liquid -> Modifier.appGlassEffect(hazeState, shape, clear)
+                            cheap -> Modifier.appHazeEffect(hazeState, cheap = true)
+                            else -> Modifier.appHazeEffect(hazeState)
+                        },
+                    ),
+            )
+        }
+        // The tint and sheen, on top of the blur.
         Box(
             Modifier.matchParentSize().clip(shape)
-                // Floating glass refracts what is behind it; a nested panel or card keeps the flat
-                // blur.
-                .then(
-                    when {
-                        !canBlur -> Modifier
-                        liquid -> Modifier.appGlassEffect(hazeState, shape, clear)
-                        cheap -> Modifier.appHazeEffect(hazeState, cheap = true)
-                        else -> Modifier.appHazeEffect(hazeState)
-                    },
-                )
                 .background(tint)
                 .glassSheen(),
         )

@@ -41,8 +41,11 @@ import com.bloo.uicommon.LocalHaptics
  * The pebble header action model and its split-button control. Split out of PebbleShell.kt --
  * Pebble/PebbleShell (staying there) reference PebbleHeaderAction only as a parameter type, needing
  * no import for the same-package reference.
+ *
+ * A data class, so two actions built with the same values compare equal: every pebble builds its action fresh each time it composes,
+ * and as a plain class each new instance counted as a change, so the header and its split button could never skip a recomposition.
  */
-internal class PebbleHeaderAction(
+internal data class PebbleHeaderAction(
     val label: String,
     val icon: ImageVector,
     val onClick: () -> Unit,

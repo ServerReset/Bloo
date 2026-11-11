@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -64,28 +65,32 @@ internal fun Modifier.carTonalBackground(scheme: ColorScheme): Modifier {
     val tone = { c: Color -> lerp(c, toward, if (dark) 0.62f else 0.5f) }
     val glow = { c: Color -> lerp(c, if (dark) Color.White else Color.White, if (dark) 0.8f else 0.35f) }
     val base = tone(scheme.primary); val mid = tone(scheme.tertiary); val end = tone(scheme.secondary)
-    return this.drawBehind {
-        drawRect(
-            Brush.linearGradient(
-                0f to base, 0.55f to mid, 1f to end,
-                start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                end = androidx.compose.ui.geometry.Offset(size.width, size.height),
-            ),
+    val glowPrimary = glow(scheme.primary).copy(alpha = if (dark) 0.34f else 0.30f)
+    val glowTertiary = glow(scheme.tertiary).copy(alpha = if (dark) 0.30f else 0.26f)
+    // Cached: the three gradients are built once per size (and the colour blends once per composition), not on every draw. Built in a
+    // plain drawBehind they were made again, colour blends included, each time the hero redrew -- every frame of a swipe or a morph.
+    return this.drawWithCache {
+        val sweep = Brush.linearGradient(
+            0f to base, 0.55f to mid, 1f to end,
+            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+            end = androidx.compose.ui.geometry.Offset(size.width, size.height),
         )
         val r = size.maxDimension * 0.85f
-        drawRect(
-            Brush.radialGradient(
-                listOf(glow(scheme.primary).copy(alpha = if (dark) 0.34f else 0.30f), Color.Transparent),
-                center = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.05f), radius = r,
-            ),
+        val topLight = Brush.radialGradient(
+            listOf(glowPrimary, Color.Transparent),
+            center = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.05f), radius = r,
         )
-        drawRect(
-            Brush.radialGradient(
-                listOf(glow(scheme.tertiary).copy(alpha = if (dark) 0.30f else 0.26f), Color.Transparent),
-                center = androidx.compose.ui.geometry.Offset(size.width * 0.92f, size.height * 0.98f), radius = r * 0.9f,
-            ),
+        val bottomLight = Brush.radialGradient(
+            listOf(glowTertiary, Color.Transparent),
+            center = androidx.compose.ui.geometry.Offset(size.width * 0.92f, size.height * 0.98f), radius = r * 0.9f,
         )
+        onDrawBehind {
+            drawRect(sweep)
+            drawRect(topLight)
+            drawRect(bottomLight)
+        }
     }
+}
 }
 
 /**

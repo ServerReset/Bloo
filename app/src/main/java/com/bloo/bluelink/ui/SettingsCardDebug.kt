@@ -155,15 +155,23 @@ internal fun DebugCardContent(
                     MorphTextButton("Copy", onClick = { copy("bloo logs", logs.joinToString("\n")) })
                     MorphTextButton("Clear", onClick = { vm.clearLogs() }, emphasis = ButtonEmphasis.Deny)
                 }
-                val scroll = rememberScrollState()
-                SelectionContainer {
-                    RevealText(
-                        text = logs.joinToString("\n").ifBlank { "No activity yet." },
-                        style = SecondaryTextStyle(),
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).fadingEdges(scroll)
-                            .verticalScroll(scroll),
-                    )
+                // One line per row, in a lazy list: only the lines on screen are laid out. As one text, all of up to 500 lines were joined
+                // and laid out again (a single huge layout) every time a line was added -- the largest main-thread stall in a performance
+                // log, and Advanced logging, which records that log, adds lines constantly. Copy still hands over the whole log.
+                if (logs.isEmpty()) {
+                    BodySmallText("No activity yet.")
+                } else {
+                    val logStyle = SecondaryTextStyle()
+                    SelectionContainer {
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                            state = androidx.compose.foundation.lazy.rememberLazyListState(),
+                        ) {
+                            items(logs.size) { i ->
+                                androidx.compose.material3.Text(logs[i], style = logStyle, fontFamily = FontFamily.Monospace)
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -220,9 +220,13 @@ internal fun SettingsCard(
 ) {
     // Open/closed uses the car pebbles' collapse set and togglePebble (via SettingsPseudoVehicle),
     // so it survives process death like they do.
-    val collapsed by vm.collapsedSections.collectAsStateWithLifecycle()
+    // Only this card's own entry is read, through a derived value: reading the whole set recomposed every Settings card whenever any one
+    // card, or any car's pebble, was opened or closed.
+    val collapsedSet = vm.collapsedSections.collectAsStateWithLifecycle()
+    val collapseKey = "$SETTINGS_CARD_VIN:$title"
+    val collapsed by remember(collapseKey) { androidx.compose.runtime.derivedStateOf { collapseKey in collapsedSet.value } }
     val inline = inlineSetting != null
-    val expanded = !inline && "$SETTINGS_CARD_VIN:$title" !in collapsed
+    val expanded = !inline && !collapsed
     // heading() sits on the outer wrapper because PebbleShell exposes no hook into its title
     // Modifier; its header row is already one merged TalkBack stop.
     Box(Modifier.entrance("settings:$title").settingsCardSlot()) {

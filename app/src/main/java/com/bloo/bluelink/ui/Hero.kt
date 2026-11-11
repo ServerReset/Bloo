@@ -102,8 +102,13 @@ internal fun HeroHeader(
     val collapsedNumbers = remember { mutableStateOf<Rect?>(null) }
     val expandedNumbers = remember { mutableStateOf<Rect?>(null) }
     // Until both ends are measured the anchors paint themselves, so the first frame is correct.
-    val hoisted = cardCoords.value != null &&
-        collapsedNumbers.value != null && expandedNumbers.value != null
+    // Derived: the anchors' rects are rewritten on every frame they move, and read directly here they recomposed the whole header on each
+    // of those frames. Only whether all three exist matters.
+    val hoisted by remember {
+        androidx.compose.runtime.derivedStateOf {
+            cardCoords.value != null && collapsedNumbers.value != null && expandedNumbers.value != null
+        }
+    }
     fun report(into: androidx.compose.runtime.MutableState<Rect?>) =
         { coords: LayoutCoordinates ->
             val card = cardCoords.value

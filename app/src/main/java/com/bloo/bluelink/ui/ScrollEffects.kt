@@ -15,6 +15,7 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.blurCapable
 import com.bloo.uicommon.softBlur
 
 // --- Soft scroll edges and edge bleed for horizontal strips ---
@@ -87,7 +88,8 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val fadePx = with(density) { 48.dp.toPx() }
     val maxBlurPx = with(density) { 4.dp.toPx() }
-    val blurOk = canBlurBackdrops()
+    // The device's capability here; the pause while the garage moves is read in the layer, so a swipe does not recompose every row.
+    val blurOk = blurCapable()
     return this
         .onGloballyPositioned {
             // Not while the car pager is swiping: the page's window position moves with the swipe, and every
@@ -113,8 +115,9 @@ internal fun Modifier.glassEdgeFocus(): Modifier {
             scaleY = 1f - 0.22f * t
             scaleX = 1f - 0.07f * t
             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, if (intoTop >= intoBottom) 0f else 1f)
-            renderEffect = if (blurOk && t > 0.03f) {
-                softBlur(maxBlurPx * t)
+            renderEffect = if (blurOk && t > 0.03f && !com.bloo.uicommon.BlurSuspension.suspended) {
+                // Rounded to quarter pixels, so a slow scroll does not build a new blur effect on every frame for a change no one sees.
+                softBlur(kotlin.math.round(maxBlurPx * t * 4f) / 4f)
             } else {
                 null
             }

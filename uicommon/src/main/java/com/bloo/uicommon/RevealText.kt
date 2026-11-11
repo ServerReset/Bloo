@@ -251,9 +251,10 @@ fun RevealText(
             changeFade.animateTo(1f, tween(TextChangeMs))
         }
     }
-    val textMeasurer = rememberTextMeasurer()
+    // Only a text whose number is rolling measures its digits, so only those keep a measurer (each one holds its own layout cache).
+    val textMeasurer = if (rollStart != null) rememberTextMeasurer() else null
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val rolled = rollFrom?.let { from ->
+    val rolled = if (textMeasurer == null) null else rollFrom?.let { from ->
         val resolved = style.merge(
             TextStyle(
                 color = color, fontSize = fontSize, fontStyle = fontStyle, fontWeight = fontWeight,
@@ -272,64 +273,92 @@ fun RevealText(
     val revealPath = remember { Path() }
     // A rare caller-supplied onTextLayout still runs; the reveal's own capture is chained on top.
     val callerOnTextLayout by rememberUpdatedState(onTextLayout)
-    Text(
-        text = rolled?.first ?: AnnotatedString(text),
-        inlineContent = rolled?.second ?: emptyMap(),
-        modifier = (if (settled) {
-            // Done: the plain modifier, so nothing of the reveal is even a node any more.
-            modifier
-        } else {
-            modifier.drawWithContent {
-                val lr = layoutState.value
-                val p = progress.value
-                if (lr == null || p >= 1f || lr.lineCount <= 1) {
-                    drawContent()
-                    return@drawWithContent
-                }
-                // One full-width band per revealed line (the lines not yet due -- and, because the
-                // clip covers the halo too, their shadows -- are simply not drawn).
-                revealPath.reset()
-                val n = lr.lineCount
-                var i = 0
-                while (i < n && p * n > i) {
-                    revealPath.addRect(Rect(0f, lr.getLineTop(i), size.width, lr.getLineBottom(i)))
-                    i++
-                }
-                clipPath(revealPath) { this@drawWithContent.drawContent() }
+    val textModifier = (if (settled) {
+        // Done: the plain modifier, so nothing of the reveal is even a node any more.
+        modifier
+    } else {
+        modifier.drawWithContent {
+            val lr = layoutState.value
+            val p = progress.value
+            if (lr == null || p >= 1f || lr.lineCount <= 1) {
+                drawContent()
+                return@drawWithContent
             }
-        }).then(motion),
-        color = color,
-        fontSize = fontSize,
-        fontStyle = fontStyle,
-        fontWeight = fontWeight,
-        fontFamily = fontFamily,
-        letterSpacing = letterSpacing,
-        textDecoration = textDecoration,
-        textAlign = textAlign,
-        lineHeight = lineHeight,
-        overflow = overflow,
-        softWrap = softWrap,
-        maxLines = maxLines,
-        minLines = minLines,
-        onTextLayout = { result ->
-            layoutState.value = result
-            // Start the reveal here -- the layout phase, where the line count becomes known -- rather
-            // than from a composition that read it.
-            if (progress.value == 0f && result.lineCount > 0) {
-                scope.launch {
-                    progress.animateTo(
-                        1f,
-                        tween(
-                            durationMillis = (result.lineCount * MsPerLine).coerceIn(MinRevealMs, MaxRevealMs),
-                            easing = LinearEasing,
-                        ),
-                    )
-                }
+            // One full-width band per revealed line (the lines not yet due -- and, because the
+            // clip covers the halo too, their shadows -- are simply not drawn).
+            revealPath.reset()
+            val n = lr.lineCount
+            var i = 0
+            while (i < n && p * n > i) {
+                revealPath.addRect(Rect(0f, lr.getLineTop(i), size.width, lr.getLineBottom(i)))
+                i++
             }
-            callerOnTextLayout?.invoke(result)
-        },
-        style = style,
-    )
+            clipPath(revealPath) { this@drawWithContent.drawContent() }
+        }
+    }).then(motion)
+    val onLayout: (TextLayoutResult) -> Unit = { result ->
+        // The layout is kept only while the reveal still needs it to clip by line. Once the reveal has finished it is never read again, and
+        // writing it on every later layout was a state write per text per layout for nothing.
+        if (progress.value < 1f) layoutState.value = result
+        // Start the reveal here -- the layout phase, where the line count becomes known -- rather
+        // than from a composition that read it.
+        if (progress.value == 0f && result.lineCount > 0) {
+            scope.launch {
+                progress.animateTo(
+                    1f,
+                    tween(
+                        durationMillis = (result.lineCount * MsPerLine).coerceIn(MinRevealMs, MaxRevealMs),
+                        easing = LinearEasing,
+                    ),
+                )
+            }
+        }
+        callerOnTextLayout?.invoke(result)
+    }
+    if (rolled == null) {
+        // Plain text takes the String path: a simple text node, far cheaper to lay out than the annotated, multi-paragraph path that inline
+        // content needs. Almost every text is here almost all of the time; only a rolling number takes the other branch, and only while it rolls.
+        Text(
+            text = text,
+            modifier = textModifier,
+            color = color,
+            fontSize = fontSize,
+            fontStyle = fontStyle,
+            fontWeight = fontWeight,
+            fontFamily = fontFamily,
+            letterSpacing = letterSpacing,
+            textDecoration = textDecoration,
+            textAlign = textAlign,
+            lineHeight = lineHeight,
+            overflow = overflow,
+            softWrap = softWrap,
+            maxLines = maxLines,
+            minLines = minLines,
+            onTextLayout = onLayout,
+            style = style,
+        )
+    } else {
+        Text(
+            text = rolled.first,
+            inlineContent = rolled.second,
+            modifier = textModifier,
+            color = color,
+            fontSize = fontSize,
+            fontStyle = fontStyle,
+            fontWeight = fontWeight,
+            fontFamily = fontFamily,
+            letterSpacing = letterSpacing,
+            textDecoration = textDecoration,
+            textAlign = textAlign,
+            lineHeight = lineHeight,
+            overflow = overflow,
+            softWrap = softWrap,
+            maxLines = maxLines,
+            minLines = minLines,
+            onTextLayout = onLayout,
+            style = style,
+        )
+    }
 }
 
 private val DigitRuns = Regex("[0-9]+")

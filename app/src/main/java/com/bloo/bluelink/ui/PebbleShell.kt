@@ -175,7 +175,6 @@ internal fun PebbleShell(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("PebbleShell")
-    val haptics = LocalHaptics.current
     // Frames while a pebble opens or closes are filed under it ("Garage/pebble-Trips"), not under the screen alone; not the first composition.
     var seenOnce by remember { mutableStateOf(false) }
     LaunchedEffect(expanded) {

@@ -10,6 +10,7 @@ import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -147,7 +148,11 @@ class SettingsStore(internal val context: Context) {
     // default when the key is absent or fails to parse, because this flow is collected at launch
     // and must never crash.
     /** Every stored preference by key, live: what search reads so it can show any value in the store. */
+    // Off the main thread, and only when the map really changes: collected on Main, the store's own read and this rebuild ran on the UI
+    // thread, and the search re-scored every result on each write, even one that left the map equal.
     val allPrefs: Flow<Map<String, Any>> = context.settingsDataStore.data.map { it.toNameMap() }
+        .distinctUntilChanged()
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
 
     val appearance: Flow<Appearance> = context.settingsDataStore.data.map { prefs ->
         Appearance(

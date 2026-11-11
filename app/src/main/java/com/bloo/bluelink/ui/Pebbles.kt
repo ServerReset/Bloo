@@ -256,8 +256,11 @@ internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState)
     // Diagnostic: which part of the slice changed, so a performance log names what keeps a pebble recomposing. Rate-limited per row.
     val lastKey = remember(contextKey) { arrayOfNulls<Any?>(1) }
     val lastLogAt = remember(contextKey) { longArrayOf(0L) }
+    // Structural equality: while the key is unchanged the slice keeps its OLD instance (and the UiState inside it). Without a policy the
+    // readers were not invalidated, but the stored slice still became a new one wrapping the latest UiState, so a row recomposing for any
+    // other reason handed its pebble a different UiState, and the pebble's skip check ran a deep equals over the whole state and failed.
     val slice by remember(state, contextKey) {
-        derivedStateOf {
+        derivedStateOf(androidx.compose.runtime.structuralEqualityPolicy()) {
             val s = state.value
             val key = keys(s)
             val before = lastKey[0]

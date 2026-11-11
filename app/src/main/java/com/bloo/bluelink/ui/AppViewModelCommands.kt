@@ -52,10 +52,14 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
             com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
                 val now = System.currentTimeMillis()
                 val last = lastPublished
-                val tooSoonAndTooClose = last != null &&
-                    now - lastPublishedAtMs < MIN_DEVICE_LOCATION_INTERVAL_MS &&
-                    last.distanceTo(loc) < MIN_DEVICE_LOCATION_MOVE_METERS
-                if (tooSoonAndTooClose) return@collect
+                // Published only when the phone has really moved: further than the fix's own accuracy, and at least the minimum. It used
+                // to let any fix through once 5 seconds had passed, so a phone lying still published a slightly different position (GPS
+                // jitter) every 5-10 seconds, and every car's Location card and the map recomposed for a dot that had not moved. A burst
+                // of fixes inside the minimum interval is still dropped whatever their distance.
+                val accuracy = if (loc.hasAccuracy()) loc.accuracy else 0f
+                val moved = last == null || last.distanceTo(loc) >= maxOf(MIN_DEVICE_LOCATION_MOVE_METERS, accuracy)
+                val tooSoon = last != null && now - lastPublishedAtMs < MIN_DEVICE_LOCATION_INTERVAL_MS
+                if (!moved || tooSoon) return@collect
                 lastPublished = loc
                 lastPublishedAtMs = now
                 _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }

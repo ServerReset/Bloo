@@ -47,15 +47,17 @@ fun blurCapable(): Boolean =
 @Composable
 fun Modifier.inertButtonFrost(inert: Boolean): Modifier {
     val amount = animateFloatAsState(if (inert) 1f else 0f, tween(MotionLong), label = "inertFrost")
-    // A real blur is expensive; without it (older API, battery saver) the fade carries the whole effect.
-    val canBlur = canBlurBackdrops()
+    // A real blur is expensive; without it (older API, battery saver) the fade carries the whole effect. The device's capability is read
+    // here; the pause while the garage moves is read in the layer below, so a swipe starting or ending re-runs the layer instead of
+    // recomposing every inert control, and only drops the blur, leaving the fade as it was so the control does not jump in brightness.
+    val canBlur = blurCapable()
     // Driven from the layer block: the transition re-composites the layer instead of rebuilding the
     // modifier chain (and the blur) on every frame, and an active control carries no effect at all.
     return this.graphicsLayer {
         val a = amount.value
         if (a > 0.001f) {
             val r = InertBlurRadius.toPx() * a
-            renderEffect = if (canBlur) softBlur(r) else null
+            renderEffect = if (canBlur && !BlurSuspension.suspended) softBlur(r) else null
             alpha = 1f - (if (canBlur) 0.08f else 0.4f) * a
         } else {
             renderEffect = null
