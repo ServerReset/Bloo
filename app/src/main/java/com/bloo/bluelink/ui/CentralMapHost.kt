@@ -11,6 +11,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -33,11 +34,19 @@ import dev.chrisbanes.haze.HazeState
 internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap: CentralMap, frostHaze: HazeState) {
     // The map's feeds: every car with a location is an icon on it, and the open car's place is its centre. The search bubble reads whether
     // the map is open, through the shared state.
-    SideEffect {
-        centralMap.cars = state.value.vehicles.mapNotNull { v ->
-            state.value.locations[v.vin]?.let { CarPin(v.vin, it, v.name, state.value.imageUrls[v.vin]) }
+    //
+    // Everything this host takes from the app's state is a derived slice compared by value, never a read of the whole state: the state
+    // changes on every status poll, charging tick and pending flag, and a whole-state read recomposed the map host, rebuilt every car's
+    // bar and pins, and recomposed the map each time, even when nothing the map shows had changed.
+    val pins by remember {
+        derivedStateOf(structuralEqualityPolicy()) {
+            val s = state.value
+            s.vehicles.mapNotNull { v -> s.locations[v.vin]?.let { CarPin(v.vin, it, v.name, s.imageUrls[v.vin]) } }
         }
     }
+    // Handed to the map only when the pins really change.
+    LaunchedEffect(Unit) { snapshotFlow { pins }.collect { centralMap.cars = it } }
+    val locations by remember { derivedStateOf(structuralEqualityPolicy()) { state.value.locations } }
     LaunchedEffect(centralMap.vin) { vm.setMapExpanded(centralMap.vin != null) }
     // A car chosen on the map becomes the app's current car, so the garage travels to it behind the map.
     SideEffect {
@@ -63,7 +72,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     val homeVin = centralMap.homeVin
     val hostVin = openVin ?: homeVin
     val hostVehicle = if (hostVin != null) vehicles.firstOrNull { it.vin == hostVin } else null
-    val hostLocation = hostVin?.let { state.value.locations[it] }
+    val hostLocation = hostVin?.let { locations[it] }
     // A map that has nothing to draw from is nothing on screen: say so in the log, rather than leave it silent.
     LaunchedEffect(hostVin, hostVehicle == null, hostLocation == null) {
         if (openVin != null && (hostVehicle == null || hostLocation == null)) {
@@ -96,25 +105,34 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     // The car the bar shows: the garage's current car (the anchor until the garage has reported one).
     val barVin = centralMap.currentVin?.takeIf { vin -> vehicles.any { it.vin == vin } } ?: hostVehicle.vin
     val barVehicle = vehicles.firstOrNull { it.vin == barVin } ?: hostVehicle
-    val barLocation = state.value.locations[barVehicle.vin] ?: hostLocation
+    val barLocation = locations[barVehicle.vin] ?: hostLocation
     val metric = appearance.metricDistance
-    // Every car, as the bar's carousel shows it.
-    val barItems = vehicles.map { v ->
-        val (pct, range) = mapChargeStats(state.value, v, metric)
-        BarItem(
-            vin = v.vin,
-            name = v.name,
-            photo = state.value.imageUrls[v.vin],
-            charge = pct,
-            range = range,
-            details = buildList {
-                v.modelYear?.let { add("Year" to it) }
-                v.trim?.let { add("Trim" to it) }
-                add("Model" to v.model)
-                pct?.let { add("Charge" to it) }
-                range?.let { add("Range" to it) }
-            },
-        )
+    // Every car, as the bar's carousel shows it. Derived and compared by value, so the bar is rebuilt only when a car's name, photo,
+    // charge or range actually changes.
+    val barItems by remember(metric) {
+        derivedStateOf(structuralEqualityPolicy()) {
+            val s = state.value
+            s.vehicles.map { v ->
+                val (pct, range) = mapChargeStats(s, v, metric)
+                BarItem(
+                    vin = v.vin,
+                    name = v.name,
+                    photo = s.imageUrls[v.vin],
+                    charge = pct,
+                    range = range,
+                    details = buildList {
+                        v.modelYear?.let { add("Year" to it) }
+                        v.trim?.let { add("Trim" to it) }
+                        add("Model" to v.model)
+                        pct?.let { add("Charge" to it) }
+                        range?.let { add("Range" to it) }
+                    },
+                )
+            }
+        }
+    }
+    val refreshing by remember(barVehicle.vin) {
+        derivedStateOf { state.value.isPending(barVehicle.vin, CarCommandIds.LOCATE) }
     }
     val locateBarVehicle = rememberLocateAction(vm, barVehicle)
     ExpandableMapLayer(
@@ -141,7 +159,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         onRefreshLocation = locateBarVehicle,
         deviceRequest = rememberDeviceLocationRequest(vm),
         // The real command-pending flag, not a guessed timer, so the refresh spin tracks the fetch this same button just started.
-        refreshing = state.value.isPending(barVehicle.vin, CarCommandIds.LOCATE),
+        refreshing = refreshing,
         frostHaze = frostHaze,
         chromeInsets = centralMap.chromeInsets,
         beforeClose = {
