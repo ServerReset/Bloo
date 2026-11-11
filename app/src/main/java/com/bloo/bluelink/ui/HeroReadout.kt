@@ -98,6 +98,8 @@ internal fun chargeReadoutOf(
     hasFuel: Boolean,
     drivingLabel: String?,
     metric: Boolean,
+    /** Where the car is, when it is charging: "Charging at <place>" reads the charger's place straight from the car. */
+    place: String? = null,
 ): ChargeReadout {
     val pct = status?.percentFor(hasBattery)
     val range = status?.rangeMiFor(hasBattery)
@@ -121,6 +123,7 @@ internal fun chargeReadoutOf(
         statusLine = when {
             charging -> buildString {
                 append(CHARGING_WORD)
+                place?.let { append(" at $it") }
                 chargeMinutes?.let { append(" · ${fmtMinutes(it)}") }
                 chargeType?.let { append(" · $it") }
             }

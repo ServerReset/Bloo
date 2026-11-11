@@ -190,7 +190,7 @@ internal fun HeroForeground(
  */
 @Composable
 internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, metric: Boolean, clearOfText: Boolean = false) {
-    val readout = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
+    val readout = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric, state.placeNames[v.vin])
     val tone by rememberHeroPhotoTone(imageUrl, MaterialTheme.colorScheme.background)
     val cardCoords = remember { mutableStateOf<LayoutCoordinates?>(null) }
     // Clear of the photo, the text sits on the page, so it takes the page's own colour rather than the photo's.
