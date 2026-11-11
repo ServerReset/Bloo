@@ -129,7 +129,14 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     val searchRise = remember { Animatable(if (searchHidden) 1f else 0f) }
     // Built here, in composition: lowPowerAwareSpring is @Composable, so it cannot be read inside the coroutine below.
     // Calm rather than bouncy: the bar glides up and settles, instead of snapping up with an overshoot.
-    val searchRiseSpec = lowPowerCalm<Float>(stiffness = Spring.StiffnessLow)
+    // The same easing and length as the map itself (ExpandableMap's open and close), so the bar rises and drops in step with the map. A
+    // spring of its own ran on a different timeline, so the bar jumped against the map's motion when a map opened or closed.
+    val plainRise = LocalReduceMotion.current || LocalPowerPolicy.current.lean
+    val searchRiseSpec: androidx.compose.animation.core.AnimationSpec<Float> = if (plainRise) {
+        androidx.compose.animation.core.tween(160)
+    } else {
+        androidx.compose.animation.core.tween(durationMillis = 480, easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0f, 0.2f, 1f))
+    }
     LaunchedEffect(searchHidden) {
         // A lock hides the bar at once, under the blur. Everything else animates it.
         if (locked) {
