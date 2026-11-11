@@ -49,11 +49,6 @@ internal fun UpdateAvailableTile(
         val info = state.updateAvailable?.takeIf { !state.updateTileDismissed }
         // Keyed on the build number so a different build starts collapsed.
         var expanded by rememberSaveable(info?.run?.runNumber) { mutableStateOf(false) }
-        val headerAction = if (info != null && !playAvailable) {
-            githubHeaderAction(state, vm, info, context)
-        } else {
-            playHeaderAction()
-        }
         // Animates the card's own height as its state changes (the Play and GitHub bodies, the Details disclosure, a new summary).
         UpdateBadgedCard(visible = true, modifier = Modifier.fillMaxWidth().animateContentSize(pebbleOpenSizeSpec())) {
             PebbleShell(
@@ -68,10 +63,10 @@ internal fun UpdateAvailableTile(
                 } else {
                     "Google Play"
                 },
-                headerAction = headerAction,
+                headerAction = null,
             ) {
                 // The header carries the primary action, so the body does not repeat it.
-                UpdatePanel(state, vm, hazeState, primaryInBody = false, showHeadline = true)
+                UpdateCardBody(state, vm, info, playAvailable, hazeState)
             }
         }
     }
