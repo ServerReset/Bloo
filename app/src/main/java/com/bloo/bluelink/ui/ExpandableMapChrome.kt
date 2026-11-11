@@ -58,6 +58,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.percentFor
+import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.formatDistance
 import com.bloo.uicommon.bounceSpring
 import com.bloo.uicommon.ExpressiveButtonGroup
 import com.bloo.uicommon.PrimaryTextStyle
@@ -793,10 +796,15 @@ internal fun Modifier.pullToRefreshOrDismiss(
     }
 }
 
-/** The car's charge and its range for the map bar's end, each as its own line; null where it has none yet. */
-// chargeReadoutOf is @Composable, so this is too.
-@Composable
+/**
+ * The car's charge and its range for the map bar's end, each as its own line; null where it has none yet. The same text the hero's
+ * readout shows (see [chargeReadoutOf]), worked out without the readout's theme colours, so it is a plain function: the map host derives
+ * every car's bar from it outside composition, and so recomposes only when the text really changes.
+ */
 internal fun mapChargeStats(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): Pair<String?, String?> {
-    val r = chargeReadoutOf(state.statusFor(v), state.hasBattery(v), state.hasFuel(v), state.drivingLabel(v), metric)
-    return r.pctText.takeIf { it.isNotBlank() } to r.rangeText?.takeIf { it.isNotBlank() }
+    val status = state.statusFor(v)
+    val hasBattery = state.hasBattery(v)
+    val pctText = status?.percentFor(hasBattery)?.let { "$it%" } ?: "--"
+    val rangeText = status?.rangeMiFor(hasBattery)?.let { formatDistance(it, metric) }
+    return pctText.takeIf { it.isNotBlank() } to rangeText?.takeIf { it.isNotBlank() }
 }
