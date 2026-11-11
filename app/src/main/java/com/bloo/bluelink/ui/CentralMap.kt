@@ -2,13 +2,14 @@ package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.MapTiles
 
@@ -18,10 +19,26 @@ import com.bloo.bluelink.data.MapTiles
  */
 
 /**
+ * One Location card's place for the map: where its map slot is on screen, and how to scroll it into view. A car can be on screen in more
+ * than one card at a time (the garage pager can compose the same car on two pages while it moves), so each card holds its own slot and the
+ * map picks the one that is actually on screen (see [CentralMap.cardBounds]).
+ */
+internal class MapCardSlot(val vin: String) {
+    /** The card's map slot, in screen coordinates. Written by the card as it is laid out. */
+    var bounds by mutableStateOf<Rect?>(null)
+
+    /** Scrolls the card's page so the map slot is in view. Set by the card. */
+    var reveal: (suspend () -> Unit)? = null
+}
+
+/**
  * The garage's one map. A single [mapState] and a single map instance serve every car: the map is anchored on the car it was opened for
  * ([vin]), and every other car is an icon at its own place relative to that anchor. It is drawn only by [CentralMapHost]: closed, at the
- * Location card of the car it was last opened for ([homeVin]); open, grown to the full screen. Every other part of the app calls [open] and
- * [dismiss]; none of them draws it.
+ * Location card of the car the garage is on ([homeVin]); open, grown to the full screen.
+ *
+ * There is ONE car the app is on: the garage's current car ([currentVin]). The map's bar always shows that car, a swipe on the bar or a tap
+ * on a pin changes it (through [select], which moves the garage too), and the map closes onto that car's card. Nothing else keeps its own
+ * idea of "the selected car", so the bar, the garage and the close can never disagree.
  */
 internal class CentralMap {
     /** The map's pan and zoom: the one state every view of the map uses. */
@@ -36,78 +53,133 @@ internal class CentralMap {
     /** The car the map is anchored on: the one it was opened for, or null while it is closed. */
     var vin by mutableStateOf<String?>(null)
 
-    /** The car whose Location card shows the map while it is closed. */
+    /** The car whose Location card shows the map while it is closed: the garage's current car. */
     var homeVin by mutableStateOf<String?>(null)
 
-    /** The car the top bar is showing, by a tap on its icon. Null is no selection: the bar is just its handle. */
-    var selectedVin by mutableStateOf<String?>(null)
+    /** The car the app is on: the garage's current car. Mirrored from the garage by the host, and changed only through [select]. */
+    var currentVin by mutableStateOf<String?>(null)
+
+    /** Whether the open map's bar shows the current car's line. False shows only its handle (the car was deselected on the map). */
+    var barShown by mutableStateOf(false)
+
+    /** The car the open map's bar shows, or null for just the handle. Always the garage's current car, never a separate pick. */
+    val selectedVin: String? get() = if (vin != null && barShown) currentVin else null
 
     /** How far the bar is being dragged toward closing, 0 (not at all) to 1: the garage behind the map fades with it. */
     var dismissFade by mutableFloatStateOf(0f)
 
-    /** Each Location card's own on-screen rectangle, so the full-screen map grows from the card it was opened from. */
-    private val origins = mutableMapOf<String, MutableState<Rect?>>()
-
-    fun originBoundsFor(vin: String): MutableState<Rect?> = origins.getOrPut(vin) { mutableStateOf(null) }
-
-    /** The car the person last chose on the map (opened on, or tapped): the car the map and the app return to when it closes. */
-    var chosenVin: String? = null
-
-    /** While the map is collapsing, the car whose card it collapses onto (its own card, once the car page has moved there). */
+    /** While the map is collapsing, the car whose card it collapses onto. */
     var closingTo by mutableStateOf<String?>(null)
 
+    /** The window's size, kept by the host, so a card can be judged on or off screen. */
+    var screen: Size = Size.Zero
+
+    /** Set by the host: moves the app's garage to a car (see [select]). */
+    var onCarChosen: ((String) -> Unit)? = null
+
+    private val slots = mutableStateListOf<MapCardSlot>()
+
+    /** Adds a Location card's slot. Each card adds its own and removes it when it leaves composition. */
+    fun addCard(slot: MapCardSlot) { slots += slot }
+
+    fun removeCard(slot: MapCardSlot) { slots -= slot }
+
     /**
-     * Records [car] as the one the person is looking at: the card the closed map rests in, and the car it returns to when it closes. The
-     * one place those two are set, so they cannot drift apart.
+     * Where [vin]'s Location card is on screen: of all the cards showing that car, the one most on screen (the others are on pages off to
+     * the side). Reads snapshot state, so a reader in layout or draw follows the card as it moves.
      */
-    private fun choose(car: String) {
-        homeVin = car
-        chosenVin = car
+    fun cardBounds(vin: String): Rect? = bestSlot(vin)?.bounds
+
+    /** True when [vin]'s card is on screen. */
+    fun cardOnScreen(vin: String): Boolean = cardBounds(vin)?.let { visibleArea(it) > 0f } == true
+
+    /** True when [vin]'s card is fully across the screen sideways: its page has arrived, even if the card is scrolled up or down. */
+    fun cardPageArrived(vin: String): Boolean {
+        val r = cardBounds(vin) ?: return false
+        return r.left >= -1f && r.right <= screen.width + 1f
     }
 
-    /** The closed map rests in [car]'s card. The garage calls this as the pager moves, so the map comes along with the car page. */
+    /** Scrolls [vin]'s card into view on its page (the one most on screen), if that card can scroll. */
+    suspend fun revealCard(vin: String) {
+        bestSlot(vin)?.reveal?.invoke()
+    }
+
+    private fun bestSlot(vin: String): MapCardSlot? {
+        var best: MapCardSlot? = null
+        var bestScore = Float.NEGATIVE_INFINITY
+        for (s in slots) {
+            if (s.vin != vin) continue
+            val r = s.bounds ?: continue
+            val area = visibleArea(r)
+            // On screen beats off screen; among cards off screen, the nearest to the screen's middle.
+            val score = if (area > 0f) area else -kotlin.math.hypot(r.center.x - screen.width / 2f, r.center.y - screen.height / 2f)
+            if (score > bestScore) {
+                bestScore = score
+                best = s
+            }
+        }
+        return best
+    }
+
+    private fun visibleArea(r: Rect): Float {
+        if (screen == Size.Zero) return r.width * r.height
+        val w = (minOf(r.right, screen.width) - maxOf(r.left, 0f)).coerceAtLeast(0f)
+        val h = (minOf(r.bottom, screen.height) - maxOf(r.top, 0f)).coerceAtLeast(0f)
+        return w * h
+    }
+
+    /** The closed map rests in [car]'s card. The host calls this as the garage moves, so the map comes along with the car page. */
     fun rest(car: String) {
         homeVin = car
     }
 
-    /** Opens the map on [vin], with that car selected. A map already open is not switched under the person. */
+    /** Opens the map on [vin], showing that car in the bar. A map already open is not switched under the person. */
     fun open(vin: String) {
         if (this.vin != null) return
         com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
         this.vin = vin
-        choose(vin)
-        selectedVin = vin
+        barShown = true
+        select(vin, glide = false)
     }
 
-    /** Closes the map: the selection and the anchor clear, and the map goes back to the card it rests in. */
+    /** Closes the map: the bar and the anchor clear, and the map goes back to the card it rests in. */
     fun dismiss() {
-        selectedVin = null
+        barShown = false
         vin = null
     }
 
-    /** Set by the host: the app's car page moves to a car that was chosen on the map (see [tapPin]). */
-    var onCarChosen: ((String) -> Unit)? = null
+    /**
+     * Makes [car] the app's car: the garage moves to it, the bar shows it, and an open map glides to centre it. The one place the car
+     * changes, for a bar swipe and a pin tap alike.
+     */
+    fun select(car: String, glide: Boolean = true) {
+        currentVin = car
+        if (vin == null) homeVin = car
+        onCarChosen?.invoke(car)
+        if (glide) glideTo(car)
+    }
 
-    /** A tap on a car's icon: the bar shows that car, and the map glides to centre it from the anchor. */
-    fun tapPin(tapped: String) {
-        // The car tapped is the one the map returns to when it closes, and the car page moves to it.
-        choose(tapped)
-        onCarChosen?.invoke(tapped)
-        // Closed, a pin tap only moves to that car's card: no bar comes up and nothing floats over the card.
-        val anchor = vin
-        if (anchor == null) {
-            selectedVin = null
-            return
-        }
-        selectedVin = tapped
-        if (tapped == anchor) {
-            mapState.recenter()
-            return
-        }
+    /** Glides the open map to centre [car]. */
+    fun glideTo(car: String) {
+        val anchor = vin ?: return
         val from = cars.firstOrNull { it.vin == anchor }?.location ?: return
-        val to = cars.firstOrNull { it.vin == tapped }?.location ?: return
+        val to = cars.firstOrNull { it.vin == car }?.location ?: return
         val (tx, ty) = panBetween(from, to, mapState.zoom)
         glide.glideTo(tx, ty)
+    }
+
+    /** Where [car] sits relative to the anchor, as a map pan: (0, 0) for the anchor itself. */
+    fun panTo(car: String): Pair<Float, Float> {
+        val anchor = vin ?: return 0f to 0f
+        val from = cars.firstOrNull { it.vin == anchor }?.location ?: return 0f to 0f
+        val to = cars.firstOrNull { it.vin == car }?.location ?: return 0f to 0f
+        return panBetween(from, to, mapState.zoom)
+    }
+
+    /** A tap on a car's icon. Open, the bar shows that car and the map glides to it; closed, the garage moves to that car's page. */
+    fun tapPin(tapped: String) {
+        if (vin != null) barShown = true
+        select(tapped)
     }
 
     private val glide = MapGlide(mapState)

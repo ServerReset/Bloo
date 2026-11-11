@@ -48,6 +48,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -115,15 +116,21 @@ internal fun ExpandableMapLayer(
     isExpanded: Boolean,
     /** Read where it is used (layout or a one-off launch), not in composition, so a card moving does not recompose the host. */
     originBounds: () -> Rect,
+    /** The car the map is anchored on: the map's centre. */
     location: GeoLocation,
-    vehicleName: String,
-    /** The car's charge and range for the bar's end (see [mapChargeStats]). */
-    chargePercent: String? = null,
-    chargeRange: String? = null,
-    /** The car's other details (year, trim and so on), shown when the bar is opened. */
-    details: List<Pair<String, String>> = emptyList(),
-    /** The car's stored photo, at the bar's start in place of the car glyph. */
-    photo: String? = null,
+    /** Every car as the top bar shows it, in the garage's order (see [MapTopBar]). */
+    barItems: List<BarItem>,
+    /** The car the bar shows: the garage's current car. */
+    barIndex: Int,
+    /** A swipe on the bar landed on another car. */
+    onBarIndexChange: (Int) -> Unit,
+    /** The car the bar shows: its name and place, for Share and Open in Maps. */
+    selectedName: String,
+    selectedLocation: GeoLocation,
+    /** Where the car the bar shows sits relative to the anchor, as a map pan: (0, 0) for the anchor itself. */
+    selectedPan: () -> Pair<Float, Float> = { 0f to 0f },
+    /** The "Car" button: glide the map to the car the bar shows. */
+    onCenterCar: () -> Unit,
     deviceLocation: GeoLocation?,
     mapState: CarMapState,
     /** The garage's one map ([CentralMap.Content]), hosted here while it is open. */
@@ -143,13 +150,6 @@ internal fun ExpandableMapLayer(
     /** True when the selected car is the one this map is on: its leaving the screen clears the selection. */
     selectedIsExpanded: Boolean = true,
     onDeselect: () -> Unit = {},
-    /** A sideways swipe on the top bar: -1 for the previous car, +1 for the next. */
-    onSwipeCar: (Int) -> Unit = {},
-    /** Which car the bar shows, and how many cars there are (see MapTopBar). */
-    carIndex: Int = 0,
-    carCount: Int = 1,
-    prevBar: BarPreview? = null,
-    nextBar: BarPreview? = null,
     /** How far the bar is being dragged toward closing, 0 to 1 (see [CentralMap.dismissFade]). */
     onDismissDrag: (Float) -> Unit = {},
     onDismiss: () -> Unit,
@@ -428,11 +428,14 @@ internal fun ExpandableMapLayer(
         val carMargin = with(LocalDensity.current) { 40.dp.toPx() }
         // The car's place is read with the same pan the map is drawn with (panWeight), so while the map is still opening its pan is only
         // partway there, and the car is not judged off screen by its final position.
+        // Measured from the car the bar shows, not the anchor: with another car chosen, the map is panned to centre that car.
+        val latestSelectedPan = rememberUpdatedState(selectedPan)
         val carOnScreen by remember {
             derivedStateOf {
                 val w = progress().coerceIn(0f, 1f)
-                kotlin.math.abs(mapState.panX * w * mapState.scale) < windowSize.width / 2f - carMargin &&
-                    kotlin.math.abs(mapState.panY * w * mapState.scale) < windowSize.height / 2f - carMargin
+                val (ox, oy) = latestSelectedPan.value()
+                kotlin.math.abs((mapState.panX - ox) * w * mapState.scale) < windowSize.width / 2f - carMargin &&
+                    kotlin.math.abs((mapState.panY - oy) * w * mapState.scale) < windowSize.height / 2f - carMargin
             }
         }
         // The car the bar describes is off screen: nothing is selected any more, so the bar folds back to its handle.
@@ -457,21 +460,14 @@ internal fun ExpandableMapLayer(
             // doc).
             if (barVisible && chromeShown) {
                 MapTopBar(
+                    items = barItems,
+                    index = barIndex,
+                    onIndexChange = onBarIndexChange,
                     carOnScreen = carOnScreen,
                     mode = barMode,
                     lineProgress = { barSelectedT },
                     onDetailsOpenChange = { barDetailsOpen = it },
-                    vehicleName = vehicleName,
-                    photo = photo,
-                    chargePercent = chargePercent,
-                    chargeRange = chargeRange,
-                    details = details,
                     mapHazeState = mapHazeState,
-                    onSwipeCar = onSwipeCar,
-                    carIndex = carIndex,
-                    carCount = carCount,
-                    prevBar = prevBar,
-                    nextBar = nextBar,
                     // No refresh button: pull the bar up to full tension and let go instead.
                     dragModifier = Modifier.pullToRefreshOrDismiss(
                         dragPx, pull, gapPx, scope, density, dragSpring, LocalHaptics.current, ::close,
@@ -536,14 +532,15 @@ internal fun ExpandableMapLayer(
                 ) {
                     MapFeatureRow(
                         features = listOf(
-                            MapFeature(AppIcons.DirectionsCar, "Car") { mapState.recenter() },
+                            // Every button acts on the car the bar shows, so a swipe to another car moves all of them to it.
+                            MapFeature(AppIcons.DirectionsCar, "Car") { onCenterCar() },
                             MapFeature(Icons.Filled.MyLocation, "Me") { showMe() },
                             MapFeature(Icons.Filled.Refresh, "Refresh", enabled = !refreshing) { onRefreshLocation() },
                             MapFeature(Icons.Filled.Share, "Share") {
-                                shareLocation(context, location, vehicleName)
+                                shareLocation(context, selectedLocation, selectedName)
                             },
                             MapFeature(Icons.Filled.Map, "Open in Maps") {
-                                openInExternalMaps(context, location, vehicleName)
+                                openInExternalMaps(context, selectedLocation, selectedName)
                             },
                         ),
                         modifier = Modifier.fillMaxWidth(),

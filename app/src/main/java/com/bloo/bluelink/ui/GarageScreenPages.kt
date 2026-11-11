@@ -88,35 +88,17 @@ internal fun CollapsedGaragePager(
         // One virtual page per real item; the real item for a page is wrap.real(page).
         val wrap = rememberWrapPager(total, initialItem)
         val pager = wrap.pager
-        // While the pager moves, or the map bar is dragged, glass drops its backdrop blur (see BlurSuspension), so no backdrop is blurred
-        // again on every frame of the motion. It is set when the motion starts and stops, not per frame.
+        // While the pager moves, glass drops its backdrop blur (see BlurSuspension), so no backdrop is blurred again on every frame of the
+        // motion. It is set when the motion starts and stops, not per frame.
         LaunchedEffect(pager) {
-            snapshotFlow { pager.isScrollInProgress || BarSwipeState.active }
+            snapshotFlow { pager.isScrollInProgress }
                 .distinctUntilChanged()
                 .collect { com.bloo.uicommon.BlurSuspension.suspended = it }
         }
         DisposableEffect(pager) { onDispose { com.bloo.uicommon.BlurSuspension.suspended = false } }
-        // The map bar's sideways drag drives this pager: the page follows the finger while the bar is held, then settles to the
-        // nearest car when the bar is let go (see BarSwipeState). Only the pager's own scroll is moved, never the car it shows.
-        LaunchedEffect(pager) {
-            var applied = 0f
-            snapshotFlow { BarSwipeState.active to BarSwipeState.px }.collect { (active, px) ->
-                if (active) {
-                    // One flick, one page: the follow never travels past one page's width, so a hold at the edge cannot keep paging.
-                    val limit = windowWidthPx.toFloat()
-                    val target = px.coerceIn(-limit, limit)
-                    val step = applied - target
-                    applied = target
-                    if (step != 0f) pager.scroll(androidx.compose.foundation.MutatePriority.UserInput) { scrollBy(step) }
-                } else if (applied != 0f) {
-                    applied = 0f
-                    // A committed bar swipe changes the car, and the pager follows that change (see currentIndex). Only a spring-back
-                    // settles here, back to the page it was on, so one flick moves exactly one car.
-                    if (BarSwipeState.committed == 0) pager.animateScrollToPage(pager.currentPage)
-                    BarSwipeState.committed = 0
-                }
-            }
-        }
+        // The map's top bar does NOT drive this pager's scroll. A swipe on the bar changes the current car by exactly one (see CentralMap),
+        // and the pager travels one page to follow it, through currentIndex like any other car change. Driving the scroll from the finger
+        // as well let the pager settle on its own pages mid-drag, and those settles changed the car again: one flick moved two or three.
         // Frames while a page is being swiped are their own line in the performance report.
         LaunchedEffect(pager) {
             snapshotFlow { pager.isScrollInProgress }.collect { if (it) com.bloo.bluelink.perf.PerfMonitor.scope("garage-swipe", 1_200) }

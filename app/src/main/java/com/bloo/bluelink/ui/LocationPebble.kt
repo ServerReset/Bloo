@@ -24,6 +24,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -170,13 +172,25 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                 // The one map is drawn by the app's host (CentralMapHost), not here. This card only holds the map's place: the host draws the
                 // map over it while it is closed, and grows it to the full screen when it is opened. Its rectangle is reported here.
                 val host = LocalCentralMap.current
-                val slot = Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp).clip(StandardShape)
-                    .semantics { contentDescription = "Map showing where ${v.name} is" }
+                // This card's own place for the map. The same car can be composed on two pages at once while the garage moves, so each
+                // card reports into its own slot, and the map uses whichever is on screen.
+                val cardSlot = remember(v.vin) { MapCardSlot(v.vin) }
+                val revealRequester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+                if (host != null) {
+                    DisposableEffect(host, cardSlot) {
+                        cardSlot.reveal = { revealRequester.bringIntoView() }
+                        host.addCard(cardSlot)
+                        onDispose { host.removeCard(cardSlot) }
+                    }
+                }
+                val slot = Modifier.fillMaxWidth().height(if (glance) 130.dp else 220.dp)
                     .then(
-                        if (host == null) Modifier else Modifier.onGloballyPositioned {
-                            host.originBoundsFor(v.vin).value = Rect(it.positionOnScreen(), it.size.toSize())
-                        },
+                        if (host == null) Modifier else Modifier
+                            .bringIntoViewRequester(revealRequester)
+                            .onGloballyPositioned { cardSlot.bounds = Rect(it.positionOnScreen(), it.size.toSize()) },
                     )
+                    .clip(StandardShape)
+                    .semantics { contentDescription = "Map showing where ${v.name} is" }
                 Box(slot) {
                     // Home car: the map covers this, and a tap that reaches it opens the map. Other cars: the same tap, with a label.
                     // The card's own map, of the shared map, centred on this car with every car on it. Tapping its empty part opens the map;
@@ -189,10 +203,9 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     // Only a card on screen builds its map: the others are off to the side of the pager, and building them costs time.
                     // Read through derivedStateOf: the card recomposes only when it goes on or off screen, not on every move of its rectangle.
                     val screenNow = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
-                    val onScreen by remember(v.vin, screenNow) {
+                    val onScreen by remember(cardSlot, screenNow) {
                         androidx.compose.runtime.derivedStateOf {
-                            host?.originBoundsFor(v.vin)?.value
-                                ?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
+                            cardSlot.bounds?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
                         }
                     }
                     if (onScreen) host?.CardContent(
