@@ -22,6 +22,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
@@ -157,6 +158,8 @@ internal fun ExpandableMapLayer(
     chromeInsets: MapChromeInsets? = null,
     /** Run before the map collapses: the host waits here until the card the map collapses onto is on screen. */
     beforeClose: (suspend () -> Unit)? = null,
+    /** Opens the map from its floating place (closed). */
+    onOpen: () -> Unit = {},
 ) {
     com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
     val context = LocalContext.current
@@ -366,7 +369,8 @@ internal fun ExpandableMapLayer(
         val searchClearPx = with(density) { searchBarClearance(fallback = 132.dp).toPx() }
         val windowH = windowSize.height.toFloat()
         val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize, panWeight = { progress().coerceIn(0f, 1f) })
-    val mapLive by remember { androidx.compose.runtime.derivedStateOf { isExpanded || progress() > 0.001f } }
+    // The map is always drawn: closed, it floats over the whole app, so it is no longer hosted inside a car's card.
+    val mapLive = true
         // The cut, in layout: the map sits in a box that clips to the band it may show (see [visibleBand]), so the cut hides its taps as well.
         Box(
             Modifier
@@ -413,6 +417,7 @@ internal fun ExpandableMapLayer(
                     clip = true
                 }
                 .hazeSource(mapHazeState)
+                .then(if (!isExpanded) Modifier.clickable { onOpen() } else Modifier)
                 .onGloballyPositioned { c ->
                     chromeInsets?.let {
                         it.mapTop = c.positionOnScreen().y

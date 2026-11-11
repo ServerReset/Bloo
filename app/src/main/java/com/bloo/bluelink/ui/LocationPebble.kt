@@ -208,10 +208,6 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                             cardSlot.bounds?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
                         }
                     }
-                    if (onScreen) host?.CardContent(
-                        Modifier.fillMaxSize(),
-                        MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
-                    )
                 }
                 MapFeatureRow(
                     features = listOfNotNull(

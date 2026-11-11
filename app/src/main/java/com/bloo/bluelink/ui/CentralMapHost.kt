@@ -89,16 +89,17 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     if (hostVehicle == null || hostLocation == null) return
     // Opening, the map grows from the card it was opened from; until that card has been on screen, and when the card it closes onto is
     // nowhere on screen, it uses a box in the middle, so the map always opens and never flies off the screen to close.
+    val floatingRect = Rect(windowSize.width * 0.04f, windowSize.height * 0.52f, windowSize.width * 0.96f, windowSize.height * 0.84f)
     val fallback = Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
     val screenRect = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
     val closingTo = centralMap.closingTo
     val opening = openVin != null && closingTo == null
-    if (openVin == null && closingTo == null && closedAt == null) return
     val originBounds: () -> Rect = {
         when {
+            // Opening grows from the card that was tapped. Closed, and closing, the map is a fixed floating overlay over the whole app,
+            // so it never depends on a car's card being on screen (nor on the garage travelling to a car to find it).
             opening -> centralMap.cardBounds(openVin!!) ?: fallback
-            closingTo != null -> centralMap.cardBounds(closingTo)?.takeIf { it.overlaps(screenRect) } ?: fallback
-            else -> homeVin?.let { centralMap.cardBounds(it) } ?: lastClosed[0] ?: fallback
+            else -> floatingRect
         }
     }
 
@@ -162,17 +163,8 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         refreshing = refreshing,
         frostHaze = frostHaze,
         chromeInsets = centralMap.chromeInsets,
-        beforeClose = {
-            // The map closes onto the card of the car it is on now. The garage is already on that car (the bar and the garage share it),
-            // but it may still be travelling there, and the car's Location card may be scrolled up or down its page. So: wait for the
-            // page to arrive, bring the card into view, and wait for it to be on screen. Each step is bounded, and a card that never
-            // shows closes the map into the middle of the screen rather than off it.
-            val target = centralMap.currentVin ?: hostVehicle.vin
-            centralMap.closingTo = target
-            withTimeoutOrNull(PageWaitMs) { snapshotFlow { centralMap.cardPageArrived(target) }.first { it } }
-            withTimeoutOrNull(RevealWaitMs) { centralMap.revealCard(target) }
-            withTimeoutOrNull(OnScreenWaitMs) { snapshotFlow { centralMap.cardOnScreen(target) }.first { it } }
-        },
+        // Closing goes straight to the floating place: the car it closes for is the one the bar shows, which a swipe or a pin tap has already chosen.
+        onOpen = { centralMap.open(hostVehicle.vin) },
         onDismiss = {
             // The closed map rests in the card it closed onto: the garage's current car.
             (centralMap.closingTo ?: centralMap.currentVin)?.let { centralMap.rest(it) }

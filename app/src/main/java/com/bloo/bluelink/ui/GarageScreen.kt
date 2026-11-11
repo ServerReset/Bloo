@@ -137,7 +137,7 @@ internal fun GarageScreen(
         // ONE page, ALWAYS the pager: a car's own layout scales with the device width, so there is no
         // expand or collapse to reconcile -- the pebbles slide from under the hero to beside it purely
         // as the page grows wide enough.
-        BlurredBehindMap(centralMap) {
+        run {
         CollapsedGaragePager(
             vehicles, count, slots, perPage, naturalColumns, shownColumns, vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
@@ -173,7 +173,7 @@ private const val MapBlurDp = 14f
 
 /** The garage behind an open full-screen map: softly blurred while it is open, and clear again once the map closes. */
 @Composable
-private fun BlurredBehindMap(centralMap: CentralMap, content: @Composable () -> Unit) {
+internal fun MapBlurLayer(centralMap: CentralMap, content: @Composable () -> Unit) {
     val target = if (centralMap.vin != null) 1f else 0f
     val amount by androidx.compose.animation.core.animateFloatAsState(
         targetValue = target,

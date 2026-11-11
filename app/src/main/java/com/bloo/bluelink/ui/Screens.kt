@@ -262,6 +262,8 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         }
     }
     LockBlurLayer(locked = locked && contentSettled) {
+    // The whole app behind the open map is blurred, not just the garage: the blur wraps everything the map draws over.
+    MapBlurLayer(centralMap) {
     Box(Modifier.fillMaxSize()) {
     // The app's backdrop: the Haze source every glass card blurs (a sibling under everything).
     AppBackdrop(backdropHaze, Modifier.matchParentSize(), alsoInto = searchHazeState)
@@ -428,6 +430,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                 )
             }
         }
+    }
     }
     // The expanded car's map sits over the app and under the status bar's blur, so the part of it that goes behind the status bar is
     // blurred rather than cut off at the content's edge. The map is drawn here, at screen level, for that reason.
