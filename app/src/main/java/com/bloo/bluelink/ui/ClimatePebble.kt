@@ -60,6 +60,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.bloo.bluelink.data.smartClimateTargetF
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.compose.runtime.snapshotFlow
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.MorphActionButton
@@ -97,8 +99,6 @@ internal fun ClimatePebble(
         vm.loadSavedClimate(v)?.let(applyRequest)
         settingsLoaded = true
     }
-
-    val currentReq = form.toRequest()
 
     val presets = state.climatePresets[v.vin].orEmpty()
     val steeringLevels = if (state.isGen5WEffective(v)) Gen5WSteeringLevels else WheelHeatLevel.entries
@@ -141,9 +141,14 @@ internal fun ClimatePebble(
             ),
         )
     }
-    LaunchedEffect(currentReq, activePresetId, presets) {
-        val active = presets.firstOrNull { it.id == activePresetId }
-        if (active != null && active.request != currentReq) activePresetId = null
+    // Read through snapshotFlow, not as a key: a key read the whole form in this card's body, so every slider tick recomposed the card.
+    LaunchedEffect(presets) {
+        snapshotFlow { form.toRequest() to activePresetId }
+            .distinctUntilChanged()
+            .collect { (req, activeId) ->
+                val active = presets.firstOrNull { it.id == activeId }
+                if (active != null && active.request != req) activePresetId = null
+            }
     }
 
     // --- Cross-composition climate sync ---------------------------------------
@@ -163,8 +168,10 @@ internal fun ClimatePebble(
     }
     // Persist + publish once settings stop changing, not per drag tick (which recomposed the whole
     // screen).
-    LaunchedEffect(currentReq, activePresetId) {
-        if (settingsLoaded) vm.saveClimateDebounced(v, currentReq, activePresetId)
+    LaunchedEffect(v.vin) {
+        snapshotFlow { form.toRequest() to activePresetId }
+            .distinctUntilChanged()
+            .collect { (req, activeId) -> if (settingsLoaded) vm.saveClimateDebounced(v, req, activeId) }
     }
 
     val climateOn = status?.airCtrlOn == true
@@ -259,10 +266,10 @@ internal fun ClimatePebble(
                 } else if (expanded) {
                     // The sliders are live, so Start sends exactly what they show, not the
                     // smart/preset logic. A hand-set start is kept, so smart climate learns what this person picks.
-                    weather?.let { ClimateChoices.record(climateContext, v.vin, ambientFahrenheit(it.tempC), currentReq.tempF) }
-                    startClimateWithEngineCheck(currentReq)
+                    weather?.let { ClimateChoices.record(climateContext, v.vin, ambientFahrenheit(it.tempC), form.toRequest().tempF) }
+                    startClimateWithEngineCheck(form.toRequest())
                 } else if (simpleMode && weather != null) {
-                    startAtTarget(smartPlan?.targetF ?: smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
+                    startAtTarget(smartPlan?.targetF ?: smartClimateTargetF(ambientFahrenheit(weather.tempC)), form.toRequest())
                 } else {
                     val defaultId = state.defaultClimatePresets[v.vin]
                     val matchingPreset = defaultId?.let { id -> presets.firstOrNull { it.id == id } }
@@ -271,8 +278,8 @@ internal fun ClimatePebble(
                         startClimateWithEngineCheck(matchingPreset.request)
                         activePresetId = matchingPreset.id
                     } else if (weather != null) {
-                        startAtTarget(smartPlan?.targetF ?: smartClimateTargetF(ambientFahrenheit(weather.tempC)), currentReq)
-                    } else startClimateWithEngineCheck(currentReq)
+                        startAtTarget(smartPlan?.targetF ?: smartClimateTargetF(ambientFahrenheit(weather.tempC)), form.toRequest())
+                    } else startClimateWithEngineCheck(form.toRequest())
                 }
             },
             enabled = !running,
@@ -322,7 +329,7 @@ internal fun ClimatePebble(
                         ClimateChoices.recordFeedback(climateContext, v.vin, ambientFahrenheit(it.tempC), delta)
                         vm.learnClimate(v, ambientFahrenheit(it.tempC), delta)
                     }
-                    smartPlan?.let { startAtTarget(it.targetF + delta, currentReq) }
+                    smartPlan?.let { startAtTarget(it.targetF + delta, form.toRequest()) }
                 },
                 onStartUnread = {
                     if (!pending) vm.startSmartClimate(v) { req ->
@@ -371,7 +378,7 @@ internal fun ClimatePebble(
 
         ExpandVisibility(showAddPreset && !climateOn) {
             SavePresetForm(
-                onSave = { name -> vm.saveClimatePreset(v, name, currentReq); showAddPreset = false },
+                onSave = { name -> vm.saveClimatePreset(v, name, form.toRequest()); showAddPreset = false },
                 onCancel = { showAddPreset = false },
             )
         }

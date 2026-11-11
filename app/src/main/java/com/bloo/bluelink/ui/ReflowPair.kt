@@ -48,7 +48,12 @@ internal fun ReflowPair(
     ) { measurables, constraints ->
         val t = expandedT().coerceIn(0f, 1f)
         val gapPx = gap.roundToPx()
-        val w = blockWidth().roundToPx().coerceIn(0, constraints.maxWidth)
+        // Snapped to 6 dp steps: while a car widens, the width changes every frame, and every wrapping text in both blocks re-laid out
+        // on each one. Stepped, the texts re-lay out only when the step changes -- about a sixth as often -- and a 6 dp step is
+        // hard to see across a widen.
+        val stepPx = WidthStep.roundToPx()
+        val rawW = blockWidth().roundToPx()
+        val w = ((rawW + stepPx / 2) / stepPx * stepPx).coerceIn(0, constraints.maxWidth)
         val blockConstraints = constraints.copy(minWidth = w, maxWidth = w, minHeight = 0)
         val leadPlaceable = measurables[0].measure(blockConstraints)
         val trailPlaceable = measurables[1].measure(blockConstraints)
@@ -63,6 +68,9 @@ internal fun ReflowPair(
         }
     }
 }
+
+/** The width step, in dp, that a block's measured width snaps to while a car widens (see [ReflowPair]). */
+private val WidthStep = 6.dp
 
 /** How wide, in dp, the band is over which a car's columns turn into two: the reflow eases across it rather than switching at its edge. */
 private const val TwoColumnRampDp = 12f
