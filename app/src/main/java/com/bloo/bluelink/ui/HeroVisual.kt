@@ -91,7 +91,6 @@ internal fun Modifier.carTonalBackground(scheme: ColorScheme): Modifier {
         }
     }
 }
-}
 
 /**
  * Coil model for a stored car photo: a [java.io.File] for a cropped local path, else the raw URL.
