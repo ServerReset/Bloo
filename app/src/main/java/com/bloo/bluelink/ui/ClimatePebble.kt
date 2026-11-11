@@ -176,11 +176,16 @@ internal fun ClimatePebble(
     val weather = state.carWeather[v.vin] ?: state.homeWeather
     val climateContext = LocalContext.current
     // What smart climate would set right now: the weather, and the temperatures this person has chosen by hand before.
-    val smartPlan = weather?.let {
-        smartClimatePlan(
-            it, ClimateChoices.list(climateContext, v.vin), fahrenheit, ClimateChoices.feedback(climateContext, v.vin),
-            learned = state.climateModels[v.vin],
-        )
+    // Remembered on what it depends on: the weather, the units, the learned model, and the last command sent (which records a new choice).
+    // Worked out in the body, it read the saved choices from disk and re-planned on every recomposition -- every tick of a slider.
+    val learnedModel = state.climateModels[v.vin]
+    val smartPlan = remember(v.vin, weather, fahrenheit, learnedModel, lastSent) {
+        weather?.let {
+            smartClimatePlan(
+                it, ClimateChoices.list(climateContext, v.vin), fahrenheit, ClimateChoices.feedback(climateContext, v.vin),
+                learned = learnedModel,
+            )
+        }
     }
     val simpleMode = state.settingsMode != "advanced"
     // Mirrors Pebble()'s own expanded computation so this and the header Start button agree.

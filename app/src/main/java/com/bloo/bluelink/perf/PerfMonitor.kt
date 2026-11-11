@@ -590,7 +590,11 @@ object PerfMonitor {
  */
 @Composable
 fun TrackRecompositions(name: String) {
-    if (PerfMonitor.active) SideEffect { PerfMonitor.recomposed(name) }
+    if (!PerfMonitor.active) return
+    // Counts real recompositions only. The first composition is not one: counting it filed every card and page being built (each
+    // swipe builds a page's worth) as a recomposition, which made steady pages look as if they kept recomposing.
+    val composed = androidx.compose.runtime.remember { booleanArrayOf(false) }
+    SideEffect { if (composed[0]) PerfMonitor.recomposed(name) else composed[0] = true }
 }
 
 /** Appends each line of [items], or "none" when there are none. */
