@@ -55,10 +55,9 @@ internal fun Modifier.pageTurn(offset: () -> Float, strength: Float = 1f): Modif
         compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
         // No fade: every column sits at the same fractional offset, so a fade dimmed the whole screen
         // mid-swipe (cards over the black backdrop) and lifted again at rest.
-        rotationY = o * 2f * 26f * strength
+        // No 3D tilt: a rotation with a perspective camera pushes every page through a perspective transform each frame, which forces the
+        // whole page subtree to be re-walked and knocks the shadows off their fast path. Scale and the lift carry the turn at no such cost.
         translationY = away * 12.dp.toPx() * strength
-        // A distant camera keeps the tilt a clean foreshortening with no clipped top/bottom corners.
-        cameraDistance = 360.dp.toPx()
         val scale = 1f - 0.09f * strength * away
         scaleX = scale
         scaleY = scale
