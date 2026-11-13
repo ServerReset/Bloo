@@ -72,48 +72,6 @@ internal fun UpdateAvailableTile(
     }
 }
 
-/** The GitHub build's header action: download, install, or open its release page, with the progress it is in. */
-@Composable
-private fun githubHeaderAction(state: UiState, vm: AppViewModel, info: UpdateInfo, context: Context): PebbleHeaderAction {
-    val downloadProgress by vm.updateDownloadProgress.collectAsStateWithLifecycle()
-    val seamless = LocalAppearance.current.seamlessInstallShizuku && state.shizukuAvailable
-    val hasDirectDownload = info.run.phoneApkUrl != null
-    return PebbleHeaderAction(
-        label = when {
-            state.updateInstalling -> "Installing…"
-            // Rounded to the nearest 5%; this chip is the only place the download percentage shows.
-            state.updateDownloading -> downloadProgress?.let { "${(it * 100 / 5f).roundToInt() * 5}%" } ?: "Downloading…"
-            state.updateApkReady -> if (seamless) "Install now" else "Install"
-            hasDirectDownload -> "Update"
-            else -> "Open"
-        },
-        icon = if (state.updateApkReady) Icons.Filled.SystemUpdate else Icons.Filled.Download,
-        pending = state.updateDownloading || state.updateInstalling,
-        enabled = !state.updateInstalling,
-        // The confirm green: the install-ready call to action.
-        active = state.updateApkReady,
-        activeContainer = confirmTone().container,
-        activeContent = confirmTone().content,
-        onClick = { runUpdateAction(state, vm, info, context) },
-    )
-}
-
-/** Play's header action: it opens Play's own flow for the build Play reported. The Activity is what Play needs to show it. */
-@Composable
-private fun playHeaderAction(): PebbleHeaderAction {
-    val context = LocalContext.current
-    return PebbleHeaderAction(
-        label = "Update",
-        icon = Icons.Filled.SystemUpdate,
-        pending = false,
-        enabled = true,
-        active = true,
-        activeContainer = confirmTone().container,
-        activeContent = confirmTone().content,
-        onClick = { context.hostActivity()?.let { PlayUpdates.start(it) } },
-    )
-}
-
 /**
  * What the update's primary action says and does, in one place. The pebble surfaces it as its header action and the Settings card as a
  * full-width button, so the CHROME differs -- but the label, the glyph and the branch it takes must not, and they had a copy each.

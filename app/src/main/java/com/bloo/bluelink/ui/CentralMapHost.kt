@@ -79,19 +79,11 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             com.bloo.bluelink.data.AppLog.log("Map: $openVin not drawn (car found: ${hostVehicle != null}, location: ${hostLocation != null})")
         }
     }
-    // Closed, the map sits on its home card, so it needs that card's place on screen. Until the card has been placed, nothing is drawn.
-    // A swipe to a car whose card has not been placed yet keeps the last place the map was drawn in, rather than drawing nothing. The gate
-    // reads the card's place WITHOUT subscribing: the layer reads it live, in layout, so a card moving does not recompose this host.
-    val lastClosed = remember { arrayOfNulls<Rect>(1) }
-    val reportedClosed: Rect? = if (openVin == null && homeVin != null) unobservedCard(centralMap, homeVin) else null
-    if (reportedClosed != null) lastClosed[0] = reportedClosed
-    val closedAt: Rect? = reportedClosed ?: lastClosed[0]
     if (hostVehicle == null || hostLocation == null) return
     // Opening, the map grows from the card it was opened from; until that card has been on screen, and when the card it closes onto is
     // nowhere on screen, it uses a box in the middle, so the map always opens and never flies off the screen to close.
     val floatingRect = Rect(windowSize.width * 0.04f, windowSize.height * 0.52f, windowSize.width * 0.96f, windowSize.height * 0.84f)
     val fallback = Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
-    val screenRect = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
     val closingTo = centralMap.closingTo
     val opening = openVin != null && closingTo == null
     val originBounds: () -> Rect = {
@@ -177,16 +169,3 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
 
 /** [index] wrapped into 0 until [size]: past either end, the list continues from the other end, as the car pager does. */
 internal fun wrapIndex(index: Int, size: Int): Int = ((index % size) + size) % size
-
-/** The longest the map waits for the garage to arrive at the car it closes onto. */
-private const val PageWaitMs = 900L
-
-/** The longest the map waits for that car's Location card to scroll into view. */
-private const val RevealWaitMs = 600L
-
-/** The longest the map waits for the card to be on screen after that, before it closes regardless. */
-private const val OnScreenWaitMs = 500L
-
-/** A card's place, read without making the composition that asks for it depend on it. Only for checks like "has it been placed yet". */
-private fun unobservedCard(centralMap: CentralMap, vin: String): Rect? =
-    androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation { centralMap.cardBounds(vin) }

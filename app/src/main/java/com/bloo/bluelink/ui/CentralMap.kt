@@ -90,37 +90,6 @@ internal class CentralMap {
      */
     fun cardBounds(vin: String): Rect? = bestSlot(vin)?.bounds
 
-    /** True when [vin]'s card is on screen. */
-    fun cardOnScreen(vin: String): Boolean = cardBounds(vin)?.let { visibleArea(it) > 0f } == true
-
-    /** True when [vin]'s card is fully across the screen sideways: its page has arrived, even if the card is scrolled up or down. */
-    fun cardPageArrived(vin: String): Boolean {
-        val r = cardBounds(vin) ?: return false
-        return r.left >= -1f && r.right <= screen.width + 1f
-    }
-
-    /** Scrolls [vin]'s card into view on its page (the one most on screen), if that card can scroll. */
-    suspend fun revealCard(vin: String) {
-        bestSlot(vin)?.reveal?.invoke()
-    }
-
-    private fun bestSlot(vin: String): MapCardSlot? {
-        var best: MapCardSlot? = null
-        var bestScore = Float.NEGATIVE_INFINITY
-        for (s in slots) {
-            if (s.vin != vin) continue
-            val r = s.bounds ?: continue
-            val area = visibleArea(r)
-            // On screen beats off screen; among cards off screen, the nearest to the screen's middle.
-            val score = if (area > 0f) area else -kotlin.math.hypot(r.center.x - screen.width / 2f, r.center.y - screen.height / 2f)
-            if (score > bestScore) {
-                bestScore = score
-                best = s
-            }
-        }
-        return best
-    }
-
     private fun visibleArea(r: Rect): Float {
         if (screen == Size.Zero) return r.width * r.height
         val w = (minOf(r.right, screen.width) - maxOf(r.left, 0f)).coerceAtLeast(0f)
