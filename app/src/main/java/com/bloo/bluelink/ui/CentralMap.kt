@@ -90,6 +90,23 @@ internal class CentralMap {
      */
     fun cardBounds(vin: String): Rect? = bestSlot(vin)?.bounds
 
+    private fun bestSlot(vin: String): MapCardSlot? {
+        var best: MapCardSlot? = null
+        var bestScore = Float.NEGATIVE_INFINITY
+        for (s in slots) {
+            if (s.vin != vin) continue
+            val r = s.bounds ?: continue
+            val area = visibleArea(r)
+            // On screen beats off screen; among cards off screen, the nearest to the screen's middle.
+            val score = if (area > 0f) area else -kotlin.math.hypot(r.center.x - screen.width / 2f, r.center.y - screen.height / 2f)
+            if (score > bestScore) {
+                bestScore = score
+                best = s
+            }
+        }
+        return best
+    }
+
     private fun visibleArea(r: Rect): Float {
         if (screen == Size.Zero) return r.width * r.height
         val w = (minOf(r.right, screen.width) - maxOf(r.left, 0f)).coerceAtLeast(0f)
