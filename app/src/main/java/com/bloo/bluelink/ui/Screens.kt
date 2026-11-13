@@ -432,8 +432,9 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         }
     }
     }
-    // The expanded car's map sits over the app and under the status bar's blur, so the part of it that goes behind the status bar is
-    // blurred rather than cut off at the content's edge. The map is drawn here, at screen level, for that reason.
+    }
+    // The map is drawn OUTSIDE the blur layer above, so the open map itself is never blurred; only the app behind it is. It sits over
+    // the app and under the status bar's blur, so the part of it that goes behind the status bar is blurred rather than cut off.
     if (target == Screen.Garage && !(locked && !unlockedThisSession)) CentralMapHost(stateHolder, vm, centralMap, searchHazeState)
     // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
     // by the bottom of the strip. It is the ONLY edge treatment in the app.
@@ -441,7 +442,6 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
     // and dialogs sit above it.
     PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)
-    }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
