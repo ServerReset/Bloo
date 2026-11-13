@@ -208,6 +208,11 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                             cardSlot.bounds?.overlaps(Rect(0f, 0f, screenNow.width.toFloat(), screenNow.height.toFloat())) == true
                         }
                     }
+                    // The card's own copy of the map, only while its card is on screen.
+                    if (onScreen) host?.CardContent(
+                        Modifier.fillMaxSize(),
+                        MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
+                    )
                 }
                 MapFeatureRow(
                     features = listOfNotNull(

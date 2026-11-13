@@ -370,7 +370,7 @@ internal fun ExpandableMapLayer(
         val windowH = windowSize.height.toFloat()
         val mapInputs = MapInputs(location, deviceLocation, interactive = isExpanded, tileArea = windowSize, panWeight = { progress().coerceIn(0f, 1f) })
     // The map is always drawn: closed, it floats over the whole app, so it is no longer hosted inside a car's card.
-    val mapLive = true
+    val mapLive by remember { androidx.compose.runtime.derivedStateOf { isExpanded || progress() > 0.001f } }
         // The cut, in layout: the map sits in a box that clips to the band it may show (see [visibleBand]), so the cut hides its taps as well.
         Box(
             Modifier

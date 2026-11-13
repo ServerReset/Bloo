@@ -82,16 +82,19 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     if (hostVehicle == null || hostLocation == null) return
     // Opening, the map grows from the card it was opened from; until that card has been on screen, and when the card it closes onto is
     // nowhere on screen, it uses a box in the middle, so the map always opens and never flies off the screen to close.
-    val floatingRect = Rect(windowSize.width * 0.04f, windowSize.height * 0.52f, windowSize.width * 0.96f, windowSize.height * 0.84f)
     val fallback = Rect(windowSize.width * 0.05f, windowSize.height * 0.35f, windowSize.width * 0.95f, windowSize.height * 0.6f)
     val closingTo = centralMap.closingTo
     val opening = openVin != null && closingTo == null
     val originBounds: () -> Rect = {
         when {
-            // Opening grows from the card that was tapped. Closed, and closing, the map is a fixed floating overlay over the whole app,
-            // so it never depends on a car's card being on screen (nor on the garage travelling to a car to find it).
+            // Opening grows from the card that was tapped. Closed, the map sits in its car's card; closing lands on the card of the car
+            // the bar shows, and falls back to the middle of the screen when that card is off screen, never off the screen itself.
             opening -> centralMap.cardBounds(openVin!!) ?: fallback
-            else -> floatingRect
+            else -> {
+                val target = closingTo ?: homeVin
+                val screen = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
+                target?.let { centralMap.cardBounds(it) }?.takeIf { it.overlaps(screen) } ?: fallback
+            }
         }
     }
 
