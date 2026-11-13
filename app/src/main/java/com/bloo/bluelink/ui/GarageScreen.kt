@@ -180,6 +180,9 @@ internal fun MapBlurLayer(centralMap: CentralMap, content: @Composable () -> Uni
         animationSpec = androidx.compose.animation.core.tween(MapBlurMs),
         label = "garageBehindMap",
     )
+    // The last blur built, kept by its rounded radius: a new blur effect for every frame of the animation was a new allocation each time,
+    // when the radius only changes in quarter-pixel steps the eye cannot tell apart.
+    val cached = remember { arrayOfNulls<Pair<Float, androidx.compose.ui.graphics.RenderEffect>>(1) }
     Box(
         Modifier.fillMaxSize().graphicsLayer {
             // The drag toward closing fades the blur out (see CentralMap.dismissFade), and the release brings it back.
@@ -187,7 +190,15 @@ internal fun MapBlurLayer(centralMap: CentralMap, content: @Composable () -> Uni
             // Decal edges: the blur fades to transparent at the layer's edge instead of smearing its edge pixels, so a blurred background
             // never picks up dark bands. With the blur off, nothing is applied and the background shows as it is.
             renderEffect = if (amount > 0.01f) {
-                androidx.compose.ui.graphics.BlurEffect(px, px, androidx.compose.ui.graphics.TileMode.Decal)
+                val step = kotlin.math.round(px * 4f) / 4f
+                val hit = cached[0]
+                if (hit != null && hit.first == step) {
+                    hit.second
+                } else {
+                    val effect = androidx.compose.ui.graphics.BlurEffect(step, step, androidx.compose.ui.graphics.TileMode.Decal)
+                    cached[0] = step to effect
+                    effect
+                }
             } else {
                 null
             }
