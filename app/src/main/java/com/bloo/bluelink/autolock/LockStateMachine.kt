@@ -6,12 +6,11 @@ package com.bloo.bluelink.autolock
  * the next state, which is what makes it exhaustively unit-testable.
  *
  * Confirmation policy: after the Bluetooth disconnect trigger, walking confirmation (physical
- * detection, via Activity Recognition) must arrive before the grace countdown starts when
- * [useActivityRecognition] is on. With it off, the disconnect alone starts the grace countdown.
+ * detection, via Activity Recognition) is always required before the grace countdown starts.
  */
-class LockStateMachine(useActivityRecognition: Boolean) {
+class LockStateMachine {
 
-    private var walkingConfirmed = !useActivityRecognition
+    private var walkingConfirmed = false
 
     fun next(current: DetectionState, event: DetectionEvent): DetectionState = when (event) {
         DetectionEvent.CarBluetoothReconnected,

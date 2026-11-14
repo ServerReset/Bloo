@@ -155,14 +155,13 @@ object AutoLockController {
             val settings = SettingsStore(context).autoLockConfig(vin)
             if (!settings.enabled) return@withLock
 
-            val sm = LockStateMachine(settings.useActivityRecognition).also { machines[vin] = it }
+            val sm = LockStateMachine().also { machines[vin] = it }
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) - evaluating.")
 
-            if (settings.useActivityRecognition) {
-                ActivityRecognitionManager.start(context)
-                startedActivityRecognition = true
-            }
+            // Physical detection is mandatory: Activity Recognition always runs for an evaluation.
+            ActivityRecognitionManager.start(context)
+            startedActivityRecognition = true
 
             // Wait for the walking confirmation to promote CONFIRMING -> GRACE, or time out and
             // skip. Suspends on the state flow itself rather than polling on a timer: a
@@ -179,17 +178,10 @@ object AutoLockController {
                 _state.first { (it[vin]?.detection ?: DetectionState.IDLE) != DetectionState.CONFIRMING }
             }
             if (leftConfirming == null) {
-                // Timed out still CONFIRMING. With physical detection on, a walk that was never confirmed means no lock: the car is
-                // not locked on a Bluetooth drop alone (a brief signal loss is the usual false trigger this guards against). With it
-                // off, the Bluetooth disconnect is the only signal, so the grace countdown starts.
-                if (!walkAwayConfirmed.contains(vin)) {
-                    if (settings.useActivityRecognition) {
-                        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
-                        AppLog.log("AutoLock: no walk-away confirmation for $vin - not locking.")
-                        return@withLock
-                    }
-                }
-                advance(vin, DetectionState.GRACE)
+                // Timed out still CONFIRMING: no walk was confirmed, so the car is not locked. A Bluetooth drop alone never locks it.
+                _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
+                AppLog.log("AutoLock: no walk-away confirmation for $vin - not locking.")
+                return@withLock
             }
 
             // Grace countdown, skippable via "Lock now" (skipGrace) or cut short by a cancel/
