@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.first
 /** The size of a car that has gone off the edge, as a share of its icon: it shrinks into a pin as it reaches the edge. */
 internal const val EdgePinScale = 0.75f
 
+/** How transparent a car gets once it is fully an edge pin: 20%, so it reads as a car that has left the view rather than one still there. */
+internal const val EdgePinAlphaLoss = 0.2f
+
 /** How far past the edge a car travels while it morphs from its icon into its edge pin, in dp. */
 internal val EdgeMorphDp = 72.dp
 
@@ -39,7 +42,7 @@ internal val EdgeMarginDp = 8.dp
  * window it is its icon, at its place. Past the window it slides to the window's edge on the line from the centre to it, and shrinks into a
  * pin there. The change is continuous: it starts the moment the car crosses the edge, and the pin keeps the car's direction.
  */
-internal data class EdgePin(val x: Float, val y: Float, val scale: Float)
+internal data class EdgePin(val x: Float, val y: Float, val scale: Float, val alpha: Float = 1f)
 
 internal fun edgePin(x: Float, y: Float, halfW: Float, halfTop: Float, halfBottom: Float, morphPx: Float): EdgePin {
     // Before the map has a size there is no window to keep a car in: it stays where it is.
@@ -59,7 +62,7 @@ internal fun edgePin(x: Float, y: Float, halfW: Float, halfTop: Float, halfBotto
     // Never past the window itself: a marker that has morphed in still stays inside the map's edges and below the bar.
     val px = (x + (edgeX - x) * f).coerceIn(-halfW, halfW)
     val py = (y + (edgeY - y) * f).coerceIn(-halfTop, halfBottom)
-    return EdgePin(px, py, 1f - (1f - EdgePinScale) * f)
+    return EdgePin(px, py, 1f - (1f - EdgePinScale) * f, 1f - EdgePinAlphaLoss * f)
 }
 
 /**
@@ -105,7 +108,32 @@ internal const val PillMaxPhotos = 10
 internal val PillPhotoSize = DpSize(34.dp, 24.dp)
 
 /** One car's marker this frame: where its icon's centre sits, the pin scale, and whether it is past the edge (moved off its own place). */
-internal class CarMarker(val vin: String, val x: Float, val y: Float, val scale: Float, val offEdge: Boolean)
+internal class CarMarker(val vin: String, val x: Float, val y: Float, val scale: Float, val offEdge: Boolean, val alpha: Float = 1f)
+
+/**
+ * Pushes on-screen cars that overlap sideways, so they sit next to each other instead of on top of each other. Two cars count as overlapping
+ * when they are closer than [spacing] across and within [rowHeight] down. Edge pins are left where the edge put them. A few passes settle a
+ * cluster of three or more.
+ */
+internal fun spreadApart(markers: List<CarMarker>, spacing: Float, rowHeight: Float): List<CarMarker> {
+    if (markers.size < 2) return markers
+    val x = FloatArray(markers.size) { markers[it].x }
+    val y = FloatArray(markers.size) { markers[it].y }
+    repeat(4) {
+        for (i in markers.indices) for (j in i + 1 until markers.size) {
+            if (markers[i].offEdge || markers[j].offEdge) continue
+            if (abs(y[i] - y[j]) >= rowHeight) continue
+            val dx = x[j] - x[i]
+            val gap = abs(dx)
+            if (gap >= spacing) continue
+            val push = (spacing - gap) / 2f
+            val dir = if (dx >= 0f) 1f else -1f
+            x[i] -= dir * push
+            x[j] += dir * push
+        }
+    }
+    return markers.mapIndexed { i, m -> CarMarker(m.vin, x[i], y[i], m.scale, m.offEdge, m.alpha) }
+}
 
 /**
  * The leader of each car's pill, by index: a car that is past the edge and lands within the radius of an earlier leader joins that

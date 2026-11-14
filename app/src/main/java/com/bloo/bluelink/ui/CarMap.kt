@@ -458,12 +458,19 @@ internal fun BoxScope.CarIconLayer(
     val radiusPx = with(LocalDensity.current) { PillGroupRadiusDp.toPx() }
     val edgeMarginPx = with(LocalDensity.current) { EdgeMarginDp.toPx() }
     // Every car's marker this frame. Read by each car's layout and draw, so a pan or a pinch moves the whole set together.
-    fun markers(): List<CarMarker> = cars.map { car ->
-        val place = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
-        val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
-        val pin = edge.pin(at.x, at.y, viewport)
-        CarMarker(car.vin, pin.x, pin.y, pin.scale, abs(pin.x - at.x) > 0.5f || abs(pin.y - at.y) > 0.5f)
-    }
+    // Cars that land on top of each other on screen sit side by side: one icon's width and a small gap apart.
+    val spacingPx = with(LocalDensity.current) { CarIconWidth.toPx() + 8.dp.toPx() }
+    val rowHeightPx = with(LocalDensity.current) { CarIconHeight.toPx() }
+    fun markers(): List<CarMarker> = spreadApart(
+        cars.map { car ->
+            val place = tilePlace(car.location.latitude, car.location.longitude, zoom, xTileF, yTileF, tilePx)
+            val at = mapScreenOffset(place.x, place.y, state.panX, state.panY, panWeight(), state.scale)
+            val pin = edge.pin(at.x, at.y, viewport)
+            CarMarker(car.vin, pin.x, pin.y, pin.scale, abs(pin.x - at.x) > 0.5f || abs(pin.y - at.y) > 0.5f, pin.alpha)
+        },
+        spacingPx,
+        rowHeightPx,
+    )
     // Which car leads each pill. It changes only when cars merge or split, not on every pan or pinch frame: a derived value that only
     // invalidates its readers when the grouping itself changes (a list, so equal groupings compare equal).
     // Keyed on what markers() captures that is not state (the zoom and the map centre's tile), so it is rebuilt when those change.
@@ -494,7 +501,7 @@ internal fun BoxScope.CarIconLayer(
                     val s = if (hidden) 0f else markers()[index].scale
                     scaleX = s
                     scaleY = s
-                    alpha = if (hidden) 0f else 1f
+                    alpha = if (hidden) 0f else markers()[index].alpha
                 }
             if (isPillLeader()) {
                 CarPillCluster(
