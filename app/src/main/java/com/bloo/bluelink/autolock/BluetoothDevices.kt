@@ -3,7 +3,8 @@ package com.bloo.bluelink.autolock
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import com.bloo.bluelink.ui.hasPermission
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 data class PairedDevice(val name: String, val address: String)
 
@@ -11,8 +12,9 @@ data class PairedDevice(val name: String, val address: String)
  *  paired device is my car". Ported from i5-AutoLock's `BluetoothDevices`. */
 object BluetoothDevices {
     fun hasPermission(context: Context): Boolean =
-        @Suppress("InlinedApi") // gated by the minSdk arg on the next line
-        context.hasPermission(Manifest.permission.BLUETOOTH_CONNECT, android.os.Build.VERSION_CODES.S)
+        android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
 
     fun bondedDevices(context: Context): List<PairedDevice> {
         if (!hasPermission(context)) return emptyList()
