@@ -58,6 +58,9 @@ internal class CentralMap {
     /** The car whose Location card shows the map while it is closed: the garage's current car. */
     var homeVin by mutableStateOf<String?>(null)
 
+    /** True while the big map is open or closing over the cards, so a card does not draw its own copy of the map underneath it. */
+    val mapOverCard: Boolean get() = vin != null || closingTo != null
+
     /** The car the app is on: the garage's current car. Mirrored from the garage by the host; changed by [open] and [select] only. */
     var currentVin by mutableStateOf<String?>(null)
 
