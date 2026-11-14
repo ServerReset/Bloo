@@ -87,6 +87,12 @@ internal class CarMapState {
         scale = scale.coerceIn(0.5f, 2f)
     }
 
+    /** Takes another map's zoom and pinch scale, so this view shows the same zoom. Its pan stays its own. */
+    fun takeZoomOf(z: Int, sc: Float) {
+        zoom = z
+        scale = sc
+    }
+
     /**
      * Back to the car, dead centre, default zoom -- the full-screen map's "Recentre" feature.
      * Clears [userAdjusted]: an explicit "start over" that also re-allows a fresh

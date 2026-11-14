@@ -45,7 +45,7 @@ class WearAutoLockReceiver : BroadcastReceiver() {
      */
     private suspend fun lockWithRetry(app: Context, vin: String): Boolean {
         repeat(3) { attempt ->
-            if (runCatching { runWatchCommandChecked(app, vin, CarAction.LOCK) }.getOrElse { false }) return true
+            if (runCatching { runWatchCommandChecked(app, vin, CarAction.LOCK) }.getOrNull() == true) return true
             if (attempt < 2) delay(if (attempt == 0) 2_500L else 5_000L)
         }
         return false

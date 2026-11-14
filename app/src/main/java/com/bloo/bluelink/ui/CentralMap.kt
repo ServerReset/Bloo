@@ -181,10 +181,7 @@ internal class CentralMap {
         // The card takes the big map's zoom and pinch scale, so closing onto it is not a cut in zoom. Its pan stays its own: each card
         // centres on its own car, and a shared pan would put every card's car in the wrong place.
         LaunchedEffect(own) {
-            snapshotFlow { mapState.zoom to mapState.scale }.collect { (z, sc) ->
-                own.zoom = z
-                own.scale = sc
-            }
+            snapshotFlow { mapState.zoom to mapState.scale }.collect { (z, sc) -> own.takeZoomOf(z, sc) }
         }
         CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
             CarMap(
