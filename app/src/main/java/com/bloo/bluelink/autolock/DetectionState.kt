@@ -9,7 +9,6 @@ package com.bloo.bluelink.autolock
 enum class DetectionState {
     IDLE,
     ARMED,        // Watching for a disconnect trigger.
-    ARMED,        // Watching for a disconnect trigger.
     CONFIRMING,   // Trigger fired; waiting for corroborating signals (activity/geofence).
     GRACE,        // Counting down before acting.
     VERIFYING,    // Querying the vehicle status via the API.
