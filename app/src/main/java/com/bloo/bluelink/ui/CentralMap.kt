@@ -1,6 +1,8 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -176,6 +178,14 @@ internal class CentralMap {
     @Composable
     fun CardContent(modifier: Modifier, inputs: MapInputs) {
         val own = rememberCarMapState()
+        // The card takes the big map's zoom and pinch scale, so closing onto it is not a cut in zoom. Its pan stays its own: each card
+        // centres on its own car, and a shared pan would put every card's car in the wrong place.
+        LaunchedEffect(own) {
+            snapshotFlow { mapState.zoom to mapState.scale }.collect { (z, sc) ->
+                own.zoom = z
+                own.scale = sc
+            }
+        }
         CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
             CarMap(
                 location = inputs.location,
