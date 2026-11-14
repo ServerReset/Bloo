@@ -11,7 +11,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,9 +72,23 @@ internal fun GlassSurface(
     // neither recomposes this surface nor tears down and rebuilds its blur.
     val canBlur = hazeState != null && blurCapable()
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
+    // Whether any of this surface is on screen, from its own place in the window: no column or page arithmetic, so every layout (multi-column,
+    // pagers, sheets) is judged the same way. A surface wholly off the window draws no blur, which nobody can see; it changes only when the
+    // surface crosses the window's edge, so it does not recompose on every move. The margin keeps the blur on a little past the edge.
+    val windowSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+    val marginPx = with(density) { 32.dp.toPx() }
+    var inView by remember { mutableStateOf(true) }
     Box(
         modifier = modifier
             .glassEdge(shape, shadow = shadow)
+            .onGloballyPositioned { c ->
+                val p = c.positionInWindow()
+                val r = Rect(p.x, p.y, p.x + c.size.width, p.y + c.size.height)
+                val window = Rect(-marginPx, -marginPx, windowSize.width + marginPx, windowSize.height + marginPx)
+                val now = r.overlaps(window)
+                if (now != inView) inView = now
+            }
             .then(
                 if (onClick != null) {
                     Modifier.clip(shape).clickable(
@@ -94,7 +116,7 @@ internal fun GlassSurface(
     ) {
         // The blur, under the tint. Kept attached while the garage moves and only not DRAWN then (a draw-phase read of the pause), so
         // the glass goes clear for the moment of a swipe, with its tint still on, and is back on the settle frame without being rebuilt.
-        if (canBlur) {
+        if (canBlur && inView) {
             Box(
                 Modifier.matchParentSize().clip(shape)
                     // Floating glass refracts what is behind it; a nested panel or card keeps the flat blur.
