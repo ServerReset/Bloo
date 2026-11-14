@@ -9,6 +9,8 @@ import com.bloo.bluelink.data.SessionStore
 import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.toSnapshot
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
@@ -173,7 +175,7 @@ object AutoLockController {
 
             // Read the CACHED status -- never wake the car for the pre-lock check, matching
             // AlertWorker's own refresh=false convention for background polls.
-            val v = SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.toVehicle()
+            val v = ensureVehicleCached(context, vin)?.toVehicle()
             if (v == null) {
                 fail(context, vin, "Car no longer found.")
                 return@withLock
@@ -209,6 +211,23 @@ object AutoLockController {
                 if (startedActivityRecognition) ActivityRecognitionManager.stop(context)
             }
         }
+    }
+
+    private suspend fun ensureVehicleCached(context: Context, vin: String): VehicleSnapshot? {
+        val store = SnapshotStore(context)
+        store.current().vehicles.firstOrNull { it.vin == vin }?.let { return it }
+        val sessions = SessionStore(context)
+        val credentials = CredentialStore(context)
+        for (brand in runCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
+            // Inside the shared request lock like every other car request: BlueLink answers 502 to overlapping
+            // ones, and an empty result here would read as "car not found" and skip the lock.
+            val fetched = runCatching { BlueLinkGate.statusMutex.withLock { repositoryFor(brand, sessions, credentials).vehicles() } }
+                .getOrDefault(emptyList())
+            if (fetched.isEmpty()) continue
+            runCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
+            fetched.firstOrNull { it.vin == vin }?.let { return it.toSnapshot() }
+        }
+        return null
     }
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
