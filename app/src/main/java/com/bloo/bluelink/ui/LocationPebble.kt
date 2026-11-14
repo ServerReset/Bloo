@@ -209,8 +209,7 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                         }
                     }
                     // The card's own copy of the map, only while its card is on screen.
-                    // Not while the big map is open or closing: the card's copy would sit under it as a duplicate map.
-                    if (onScreen && host?.mapOverCard != true) host?.CardContent(
+                    if (onScreen) host?.CardContent(
                         Modifier.fillMaxSize(),
                         MapInputs(loc, state.deviceLocation, interactive = false, tileArea = windowSize, panWeight = { 1f }),
                     )

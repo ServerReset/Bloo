@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,8 +59,8 @@ internal class CentralMap {
     /** The car whose Location card shows the map while it is closed: the garage's current car. */
     var homeVin by mutableStateOf<String?>(null)
 
-    /** True while the big map is open or closing over the cards, so a card does not draw its own copy of the map underneath it. */
-    val mapOverCard: Boolean get() = vin != null || closingTo != null
+    /** The car the big map was last opened for. Kept after it closes, so a card can keep the big map's view offset to its own car. */
+    private var anchorVin: String? = null
 
     /** The car the app is on: the garage's current car. Mirrored from the garage by the host; changed by [open] and [select] only. */
     var currentVin by mutableStateOf<String?>(null)
@@ -133,6 +134,7 @@ internal class CentralMap {
         if (this.vin != null) return
         com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
         this.vin = vin
+        anchorVin = vin
         barShown = true
         currentVin = vin
         homeVin = vin
@@ -181,10 +183,20 @@ internal class CentralMap {
     @Composable
     fun CardContent(modifier: Modifier, inputs: MapInputs) {
         val own = rememberCarMapState()
-        // The card takes the big map's zoom and pinch scale, so closing onto it is not a cut in zoom. Its pan stays its own: each card
-        // centres on its own car, and a shared pan would put every card's car in the wrong place.
+        // The card shows the big map's view exactly: its zoom and pinch scale, and its pan offset to the card's own car. The big map's
+        // view centres on the anchor (plus its pan); a card centred on its own car needs the same centre, so its pan is that offset.
+        // Kept in step on every change, so closing onto the card is no cut, and the card's copy under the big map is the same picture.
+        val cardCar by rememberUpdatedState(inputs.location)
         LaunchedEffect(own) {
-            snapshotFlow { mapState.zoom to mapState.scale }.collect { (z, sc) -> own.takeZoomOf(z, sc) }
+            snapshotFlow {
+                val anchor = anchorVin?.let { a -> cars.firstOrNull { it.vin == a }?.location }
+                val z = mapState.zoom
+                val (ox, oy) = if (anchor != null) panBetween(cardCar, anchor, z) else 0f to 0f
+                CardView(z, mapState.scale, mapState.panX + ox, mapState.panY + oy)
+            }.collect { v ->
+                own.takeZoomOf(v.zoom, v.scale)
+                own.panTo(v.panX, v.panY)
+            }
         }
         CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
             CarMap(
@@ -223,6 +235,9 @@ internal class CentralMap {
         }
     }
 }
+
+/** The big map's view, as a card shows it: zoom, pinch scale and pan. */
+private data class CardView(val zoom: Int, val scale: Float, val panX: Float, val panY: Float)
 
 /** How long the map takes to glide to a car chosen on it. */
 private const val GlideMs = 420

@@ -306,8 +306,7 @@ internal fun ExpandableMapLayer(
             val shrink = launch { expandFraction.animateTo(0f, animationSpec = closeSpec) }
             val drag = launch { dragPx.animateTo(0f, animationSpec = closeSpec) }
             retreat.join(); shrink.join(); drag.join()
-            // The pin has arrived at the middle of the collapsed map; the pebble's map starts from there.
-            mapState.panTo(0f, 0f)
+            // The card shows this view from here on (see CentralMap.CardContent), so the big map keeps its pan: no jump at the hand-over.
             onDismiss()
         }
     }
