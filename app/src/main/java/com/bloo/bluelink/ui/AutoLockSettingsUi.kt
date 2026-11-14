@@ -168,6 +168,11 @@ internal fun AutoLockSettingsGroup(v: Vehicle, vm: AppViewModel, gen5w: Boolean 
             onHideWatcher = { openWatcherChannel() },
         )
     } else {
+        // AutoLock cannot see a car's Bluetooth disconnect without BLUETOOTH_CONNECT, so when it is on and the permission is missing it
+        // asks at once, for any car, not only during first-car setup.
+        LaunchedEffect(current.enabled, bluetoothOk) {
+            if (current.enabled && !bluetoothOk) bluetoothConnectLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        }
         AutoLockSettings(current, v, vm, gen5w, backgroundOk) { update(it) }
     }
 
