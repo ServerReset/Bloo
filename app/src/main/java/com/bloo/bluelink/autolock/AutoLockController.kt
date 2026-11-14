@@ -304,7 +304,7 @@ object AutoLockController {
      * Records a failure that stopped an evaluation from locking the car, and tells the user about it. Before this, these went only to
      * the log and the in-app line, so an evaluation that could not lock looked like one that never ran.
      */
-    private fun carNameFor(context: Context, vin: String): String =
+    private suspend fun carNameFor(context: Context, vin: String): String =
         runCatching { SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.name }.getOrNull() ?: "Your car"
 
     /** Tells the person AutoLock did not lock a car when it should have been able to, with the reason. */
