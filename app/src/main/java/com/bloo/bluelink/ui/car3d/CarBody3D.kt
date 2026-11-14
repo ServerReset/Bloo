@@ -42,9 +42,6 @@ enum class CarBody(
         fun override(context: Context): CarBody? =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("body", null)?.let { n -> entries.firstOrNull { it.name == n } }
 
-        fun setOverride(context: Context, body: CarBody?) =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("body", body?.name).apply()
-
         private val shapes = HashMap<CarBody, CarShape>()
 
         fun shape(context: Context, body: CarBody): CarShape = synchronized(shapes) {
@@ -98,16 +95,6 @@ class CarShape(
     /** Where defrost air ends up the inside of the windshield. */
     val defrostEnd: Pair<Double, Double>,
 ) {
-    fun hoodAt(z: Double): Double {
-        if (z >= hood.first().first) return hood.first().second
-        for (i in 0 until hood.size - 1) {
-            val (z0, y0) = hood[i]
-            val (z1, y1) = hood[i + 1]
-            if (z <= z0 && z >= z1) return y0 + (y1 - y0) * (z0 - z) / (z0 - z1)
-        }
-        return hood.last().second
-    }
-
     companion object {
         private fun v(x: Double, y: Double, z: Double) = doubleArrayOf(x, y, z)
 
