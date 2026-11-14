@@ -27,7 +27,7 @@ object ActivityRecognitionManager {
         return PendingIntent.getBroadcast(context, 0, Intent(context, AutoLockActivityReceiver::class.java), flags)
     }
 
-    private fun hasPermission(context: Context): Boolean =
+    internal fun hasPermission(context: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==
             PackageManager.PERMISSION_GRANTED

@@ -130,6 +130,20 @@ object AutoLockController {
             val settings = SettingsStore(context).autoLockConfig(vin).copy(useActivityRecognition = true)
             if (!settings.enabled) return@withLock
 
+            // Without Activity Recognition no walk can ever be confirmed, so every evaluation would end in silence. Say so instead.
+            if (!ActivityRecognitionManager.hasPermission(context)) {
+                val carName = carNameFor(context, vin)
+                _state.update {
+                    it + (vin to AutoLockEvalState(
+                        detection = DetectionState.ERROR,
+                        lastOutcome = "Can't detect walking. Turn on Activity Recognition for this app.",
+                    ))
+                }
+                AppLog.log("AutoLock: Activity Recognition permission is off, so $vin cannot be locked.")
+                notifyNotDetected(context, vin, carName, "Activity Recognition is off, so AutoLock can't tell that you walked away. Turn it on in Settings.")
+                return@withLock
+            }
+
             val sm = LockStateMachine(settings.useActivityRecognition, settings.useGeofence).also { machines[vin] = it }
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
@@ -151,6 +165,7 @@ object AutoLockController {
                             ))
                         }
                         AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
+                        notifyNotDetected(context, vin, carNameFor(context, vin), "No walk was detected after you left the car, so it was not locked. Lock it manually if needed.")
                         return@withLock
                     }
                     advance(vin, DetectionState.GRACE)
@@ -289,6 +304,20 @@ object AutoLockController {
      * Records a failure that stopped an evaluation from locking the car, and tells the user about it. Before this, these went only to
      * the log and the in-app line, so an evaluation that could not lock looked like one that never ran.
      */
+    private fun carNameFor(context: Context, vin: String): String =
+        runCatching { SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.name }.getOrNull() ?: "Your car"
+
+    /** Tells the person AutoLock did not lock a car when it should have been able to, with the reason. */
+    private fun notifyNotDetected(context: Context, vin: String, carName: String, text: String) {
+        Notifications.post(
+            context,
+            id = AutoLockNotification.notificationId(vin) + 3,
+            title = "AutoLock didn't lock $carName",
+            text = text,
+            clears = false,
+        )
+    }
+
     private fun fail(context: Context, vin: String, message: String, notify: Boolean = true) {
         AppLog.log("⚠ $message")
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR, lastOutcome = message)) }
