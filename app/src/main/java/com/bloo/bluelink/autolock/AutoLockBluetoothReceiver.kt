@@ -5,62 +5,89 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.SettingsStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.Notifications
+import com.bloo.bluelink.ui.hasPermission
 
 /**
- * Primary "left the car" trigger: fires when the phone disconnects from a car's paired
- * Bluetooth device (its head unit / hands-free profile). Also cancels a pending lock and
- * re-arms the geofence on reconnect (the user got back in). Ported from i5-AutoLock's
- * `BluetoothStateReceiver`, generalized to Bloo's multiple garages: every car with AutoLock
- * enabled is checked, since more than one could plausibly share a phone.
+ * The "left the car" trigger: fires when the phone disconnects from a car's paired Bluetooth device
+ * (its head unit / hands-free profile). Also cancels a pending lock on reconnect (the user got back
+ * in).
  *
- * Registered in the manifest (not `registerReceiver` at runtime) -- ACL connect/disconnect
- * is one of the implicit broadcasts still delivered to manifest-declared receivers even
- * with the app process dead, so no persistent "watching" service is needed to catch it.
+ * Everything here is deliberately SYNCHRONOUS. Android exempts a background foreground-service start
+ * that follows a Bluetooth broadcast from an app holding BLUETOOTH_CONNECT -- but the exemption is
+ * tied to the app still processing that broadcast, and this receiver used to hand the work to a
+ * coroutine behind `goAsync()` and read the settings file first. By the time
+ * `startForegroundService()` ran, the broadcast was long finished and the exemption no longer applied,
+ * which is one way the watcher notification never appeared. The address lookup is now a
+ * SharedPreferences read (see [AutoLockAddresses]) and the trigger runs inside `onReceive`, so there is
+ * no suspension point between the broadcast and the service start at all.
  */
 class AutoLockBluetoothReceiver : BroadcastReceiver() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         if (action != BluetoothDevice.ACTION_ACL_DISCONNECTED && action != BluetoothDevice.ACTION_ACL_CONNECTED) return
+        if (com.bloo.bluelink.data.BootGate.isLocked(context)) {
+            // Silent before, which made "AutoLock stopped working after a restart" impossible to tell
+            // apart from "the Bluetooth event never arrived". See BootGate: after a reboot the app is
+            // sealed until the user signs in again, and that seals this receiver with everything else.
+            AppLog.log("AutoLock: ignoring $action - the app is sealed after a restart (BootGate), so no evaluation can run.")
+            // A departure that cannot be acted on must say so. Left silent, it looked exactly like auto-lock not working.
+            if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED) notifySealed(context, intent)
+            return
+        }
         @Suppress("DEPRECATION")
         val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-        val deviceMac = device?.address ?: return
-
-        val pending = goAsync()
-        val ctx = context.applicationContext
-        scope.launch {
-            try {
-                val store = SettingsStore(ctx)
-                for (vin in store.autoLockConfiguredVins()) {
-                    val settings = store.autoLockConfig(vin)
-                    if (!settings.enabled || !settings.useBluetoothTrigger) continue
-                    if (!deviceMac.equals(settings.deviceAddress, ignoreCase = true)) continue
-
-                    when (action) {
-                        BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
-                            AppLog.log("AutoLock: car Bluetooth disconnected for $vin — starting evaluation.")
-                            AutoLockService.start(ctx, vin)
-                        }
-                        BluetoothDevice.ACTION_ACL_CONNECTED -> {
-                            AutoLockController.cancel(vin)
-                            if (settings.useGeofence) {
-                                LocationHelper.currentLocation(ctx)?.let { loc ->
-                                    GeofenceManager.register(ctx, vin, loc.latitude, loc.longitude, settings.geofenceRadiusMeters)
-                                    AppLog.log("AutoLock: arrived at $vin — geofence armed.")
-                                }
-                            }
-                        }
-                    }
-                }
-            } finally {
-                pending.finish()
+        // BluetoothDevice.getAddress() is @RequiresPermission(BLUETOOTH_CONNECT) from API 31 -- and
+        // this receiver fires for EVERY Bluetooth device this phone ever sees (headphones, earbuds,
+        // anything), not just a configured car, since the manifest intent-filter has no way to
+        // scope by device.
+        val deviceMac = device?.let { runCatching { it.address }.getOrNull() }
+        if (deviceMac == null) {
+            // The address is the ONLY thing that can match this event to a car, and without
+            // BLUETOOTH_CONNECT it reads as null -- so the app did nothing at all: no trigger, no
+            // notification, no command, and no log line saying why. That is indistinguishable from
+            // AutoLock being broken, which is exactly how it gets reported.
+            if (!context.hasPermission(android.Manifest.permission.BLUETOOTH_CONNECT, android.os.Build.VERSION_CODES.S)) {
+                AppLog.log("⚠ AutoLock: BLUETOOTH_CONNECT is not granted, so a car's Bluetooth disconnect cannot be matched to a car. Grant it from Settings, then AutoLock can see it.")
+                Notifications.post(
+                    context,
+                    id = PERMISSION_NOTIFICATION_ID,
+                    title = "AutoLock can't see your car's Bluetooth",
+                    text = "Bloo needs the Nearby devices permission to notice when you leave the car. Grant it in Settings.",
+                    clears = false,
+                )
             }
+            return
         }
+        // ONE synchronous lookup, and a return for anything that is not a car. This is what stops a
+        // pair of earbuds cold-starting the process into a coroutine and a settings read, and it is
+        // also what makes the service start below land inside the broadcast.
+        val vin = AutoLockAddresses.vinFor(context, deviceMac) ?: return
+        val ctx = context.applicationContext
+        if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+            AutoLockTrigger.onCarDisconnected(ctx, vin)
+        } else {
+            AutoLockTrigger.onCarConnected(ctx, vin)
+        }
+    }
+
+    /** Tells the person that a departure happened while the app is sealed after a restart, so auto-lock could not run. */
+    private fun notifySealed(context: Context, intent: Intent) {
+        @Suppress("DEPRECATION")
+        val device: BluetoothDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE) ?: return
+        val mac = runCatching { device.address }.getOrNull() ?: return
+        val vin = AutoLockAddresses.vinFor(context, mac) ?: return
+        Notifications.post(
+            context,
+            id = AutoLockNotification.notificationId(vin) + 3,
+            title = "AutoLock didn't run",
+            text = "Your car left, but Bloo has been waiting for you to unlock it since the phone restarted. Open Bloo and unlock it to turn AutoLock back on.",
+            clears = false,
+        )
+    }
+
+    private companion object {
+        /** Fixed, distinct from the per-car ids: a missing permission is about the phone, not one car. */
+        const val PERMISSION_NOTIFICATION_ID = 90301
     }
 }
