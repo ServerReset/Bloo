@@ -396,5 +396,5 @@ object AutoLockController {
     }
 
     /** How long the walk-away confirmation window stays open before the evaluation gives up. */
-    internal const val CONFIRM_TIMEOUT_MS = 20_000L
+    internal const val CONFIRM_TIMEOUT_MS = 120_000L
 }
