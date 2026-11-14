@@ -117,6 +117,7 @@ object AutoLockController {
     }
 
     private suspend fun runEvaluation(context: Context, vin: String) = mutexFor(vin).withLock {
+        var startedActivityRecognition = false
         try {
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
@@ -128,7 +129,8 @@ object AutoLockController {
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
-            if (settings.useActivityRecognition) ActivityRecognitionManager.start(context)
+            ActivityRecognitionManager.start(context)
+            startedActivityRecognition = true
 
             // Wait for corroborating signals (activity + geofence) to promote CONFIRMING -> GRACE,
             // or time out and either proceed on the Bluetooth signal alone or skip, per settings.
@@ -194,13 +196,10 @@ object AutoLockController {
             // evaluation) -- a plain suspend call here would throw immediately instead of
             // running, leaving Activity Recognition updates registered indefinitely.
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                if (settingsUseActivityRecognition(context, vin)) ActivityRecognitionManager.stop(context)
+                if (startedActivityRecognition) ActivityRecognitionManager.stop(context)
             }
         }
     }
-
-    private suspend fun settingsUseActivityRecognition(context: Context, vin: String): Boolean =
-        runCatching { SettingsStore(context).autoLockConfig(vin).useActivityRecognition }.getOrDefault(false)
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
         val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
@@ -236,5 +235,5 @@ object AutoLockController {
         _state.update { it + (vin to it[vin].let { s -> (s ?: AutoLockEvalState()).copy(detection = next) }) }
     }
 
-    private const val CONFIRM_TIMEOUT_MS = 20_000L
+    private const val CONFIRM_TIMEOUT_MS = 120_000L
 }
