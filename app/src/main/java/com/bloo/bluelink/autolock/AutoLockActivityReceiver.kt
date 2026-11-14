@@ -11,17 +11,12 @@ import com.google.android.gms.location.DetectedActivity
  *  currently waiting on it. Ported from i5-AutoLock's `ActivityTransitionReceiver`. */
 class AutoLockActivityReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (com.bloo.bluelink.data.BootGate.isLocked(context)) return
         if (!ActivityTransitionResult.hasResult(intent)) return
         val result = ActivityTransitionResult.extractResult(intent) ?: return
         val walkedAway = result.transitionEvents.any {
             it.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER &&
                 (it.activityType == DetectedActivity.WALKING || it.activityType == DetectedActivity.ON_FOOT)
         }
-        if (!walkedAway) return
-        // Every in-process evaluation currently waiting on a walk-away confirmation gets the
-        // state-machine nudge. Walking transitions are app-wide (one registration), so this
-        // confirms all of them at once.
-        AutoLockController.onWalkingConfirmedAny()
+        if (walkedAway) AutoLockController.onWalkingConfirmedAny()
     }
 }
