@@ -23,13 +23,13 @@ import kotlin.math.min
 import kotlinx.coroutines.flow.first
 
 /** The size of a car that has gone off the edge, as a share of its icon: it shrinks into a pin as it reaches the edge. */
-internal const val EdgePinScale = 0.75f
+internal const val EdgePinScale = 0.9f
 
 /** How transparent a car gets once it is fully an edge pin: 20%, so it reads as a car that has left the view rather than one still there. */
 internal const val EdgePinAlphaLoss = 0.2f
 
 /** How far past the edge a car travels while it morphs from its icon into its edge pin, in dp. */
-internal val EdgeMorphDp = 72.dp
+internal val EdgeMorphDp = 0.dp
 
 /** Where a car's icon is kept clear of the map's edges, in dp: the top and bottom carry the bar and the buttons. */
 internal val EdgeInsetSidesDp = 44.dp

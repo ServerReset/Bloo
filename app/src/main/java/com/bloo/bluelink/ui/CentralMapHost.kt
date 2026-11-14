@@ -93,7 +93,8 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             else -> {
                 val target = closingTo ?: homeVin
                 val screen = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
-                target?.let { centralMap.cardBounds(it) }?.takeIf { it.overlaps(screen) } ?: fallback
+                // Only a card whose centre is on screen is a place to land: a card half off the edge would have the map fly toward that edge.
+                target?.let { centralMap.cardBounds(it) }?.takeIf { screen.contains(it.center) } ?: fallback
             }
         }
     }
