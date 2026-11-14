@@ -139,7 +139,12 @@ object AutoLockController {
                 if (System.currentTimeMillis() > confirmDeadline) {
                     val confirmed = walkAwayConfirmed.contains(vin)
                     if ((settings.useActivityRecognition || settings.useGeofence) && !confirmed) {
-                        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
+                        _state.update {
+                            it + (vin to AutoLockEvalState(
+                                detection = DetectionState.SKIPPED,
+                                lastOutcome = "Skipped. No walk was detected, so the car was not locked.",
+                            ))
+                        }
                         AppLog.log("AutoLock: no walk-away confirmation for $vin — not locking.")
                         return@withLock
                     }
@@ -181,7 +186,9 @@ object AutoLockController {
 
             when (val decision = LockPolicy.decide(status, dontLockIfOpen = settings.dontLockIfOpen)) {
                 is LockDecision.Skip -> {
-                    _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED)) }
+                    _state.update {
+                        it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED, lastOutcome = "Skipped. ${decision.reason}."))
+                    }
                     AppLog.log("AutoLock: skipped for $vin — ${decision.reason}.")
                 }
                 LockDecision.Lock -> performLock(context, vin, settings)
@@ -228,7 +235,7 @@ object AutoLockController {
 
     private fun fail(vin: String, message: String) {
         AppLog.log("⚠ $message")
-        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR)) }
+        _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ERROR, lastOutcome = message)) }
     }
 
     private fun advance(vin: String, next: DetectionState) {
