@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -71,7 +73,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.isActive
 import com.bloo.uicommon.LocalPowerPolicy
 
 /** How many frames the first map in a process waits before it composes, so it lands after the cards and photos the garage draws first. */
@@ -433,6 +434,12 @@ private fun CarMapBody(
 private val CarIconWidth = 72.dp
 private val CarIconHeight = 48.dp
 
+/** How much smaller a car's picture gets once it is pinned at the edge (a fraction of its size). */
+private const val PinShrink = 0.1f
+
+/** How transparent a pinned car's picture gets (a fraction). */
+private const val PinFade = 0.2f
+
 /**
  * Every car on the map as its own icon (its photo, or the car glyph), at the place the car is. A car that goes past the edge of the map
  * morphs into a small pin on that edge, and cars whose pins land together share one pill of their photos (up to [PillMaxPhotos], then a
@@ -480,6 +487,13 @@ internal fun BoxScope.CarIconLayer(
     Box(Modifier.matchParentSize().onSizeChanged { viewport = it })
     for ((index, car) in cars.withIndex()) {
         key(car.vin) {
+            // How far a car is into its edge pin: 0 on screen, 1 at the edge. A spring, so it overshoots and settles: the car bounces
+            // as it crosses the edge in either direction, and its picture gets a little smaller and more transparent when it is pinned.
+            val pinT = remember(car.vin) { Animatable(0f) }
+            val offEdge by remember(car.vin, index) { derivedStateOf { markers()[index].offEdge } }
+            LaunchedEffect(offEdge) {
+                pinT.animateTo(if (offEdge) 1f else 0f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessMediumLow))
+            }
             val isFollower = { leaders[index] != index }
             val isPillLeader = { leaders[index] == index && leaders.count { it == index } > 1 }
             val tileModifier = Modifier.align(Alignment.Center)
@@ -498,10 +512,11 @@ internal fun BoxScope.CarIconLayer(
                 .graphicsLayer {
                     // A follower in a pill is hidden: its photo is in the leader's pill instead.
                     val hidden = isFollower()
-                    val s = if (hidden) 0f else markers()[index].scale
+                    val t = pinT.value
+                    val s = if (hidden) 0f else (1f - PinShrink * t).coerceAtLeast(0f)
                     scaleX = s
                     scaleY = s
-                    alpha = if (hidden) 0f else markers()[index].alpha
+                    alpha = if (hidden) 0f else (1f - PinFade * t).coerceIn(0f, 1f)
                 }
             if (isPillLeader()) {
                 CarPillCluster(
