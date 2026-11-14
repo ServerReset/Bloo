@@ -30,7 +30,8 @@ class EdgePinTest {
         val p = pin(900f, 0f)
         assertEquals(200f, p.x, 0.001f)
         assertEquals(0f, p.y, 0.001f)
-        assertEquals(0.75f, p.scale, 0.001f)
+        assertEquals(0.9f, p.scale, 0.001f)
+        assertEquals(0.8f, p.alpha, 0.001f)
     }
 
     @Test
