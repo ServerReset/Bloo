@@ -120,7 +120,8 @@ object AutoLockController {
         try {
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
-            val settings = SettingsStore(context).autoLockConfig(vin)
+            // Physical detection is mandatory: a walk must be confirmed by Activity Recognition before a lock, whatever is saved.
+            val settings = SettingsStore(context).autoLockConfig(vin).copy(useActivityRecognition = true)
             if (!settings.enabled) return@withLock
 
             val sm = LockStateMachine(settings.useActivityRecognition, settings.useGeofence).also { machines[vin] = it }
