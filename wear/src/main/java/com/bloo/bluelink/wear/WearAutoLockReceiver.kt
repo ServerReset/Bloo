@@ -7,6 +7,7 @@ import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -27,14 +28,26 @@ class WearAutoLockReceiver : BroadcastReceiver() {
             try {
                 val vehicles = runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList())
                 for (vin in WearAutoLock.targets(vehicles)) {
-                    val outcome = runCatching { runWatchCommandChecked(app, vin, CarAction.LOCK) }
+                    val locked = lockWithRetry(app, vin)
                     // What it did is said on the wrist (and the phone's own Auto lock says the same on the phone).
                     val name = vehicles.firstOrNull { it.vin == vin }?.name ?: "your car"
-                    runCatching { WearNotifier.autoLockResult(app, vin, name, outcome.getOrElse { false }) }
+                    runCatching { WearNotifier.autoLockResult(app, vin, name, locked) }
                 }
             } finally {
                 result.finish()
             }
         }
+    }
+
+    /**
+     * One lock, retried twice (2.5s, then 5s apart) when the car does not answer: a network blip should not leave the car open. The phone's
+     * AutoLock does the same.
+     */
+    private suspend fun lockWithRetry(app: Context, vin: String): Boolean {
+        repeat(3) { attempt ->
+            if (runCatching { runWatchCommandChecked(app, vin, CarAction.LOCK) }.getOrElse { false }) return true
+            if (attempt < 2) delay(if (attempt == 0) 2_500L else 5_000L)
+        }
+        return false
     }
 }
