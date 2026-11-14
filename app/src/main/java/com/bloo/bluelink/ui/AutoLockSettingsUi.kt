@@ -345,7 +345,7 @@ private fun AutoLockSettings(
             )
             if (gen5w) {
                 BodySmallText(
-                    "This head unit is slow to lock, so keep the grace period low.",
+                    "Gen 5W head units are slow to lock, so most of the delay is theirs. Lower the grace period to lock sooner.",
                 )
             }
 
