@@ -427,6 +427,7 @@ private fun BluetoothDevicePicker(vm: AppViewModel, onPick: (PairedDevice) -> Un
 
 private fun DetectionState.label(): String = when (this) {
     DetectionState.IDLE -> "Idle"
+    DetectionState.ARMED -> "Watching for you to leave"
     DetectionState.CONFIRMING -> "Confirming you left"
     DetectionState.GRACE -> "Locking soon"
     DetectionState.VERIFYING -> "Checking the car"
