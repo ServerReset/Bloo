@@ -446,36 +446,16 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
 
-    // Choosing and cropping a car photo, for whichever page (or request) asked for one.
-    CarPhotoPickerHost(vm, photoPickRequest)
-
-    // A picture or a settings file shared into the app from the share sheet.
-    ShareIntakeHost(vm, stateHolder)
-
-    // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
-    androidx.compose.animation.AnimatedVisibility(
-        visible = welcomeCardsOpen,
-        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
-        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),
-    ) {
-        Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, OnboardingMode.Replay) }
-    }
-    // The pre-install guide: shown before the system installer runs when Shizuku is off, so the
-    // Play-Protect steps are seen before the sheet appears rather than after it looks broken.
-    if (showInstallGuide) {
-        UpdateInstallGuideDialog(
-            onDismiss = { vm.dismissInstallGuide() },
-            onContinue = { vm.confirmInstallUpdate() },
-        )
-    }
-    // The migration bridge's notice used to live here. It, and the whole dev-key signing path that
-    // produced the build it shipped in, is gone -- that build is published and immutable, and no
-    // build from this repo may be signed with the development key again. What reaches installs on
-    // the old key now is the release text itself: see the title and changelog steps in
-    // .github/workflows/android.yml.
-    if (showShortcuts) ShortcutsDialog(onDismiss = { showShortcuts = false })
-    // Every open dialog, above everything else.
-    DialogLayer(dialogHost)
+    AppOverlays(
+        vm = vm,
+        stateHolder = stateHolder,
+        photoPickRequest = photoPickRequest,
+        welcomeCardsOpen = welcomeCardsOpen,
+        showInstallGuide = showInstallGuide,
+        showShortcuts = showShortcuts,
+        dialogHost = dialogHost,
+        onShortcutsDismiss = { showShortcuts = false },
+    )
     }
     }
 }
@@ -508,6 +488,53 @@ internal const val FOUR_COLUMN_MIN_DP = 1500
  * (An earlier take collapsed this to `width / 600`, which showed one wide car instead of the grid --
  * wrong: a large screen wants MORE columns, not fewer.)
  */
+
+/**
+ * The layers drawn over the app: the photo picker, the share intake, the welcome cards, the install guide, the shortcuts sheet and
+ * every open dialog. Each reads its own request from the app state, so the app's screen body does not carry them.
+ */
+@Composable
+private fun AppOverlays(
+    vm: AppViewModel,
+    stateHolder: State<UiState>,
+    photoPickRequest: String?,
+    welcomeCardsOpen: Boolean,
+    showInstallGuide: Boolean,
+    showShortcuts: Boolean,
+    dialogHost: DialogHost,
+    onShortcutsDismiss: () -> Unit,
+) {
+    // Choosing and cropping a car photo, for whichever page (or request) asked for one.
+    CarPhotoPickerHost(vm, photoPickRequest)
+
+    // A picture or a settings file shared into the app from the share sheet.
+    ShareIntakeHost(vm, stateHolder)
+
+    // The welcome cards, when summoned from Settings: over the app, dismissed back to it.
+    androidx.compose.animation.AnimatedVisibility(
+        visible = welcomeCardsOpen,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(MotionMedium)),
+        exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(MotionShort)),
+    ) {
+        Box(Modifier.fillMaxSize()) { OnboardingScreen(vm, OnboardingMode.Replay) }
+    }
+    // The pre-install guide: shown before the system installer runs when Shizuku is off, so the
+    // Play-Protect steps are seen before the sheet appears rather than after it looks broken.
+    if (showInstallGuide) {
+        UpdateInstallGuideDialog(
+            onDismiss = { vm.dismissInstallGuide() },
+            onContinue = { vm.confirmInstallUpdate() },
+        )
+    }
+    // The migration bridge's notice used to live here. It, and the whole dev-key signing path that
+    // produced the build it shipped in, is gone -- that build is published and immutable, and no
+    // build from this repo may be signed with the development key again. What reaches installs on
+    // the old key now is the release text itself: see the title and changelog steps in
+    // .github/workflows/android.yml.
+    if (showShortcuts) ShortcutsDialog(onDismiss = { onShortcutsDismiss() })
+    // Every open dialog, above everything else.
+    DialogLayer(dialogHost)
+}
 
 internal fun carColumnsFor(widthDp: Float): Int = when {
     widthDp >= FOUR_COLUMN_MIN_DP -> 4
