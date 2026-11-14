@@ -34,6 +34,7 @@ fun SettingsStore.autoLockConfig(vin: String, p: Preferences): AutoLockConfig {
         enabled = b("autolock_enabled_$vin", false), deviceAddress = s("autolock_device_addr_$vin"),
         deviceName = s("autolock_device_name_$vin"), graceSeconds = i("autolock_grace_$vin", 30),
         dryRun = b("autolock_dry_run_$vin", false),
+        useActivityRecognition = b("autolock_use_activity_$vin", true),
     )
 }
 
@@ -70,6 +71,7 @@ suspend fun SettingsStore.setAutoLockConfig(vin: String, config: AutoLockConfig)
         if (config.deviceName == null) it.remove(nameKey) else it[nameKey] = config.deviceName
         it[stringPreferencesKey("autolock_grace_$vin")] = config.graceSeconds.toString()
         it[booleanPreferencesKey("autolock_dry_run_$vin")] = config.dryRun
+        it[booleanPreferencesKey("autolock_use_activity_$vin")] = config.useActivityRecognition
     }
     // Maintain the registry of "cars with AutoLock configured" so the Bluetooth
     // receiver -- which starts from a raw device MAC or a VIN, not a UI selection -- can

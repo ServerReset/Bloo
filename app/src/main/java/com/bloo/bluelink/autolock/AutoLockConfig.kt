@@ -18,6 +18,9 @@ data class AutoLockConfig(
      *  "would have locked" instead. Off by default: picking a car is the person turning auto-lock on, and a
      *  dry run left on looks exactly like a lock that never happens. Settings can still turn it on to test. */
     val dryRun: Boolean = false,
+    /** Physical detection: the car is locked only after Activity Recognition sees the person walking away from it. When on, a walk that
+     *  is never confirmed means no lock. Saved per car, and on by default. */
+    val useActivityRecognition: Boolean = true,
 ) {
     /** Whether this car has enough configured to ever actually trigger. */
     val isUsable: Boolean get() = deviceAddress != null

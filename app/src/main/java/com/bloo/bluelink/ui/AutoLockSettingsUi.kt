@@ -350,6 +350,12 @@ private fun AutoLockSettings(
             }
 
             ToggleRow(
+                "Physical detection",
+                current.useActivityRecognition,
+                description = "Locks only once Activity Recognition sees you walking away from the car. Without a walk, the car is not locked.",
+            ) { update(current.copy(useActivityRecognition = it)) }
+
+            ToggleRow(
                 "Dry run (testing mode)",
                 current.dryRun,
                 description = if (current.dryRun) {
