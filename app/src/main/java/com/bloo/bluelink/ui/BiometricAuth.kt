@@ -18,6 +18,9 @@ fun Context.findFragmentActivity(): FragmentActivity? {
 }
 
 /** Shows the system biometric prompt and routes the result to callbacks. */
+/** The activity whose biometric prompt is on screen, if any. See [showBiometricPrompt]. */
+private var inFlight: java.lang.ref.WeakReference<FragmentActivity>? = null
+
 fun showBiometricPrompt(
     activity: FragmentActivity,
     title: String,
@@ -25,16 +28,24 @@ fun showBiometricPrompt(
     onSuccess: () -> Unit,
     onError: (String) -> Unit,
 ) {
+    // One prompt at a time: a second request while one is on screen is ignored, so the lock never stacks two fingerprint prompts.
+    // The guard clears when that prompt succeeds, fails or is cancelled, or when its activity is gone.
+    val showing = inFlight?.get()
+    if (showing != null && !showing.isDestroyed && !showing.isFinishing) return
+    inFlight = java.lang.ref.WeakReference(activity)
+    val done = { inFlight = null }
     val executor = ContextCompat.getMainExecutor(activity)
     val prompt = BiometricPrompt(
         activity,
         executor,
         object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                done()
                 onSuccess()
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                done()
                 onError(errString.toString())
             }
         },

@@ -340,7 +340,8 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                         onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
                         updateChecking = loginUpdateChecking,
                         updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
-                        onFingerprint = if (vm.canUseBiometrics()) ({ vm.promptBiometricUnlock(loginContext) }) else null,
+                        // Once the phone's lock is confirmed for this boot, the login screen does not offer the fingerprint button again.
+                        onFingerprint = if (vm.canUseBiometrics() && !stateHolder.value.bootDeviceLockProven) ({ vm.promptBiometricUnlock(loginContext) }) else null,
                     )
                     kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
                     canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }

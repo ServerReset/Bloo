@@ -128,6 +128,7 @@ internal fun LockOverlay(vm: AppViewModel, opaqueBackdrop: Boolean = false) {
             ) {
                 MorphButtonLabel(Icons.Filled.Fingerprint, "Unlock", pending = false, iconSize = 24.dp)
             }
+            MorphTextButton("Go back to login", onClick = { haptics?.click(); vm.lockToLogin() })
         }
     }
 }
