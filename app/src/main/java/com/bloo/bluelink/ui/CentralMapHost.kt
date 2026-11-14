@@ -160,6 +160,8 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         chromeInsets = centralMap.chromeInsets,
         // Closing goes straight to the floating place: the car it closes for is the one the bar shows, which a swipe or a pin tap has already chosen.
         onOpen = { centralMap.open(hostVehicle.vin) },
+        // Set before the collapse starts: the map lands on the car the bar shows (the one a swipe or pin tap chose), not the car it was opened for.
+        beforeClose = { centralMap.closingTo = centralMap.currentVin ?: centralMap.homeVin },
         onDismiss = {
             // The closed map rests in the card it closed onto: the garage's current car.
             (centralMap.closingTo ?: centralMap.currentVin)?.let { centralMap.rest(it) }

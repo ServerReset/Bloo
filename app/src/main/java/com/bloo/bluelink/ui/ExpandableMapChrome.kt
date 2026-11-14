@@ -77,9 +77,7 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.ui.unit.Density
 import androidx.compose.runtime.State
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.geometry.Size
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -159,21 +157,12 @@ internal enum class MapBarMode { Handle, Line, Details }
  * It is a [RoundedCornerShape] rather than a plain [Shape]: the glass only refracts a rounded corner, and any other shape falls back to
  * the flat frosted blur whatever the glass setting says.
  */
-private class BlendCornerSize(private val detailsT: Float) : CornerSize {
+private class BlendCornerSize(private val detailsT: State<Float>) : CornerSize {
     override fun toPx(shapeSize: Size, density: Density): Float {
         val pill = shapeSize.height / 2f
         val panel = with(density) { DetailsPanelCorner.toPx() }
-        return (pill + (panel - pill) * detailsT).coerceIn(0f, shapeSize.minDimension / 2f)
+        return (pill + (panel - pill) * detailsT.value).coerceIn(0f, shapeSize.minDimension / 2f)
     }
-}
-
-/**
- * The bar's corner, read at draw time from the animated value. A shape built from a value read in composition recomposed the whole bar
- * on every frame of the details spring; this one reads the value only when its outline is drawn.
- */
-private class BlendedBarShape(private val detailsT: State<Float>) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
-        RoundedCornerShape(BlendCornerSize(detailsT.value)).createOutline(size, layoutDirection, density)
 }
 
 /** The handle-only bar's width: the handle with a little glass around it. The bar grows from this to the single line when a car is selected. */
@@ -542,7 +531,9 @@ private fun MapBarCard(
     val spring = lowPowerCalm<Float>(Spring.StiffnessMediumLow)
     // Read as a State, never as a value in composition: the bar's shape and its reveal read it at draw and layout time only.
     val detailsTState = animateFloatAsState(targetValue = if (detailsOpen) 1f else 0f, animationSpec = spring, label = "mapBarDetails")
-    val barShape = remember(detailsTState) { BlendedBarShape(detailsTState) }
+    // A real RoundedCornerShape, so the liquid glass applies (any other shape falls back to frosted blur). Its corner reads the animated
+    // value only when the outline is drawn, so the details spring does not recompose the bar on every frame.
+    val barShape = remember(detailsTState) { RoundedCornerShape(BlendCornerSize(detailsTState)) }
     val density = LocalDensity.current
     val handleHeightPx = with(density) { 22.dp.toPx() }
     val lineHeightPx = with(density) { 60.dp.toPx() }
