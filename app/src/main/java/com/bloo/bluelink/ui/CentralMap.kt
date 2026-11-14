@@ -133,12 +133,6 @@ internal class CentralMap {
         homeVin = vin
     }
 
-    /** Closes the map: the bar and the anchor clear, and the map goes back to the card it rests in. */
-    fun dismiss() {
-        barShown = false
-        vin = null
-    }
-
     /**
      * Makes [car] the app's car: the garage moves to it, the bar shows it, and an open map glides to centre it. The one place the car
      * changes, for a bar swipe and a pin tap alike.
