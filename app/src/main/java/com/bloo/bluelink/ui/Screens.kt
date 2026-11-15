@@ -250,18 +250,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                 transitionSpec = { tween(MotionMedium) },
                 label = "screenTurn",
             ) { state -> if (state == EnterExitState.Visible) 0f else 1f }
-            Box(
-                Modifier.fillMaxSize().graphicsLayer {
-                    val away = turn
-                    rotationY = away * 14f
-                    val s = 1f - 0.05f * away
-                    scaleX = s
-                    scaleY = s
-                    alpha = 1f - 0.4f * away
-                    translationY = away * 8.dp.toPx()
-                    cameraDistance = 420.dp.toPx()
-                }
-            ) {
+            Box(Modifier.fillMaxSize().screenTurnLayer { turn }) {
             // The garage draws full-bleed; other screens are inset by the Scaffold.
             when (screen) {
                 // Bootstrapping placeholder (see Screen.Loading): same aurora + wordmark as Login,
@@ -570,6 +559,21 @@ LaunchedEffect(searchHidden) {
         searchRise.snapTo(target)
     }
 }
+}
+
+/**
+ * The page-turn on a whole-screen change: the leaving screen leans away and dims, the arriving one leans back in. [turn] is read in the
+ * draw phase, so the turn never recomposes the screen it is on.
+ */
+private fun Modifier.screenTurnLayer(turn: () -> Float): Modifier = graphicsLayer {
+    val away = turn()
+    rotationY = away * 14f
+    val s = 1f - 0.05f * away
+    scaleX = s
+    scaleY = s
+    alpha = 1f - 0.4f * away
+    translationY = away * 8.dp.toPx()
+    cameraDistance = 420.dp.toPx()
 }
 
 /**
