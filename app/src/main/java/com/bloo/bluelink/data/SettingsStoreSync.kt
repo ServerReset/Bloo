@@ -173,6 +173,46 @@ private suspend fun SettingsStore.recordUploadedPass(
 }
 
 /**
+ * The import half of a pass: decides whether the file's settings should come in (the change gate, or the first sync after an update), and imports them
+ * as a full adopt or a protected merge. Returns whether anything was imported. The gate, not a flag, is what stops a file re-importing itself.
+ */
+private suspend fun SettingsStore.importRemoteSettings(
+    remoteJson: String?,
+    remoteHasContent: Boolean,
+    remoteHash: String?,
+    remoteTs: Long,
+    pullPrimary: Boolean,
+): Boolean {
+    // Adopt-mode + import-gate decision.
+    val syncedEver = syncSyncedEver()
+    // Change gate: prefer the content HASH (skew-immune, and it self-detects a no-op so two devices
+    // don't ping-pong re-imports); fall back to the file's modified-time only when the file
+    // predates the hash (an un-updated client last wrote it and dropped our additive keys).
+    val gatePassed = if (remoteHash != null) remoteHash != syncLastHash() else remoteTs > lastSyncMs()
+    // Every other pass is a normal field-level protected merge.
+    val fullAdopt = pullPrimary || !syncedEver
+    val shouldImport = remoteHasContent && (pullPrimary || !syncedEver || gatePassed)
+    var imported = false
+    // No `&& remoteJson != null` here: remoteHasContent (folded into shouldImport above) already
+    // requires it, and K2 proves it -- the extra check was dead code.
+    if (shouldImport) {
+        imported = if (fullAdopt) {
+            adoptSettingsJson(remoteJson)
+        } else {
+            mergeSettingsJson(remoteJson, protect = dirtyKeys())
+        }
+        if (imported) {
+            AppLog.log(if (fullAdopt) "Drive sync: adopted settings from file" else "Drive sync: imported newer settings")
+            // Record the content we just took, so this pass's own state matches the file and the
+            // next pass's gate is a no-op (no self-reimport).
+            if (remoteHash != null) setSyncLastHash(remoteHash)
+            setSyncSyncedEver(true)
+        }
+    }
+    return imported
+}
+
+/**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
  * when it's newer than our last sync (by the file's real last-modified time, falling back to a
  * timestamp embedded in the file for providers that don't expose one), then upload our current
@@ -218,33 +258,8 @@ suspend fun SettingsStore.performMainToMainSync(
     val resolvedFileId = remoteMeta?.fileId ?: cachedFileId ?: java.util.UUID.randomUUID().toString()
     if (resolvedFileId != cachedFileId) setSyncFileId(resolvedFileId)
 
-    // Adopt-mode + import-gate decision.
     val pullPrimary = syncPullPrimary()
-    val syncedEver = syncSyncedEver()
-    // Change gate: prefer the content HASH (skew-immune, and it self-detects a no-op so two devices
-    // don't ping-pong re-imports); fall back to the file's modified-time only when the file
-    // predates the hash (an un-updated client last wrote it and dropped our additive keys).
-    val gatePassed = if (remoteHash != null) remoteHash != syncLastHash() else remoteTs > lastSyncMs()
-    // Every other pass is a normal field-level protected merge.
-    val fullAdopt = pullPrimary || !syncedEver
-    val shouldImport = remoteHasContent && (pullPrimary || !syncedEver || gatePassed)
-    var imported = false
-    // No `&& remoteJson != null` here: remoteHasContent (folded into shouldImport above) already
-    // requires it, and K2 proves it -- the extra check was dead code.
-    if (shouldImport) {
-        imported = if (fullAdopt) {
-            adoptSettingsJson(remoteJson)
-        } else {
-            mergeSettingsJson(remoteJson, protect = dirtyKeys())
-        }
-        if (imported) {
-            AppLog.log(if (fullAdopt) "Drive sync: adopted settings from file" else "Drive sync: imported newer settings")
-            // Record the content we just took, so this pass's own state matches the file and the
-            // next pass's gate is a no-op (no self-reimport).
-            if (remoteHash != null) setSyncLastHash(remoteHash)
-            setSyncSyncedEver(true)
-        }
-    }
+    val imported = importRemoteSettings(remoteJson, remoteHasContent, remoteHash, remoteTs, pullPrimary)
     // `!syncedEver` right above doesn't have this problem -- it's derived from persisted state, not
     // a flag this function clears itself, so a failed pass naturally retries it next time; this
     // one-shot flag needs the same self-healing property.
