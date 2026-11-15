@@ -77,6 +77,9 @@ internal class CentralMap {
     /** While the map is collapsing, the car whose card it collapses onto. */
     var closingTo by mutableStateOf<String?>(null)
 
+    /** The card's rectangle when the collapse began: the collapse aims at this, so the landing point does not move while it runs. */
+    var closeRect: Rect? = null
+
     /** The window's size, kept by the host, so a card can be judged on or off screen. */
     var screen: Size = Size.Zero
 
