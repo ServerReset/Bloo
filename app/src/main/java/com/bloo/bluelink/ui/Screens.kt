@@ -356,15 +356,8 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
             }
         }
         // Toasts pop up from BEHIND the search element, so they are drawn before it (and after the page).
-        Box(Modifier.fillMaxSize()) {
-            ToastHost(
-                state = toasts,
-                hazeState = searchHazeState,
-                onCopy = { text ->
-                    scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
-                },
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
+        ToastLayer(toasts, searchHazeState) { text ->
+            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
         }
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.
@@ -504,6 +497,19 @@ private fun GarageLayer(
             if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, centralMap, hazeState = searchHazeState)
             }
         }
+}
+
+/** The toasts, drawn from behind the search element. Their copy action is the caller's. */
+@Composable
+private fun ToastLayer(toasts: ToastState, searchHazeState: HazeState, onCopy: (String) -> Unit) {
+    Box(Modifier.fillMaxSize()) {
+        ToastHost(
+            state = toasts,
+            hazeState = searchHazeState,
+            onCopy = onCopy,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
 }
 
 /**
