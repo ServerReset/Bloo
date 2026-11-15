@@ -93,8 +93,8 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             else -> {
                 val target = closingTo ?: homeVin
                 val screen = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
-                // Only a card whose centre is on screen is a place to land: a card half off the edge would have the map fly toward that edge.
-                target?.let { centralMap.cardBounds(it) }?.takeIf { screen.contains(it.center) } ?: fallback
+                // Only a card wholly on screen is a place to land: a card partly off the edge would have the map fly toward that edge.
+                target?.let { centralMap.cardBounds(it) }?.takeIf { screen.contains(it.topLeft) && screen.contains(it.bottomRight) } ?: fallback
             }
         }
     }
@@ -164,7 +164,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         // Set before the collapse starts: the map lands on the car the bar shows (the one a swipe or pin tap chose), not the car it was opened for.
         beforeClose = {
             centralMap.closingTo = centralMap.currentVin ?: centralMap.homeVin
-            com.bloo.bluelink.data.AppLog.log("Map: closing onto ${centralMap.closingTo} (bar shows ${centralMap.currentVin}, opened for ${centralMap.vin})")
+            com.bloo.bluelink.data.AppLog.log("Map: closing onto ${centralMap.closingTo} at ${centralMap.closingTo?.let { centralMap.cardBounds(it) }} (bar shows ${centralMap.currentVin}, opened for ${centralMap.vin})")
         },
         onDismiss = {
             // The closed map rests in the card it closed onto: the garage's current car.
