@@ -135,24 +135,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // Calm rather than bouncy: the bar glides up and settles, instead of snapping up with an overshoot.
     // The same easing and length as the map itself (ExpandableMap's open and close), so the bar rises and drops in step with the map. A
     // spring of its own ran on a different timeline, so the bar jumped against the map's motion when a map opened or closed.
-    val plainRise = LocalReduceMotion.current || LocalPowerPolicy.current.lean
-    val searchRiseSpec: androidx.compose.animation.core.AnimationSpec<Float> = if (plainRise) {
-        androidx.compose.animation.core.tween(160)
-    } else {
-        androidx.compose.animation.core.tween(durationMillis = 480, easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0f, 0.2f, 1f))
-    }
-    LaunchedEffect(searchHidden) {
-        // A lock hides the bar at once, under the blur. Everything else animates it.
-        if (locked) {
-            searchRise.snapTo(1f)
-        } else {
-            val target = if (searchHidden) 1f else 0f
-            searchRise.animateTo(target, searchRiseSpec)
-            // The spring stops a hair short of its target, and the offset below is that fraction of the whole screen: land on the
-            // target exactly, so the bar rests where it belongs and not a pixel off it.
-            searchRise.snapTo(target)
-        }
-    }
+    SearchRiseEffect(locked, searchHidden, searchRise)
     val screenHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     // Derived too, so only a photo pick / welcome-card / install-guide change recomposes the root:
     // reading `state.x` directly here subscribed BlooApp to EVERY UiState emission.
@@ -561,6 +544,32 @@ private fun LoginPage(
             kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
             canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
     }
+}
+
+/**
+ * Brings the search bar up from below the edge, and drops it out, as the lock or the full-screen map hides or shows it. The spec is built
+ * in composition (the reduce-motion and battery flags are composition locals); the lock hides it at once, everything else animates it.
+ */
+@Composable
+private fun SearchRiseEffect(locked: Boolean, searchHidden: Boolean, searchRise: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>) {
+val plainRise = LocalReduceMotion.current || LocalPowerPolicy.current.lean
+val searchRiseSpec: androidx.compose.animation.core.AnimationSpec<Float> = if (plainRise) {
+    androidx.compose.animation.core.tween(160)
+} else {
+    androidx.compose.animation.core.tween(durationMillis = 480, easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0f, 0.2f, 1f))
+}
+LaunchedEffect(searchHidden) {
+    // A lock hides the bar at once, under the blur. Everything else animates it.
+    if (locked) {
+        searchRise.snapTo(1f)
+    } else {
+        val target = if (searchHidden) 1f else 0f
+        searchRise.animateTo(target, searchRiseSpec)
+        // The spring stops a hair short of its target, and the offset below is that fraction of the whole screen: land on the
+        // target exactly, so the bar rests where it belongs and not a pixel off it.
+        searchRise.snapTo(target)
+    }
+}
 }
 
 /**
