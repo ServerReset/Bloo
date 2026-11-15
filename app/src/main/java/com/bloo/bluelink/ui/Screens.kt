@@ -264,15 +264,8 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     }
     }
     }
-    // The map is drawn OUTSIDE the blur layer above, so the open map itself is never blurred; only the app behind it is. It sits over
-    // the app and under the status bar's blur, so the part of it that goes behind the status bar is blurred rather than cut off.
-    if (target == Screen.Garage && !(locked && !unlockedThisSession)) CentralMapHost(stateHolder, vm, centralMap, searchHazeState)
-    // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
-    // by the bottom of the strip. It is the ONLY edge treatment in the app.
-    StatusBarScrim(searchHazeState)
-    // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
-    // and dialogs sit above it.
-    PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)
+    AppLayers(target, locked, unlockedThisSession, stateHolder, vm, centralMap, searchHazeState, refreshIndicator)
+    }
     }
         // Biometric lock overlay, drawn over the blurred app; fades out on unlock.
         LockAlphaOverlay(locked = locked, vm = vm, opaqueBackdrop = !contentSettled)
@@ -593,6 +586,32 @@ private fun ScreenPage(
         is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
         Screen.Garage -> GarageLayer(appearance, refreshing, searchOpen, locked, unlockedThisSession, stateHolder, vm, centralMap, backdropHaze, searchHazeState)
     }
+}
+
+/**
+ * The layers over the app's pages, drawn in this order: the open map (outside the blur, so it is never blurred), the status bar's blur,
+ * and the pull-to-refresh disc. The lock overlay is drawn by the caller, above the blur.
+ */
+@Composable
+private fun AppLayers(
+    target: Screen,
+    locked: Boolean,
+    unlockedThisSession: Boolean,
+    stateHolder: State<UiState>,
+    vm: AppViewModel,
+    centralMap: CentralMap,
+    searchHazeState: HazeState,
+    refreshIndicator: RefreshIndicatorState,
+) {
+    // The map is drawn OUTSIDE the blur layer above, so the open map itself is never blurred; only the app behind it is. It sits over
+    // the app and under the status bar's blur, so the part of it that goes behind the status bar is blurred rather than cut off.
+    if (target == Screen.Garage && !(locked && !unlockedThisSession)) CentralMapHost(stateHolder, vm, centralMap, searchHazeState)
+    // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
+    // by the bottom of the strip. It is the ONLY edge treatment in the app.
+    StatusBarScrim(searchHazeState)
+    // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
+    // and dialogs sit above it.
+    PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)
 }
 
 /**
