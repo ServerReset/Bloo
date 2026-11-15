@@ -135,6 +135,44 @@ private suspend fun SettingsStore.readDriveFile(parsed: android.net.Uri): Pair<S
 }
 
 /**
+ * After a verified upload: the bookkeeping that records this pass's content as what the file now holds (the modified time, the dirty keys it
+ * carried, the content hash, the registry and primary caches, and the pending primary and removals it wrote). Only a pass whose upload landed reaches it.
+ */
+private suspend fun SettingsStore.recordUploadedPass(
+    parsed: android.net.Uri,
+    now: Long,
+    uploadedDirtyKeys: Set<String>,
+    localHash: String,
+    outcomeDevices: List<SyncMerge.SyncDevice>,
+    primaryToWrite: String?,
+    pendingPrimary: String?,
+    pendingRemovedIds: Set<String>,
+) {
+    // Keep the wall-clock lastSyncMs advancing IN PARALLEL with the hash gate: it's the
+    // fallback gate for a file an un-updated client overwrote (dropping `_hash`), so it
+    // must stay current or the fallback breaks exactly when it's needed.
+    val uploadedModifiedMs = providerLastModifiedMs(parsed)
+    setLastSyncMs(uploadedModifiedMs ?: now)
+    // Clear ONLY the keys this upload body actually carried, not the whole set -- an edit
+    // made after the body snapshot (setters don't hold mainToMainSyncMutex) is still
+    // pending and must stay dirty so a later remote import can't overwrite it.
+    clearDirtyKeys(uploadedDirtyKeys)
+    // The content-hash self-write guard: next pass reads this exact hash back and the gate
+    // is a no-op (mirrors the lastSyncMs self-guard).
+    setSyncLastHash(localHash)
+    setSyncSyncedEver(true)
+    // Cache the registry + primary for offline Settings display.
+    setSyncedDevicesCache(outcomeDevices)
+    setSyncPrimaryCache(primaryToWrite)
+    if (pendingPrimary != null) setSyncPrimaryPending(null)
+    // Same reasoning, same place: a kicked device is only truly gone once THIS upload --
+    // the one that actually wrote a registry without it -- has verifiably landed.
+    if (pendingRemovedIds.isNotEmpty()) {
+        setSyncPendingRemovedDeviceIds(syncPendingRemovedDeviceIds() - pendingRemovedIds)
+    }
+}
+
+/**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
  * when it's newer than our last sync (by the file's real last-modified time, falling back to a
  * timestamp embedded in the file for providers that don't expose one), then upload our current
@@ -323,30 +361,7 @@ suspend fun SettingsStore.performMainToMainSync(
                 uploadError = if (it is TimeoutCancellationException) "Timed out writing the Drive file" else it.message ?: "Couldn't write the Drive file"
                 AppLog.log("⚠ Drive sync: upload failed: ${it.message}")
             }.getOrElse { false }
-            if (uploaded) {
-                // Keep the wall-clock lastSyncMs advancing IN PARALLEL with the hash gate: it's the
-                // fallback gate for a file an un-updated client overwrote (dropping `_hash`), so it
-                // must stay current or the fallback breaks exactly when it's needed.
-                val uploadedModifiedMs = providerLastModifiedMs(parsed)
-                setLastSyncMs(uploadedModifiedMs ?: now)
-                // Clear ONLY the keys this upload body actually carried, not the whole set -- an edit
-                // made after the body snapshot (setters don't hold mainToMainSyncMutex) is still
-                // pending and must stay dirty so a later remote import can't overwrite it.
-                clearDirtyKeys(uploadedDirtyKeys)
-                // The content-hash self-write guard: next pass reads this exact hash back and the gate
-                // is a no-op (mirrors the lastSyncMs self-guard).
-                setSyncLastHash(localHash)
-                setSyncSyncedEver(true)
-                // Cache the registry + primary for offline Settings display.
-                setSyncedDevicesCache(outcomeDevices)
-                setSyncPrimaryCache(primaryToWrite)
-                if (pendingPrimary != null) setSyncPrimaryPending(null)
-                // Same reasoning, same place: a kicked device is only truly gone once THIS upload --
-                // the one that actually wrote a registry without it -- has verifiably landed.
-                if (pendingRemovedIds.isNotEmpty()) {
-                    setSyncPendingRemovedDeviceIds(syncPendingRemovedDeviceIds() - pendingRemovedIds)
-                }
-            }
+            if (uploaded) recordUploadedPass(parsed, now, uploadedDirtyKeys, localHash, outcomeDevices, primaryToWrite, pendingPrimary, pendingRemovedIds)
         }
     }
     val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
