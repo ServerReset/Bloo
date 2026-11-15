@@ -215,6 +215,25 @@ private suspend fun SettingsStore.importRemoteSettings(
 }
 
 /**
+ * The end of a pass: the error is persisted (not just returned), so a failure from the background periodic worker -- which has no live
+ * ViewModel to update -- still shows in Settings next time the app is opened. Returns what the caller reads back.
+ */
+private suspend fun SettingsStore.finishSyncPass(
+    error: String?,
+    imported: Boolean,
+    uploaded: Boolean,
+    now: Long,
+    outcomeDevices: List<SyncMerge.SyncDevice>,
+    primaryToWrite: String?,
+): SettingsStore.MainToMainSyncOutcome {
+    setLastSyncError(error)
+    return SettingsStore.MainToMainSyncOutcome(
+        ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
+        error = error, devices = outcomeDevices, primaryDeviceId = primaryToWrite, selfDeviceId = syncDeviceId(),
+    )
+}
+
+/**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
  * when it's newer than our last sync (by the file's real last-modified time, falling back to a
  * timestamp embedded in the file for providers that don't expose one), then upload our current
@@ -384,14 +403,7 @@ suspend fun SettingsStore.performMainToMainSync(
         }
     }
     val error = uploadError ?: downloadError?.takeIf { remoteContent == null }
-    // Persisted (not just returned) so a failure from the background periodic worker -- which has
-    // no live ViewModel/UiState to update -- still shows up in Settings next time the app is
-    // opened, instead of silently only ever reaching AppLog.
-    setLastSyncError(error)
-    return SettingsStore.MainToMainSyncOutcome(
-        ran = true, imported = imported, uploaded = uploaded, syncedAtMs = if (uploaded) now else lastSyncMs(),
-        error = error, devices = outcomeDevices, primaryDeviceId = primaryToWrite, selfDeviceId = syncDeviceId(),
-    )
+    return finishSyncPass(error, imported, uploaded, now, outcomeDevices, primaryToWrite)
 }
 
 /**
