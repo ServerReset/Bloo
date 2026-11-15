@@ -81,6 +81,42 @@ suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
 private var lastContentPeekMs = 0L
 
 /**
+ * Writes the sync body to the Drive file and reads it back: read-write-truncate, flushed to disk before the descriptor closes (a plain
+ * "wt" stream can close before the provider has the bytes), then verified against what was written. Throws when the write did not land.
+ */
+private suspend fun SettingsStore.writeDriveFile(parsed: android.net.Uri, body: String) {
+    withDriveRetry {
+        kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+            context.contentResolver.openFileDescriptor(parsed, "rwt")?.use { pfd ->
+                val out = java.io.FileOutputStream(pfd.fileDescriptor)
+                out.write(body.toByteArray())
+                out.flush()
+                pfd.fileDescriptor.sync()
+            } ?: error("Couldn't open the Drive file for writing")
+            val verify = context.readUriText(parsed)
+            if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
+        }
+    }
+}
+
+/**
+ * Whether the shared device registry has a real change to write: this device's own entry changed beyond its last-seen stamp, its heartbeat
+ * has fallen due, or another device's entry changed. Pure, so it is easy to read and to test.
+ */
+private fun registryChangedSince(
+    remoteDevices: List<SyncMerge.SyncDevice>,
+    outcomeDevices: List<SyncMerge.SyncDevice>,
+    self: SyncMerge.SyncDevice,
+    now: Long,
+): Boolean {
+    val remoteSelf = remoteDevices.firstOrNull { it.id == self.id }
+    val selfChanged = remoteSelf == null || remoteSelf.copy(lastSeenMs = self.lastSeenMs) != self
+    val heartbeatDue = remoteSelf == null || now - remoteSelf.lastSeenMs >= REGISTRY_HEARTBEAT_MS
+    val othersChanged = outcomeDevices.filterNot { it.id == self.id } != remoteDevices.filterNot { it.id == self.id }
+    return selfChanged || heartbeatDue || othersChanged
+}
+
+/**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
  * when it's newer than our last sync (by the file's real last-modified time, falling back to a
  * timestamp embedded in the file for providers that don't expose one), then upload our current
@@ -216,11 +252,7 @@ suspend fun SettingsStore.performMainToMainSync(
         // This device's own entry is stamped "seen now" on every pass, so comparing the whole registry always reads as changed and
         // every poll rewrote the file. Only a REAL change counts: another device's entry, this device's own name/model/version, or
         // the heartbeat falling due (so a quiet device still reads as active to the others).
-        val remoteSelf = remoteDevices.firstOrNull { it.id == self.id }
-        val selfChanged = remoteSelf == null || remoteSelf.copy(lastSeenMs = self.lastSeenMs) != self
-        val heartbeatDue = remoteSelf == null || now - remoteSelf.lastSeenMs >= REGISTRY_HEARTBEAT_MS
-        val othersChanged = outcomeDevices.filterNot { it.id == self.id } != remoteDevices.filterNot { it.id == self.id }
-        val registryChanged = selfChanged || heartbeatDue || othersChanged
+        val registryChanged = registryChangedSince(remoteDevices, outcomeDevices, self, now)
         val primaryChanged = primaryToWrite != remoteMeta?.primaryDeviceId
         val fileAlreadyCarriesUs = remoteHasContent && remoteHash != null && remoteHash == syncLastHash()
         val nothingToUpload = !SyncPoll.shouldUpload(
@@ -278,21 +310,7 @@ suspend fun SettingsStore.performMainToMainSync(
                 uploadError = "The Drive file changed during sync; it will retry."
             }
             uploaded = !fileChangedMidPass && runCatching {
-                withDriveRetry {
-                    kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                        // Read-write-truncate, flushed to disk before the descriptor closes. A plain "wt" stream can close
-                        // before the provider has the bytes, leaving the previous version in place.
-                        context.contentResolver.openFileDescriptor(parsed, "rwt")?.use { pfd ->
-                            val out = java.io.FileOutputStream(pfd.fileDescriptor)
-                            out.write(body.toByteArray())
-                            out.flush()
-                            pfd.fileDescriptor.sync()
-                        } ?: error("Couldn't open the Drive file for writing")
-                        val verify = context.readUriText(parsed)
-                        if (verify != body) error("Upload didn't verify: the Drive file doesn't match what was written")
-                    }
-                }
-                // Which document this device actually wrote: two phones that look like one file must show the same name here.
+                writeDriveFile(parsed, body)
                 AppLog.log("Drive sync: uploaded settings to ${parsed.lastPathSegment}")
                 true
             }.onFailure {
