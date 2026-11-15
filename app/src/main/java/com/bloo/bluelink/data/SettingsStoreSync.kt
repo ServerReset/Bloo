@@ -117,6 +117,24 @@ private fun registryChangedSince(
 }
 
 /**
+ * Reads the sync file from Drive, with the timeout and retry. Returns the text (null when the read failed) and the message for a failed read.
+ * The read closes its stream: readText() alone would leak a file descriptor to the Drive provider on every sync pass.
+ */
+private suspend fun SettingsStore.readDriveFile(parsed: android.net.Uri): Pair<String?, String?> {
+    var error: String? = null
+    val content = runCatching {
+        withDriveRetry {
+            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
+                context.readUriText(parsed)
+            }
+        }
+    }.onFailure {
+        error = if (it is TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
+    }.getOrNull()
+    return content to error
+}
+
+/**
  * One full bidirectional Drive-sync pass: download the file at [syncUri] (if configured), import it
  * when it's newer than our last sync (by the file's real last-modified time, falling back to a
  * timestamp embedded in the file for providers that don't expose one), then upload our current
@@ -147,19 +165,7 @@ suspend fun SettingsStore.performMainToMainSync(
     // Check the file's actual last-modified time from Drive.
     val fileModifiedMs = providerLastModifiedMs(parsed)
     // Download: read the existing file from Drive.
-    var downloadError: String? = null
-    val remoteContent = runCatching {
-        withDriveRetry {
-            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                // .use{} closes the InputStream (and its ParcelFileDescriptor); readText() alone
-                // does NOT close, leaking an FD to the Drive SAF provider on every sync pass. Still
-                // evaluates to String?.
-                context.readUriText(parsed)
-            }
-        }
-    }.onFailure {
-        downloadError = if (it is TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
-    }.getOrNull()
+    val (remoteContent, downloadError) = readDriveFile(parsed)
     val remoteJson = remoteContent?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }
     val remoteTs = fileModifiedMs ?: (remoteContent?.substringBefore('\n')?.toLongOrNull() ?: 0L)
     // The Drive-only metadata (content hash, primary, device registry). Absent fields → null/empty
