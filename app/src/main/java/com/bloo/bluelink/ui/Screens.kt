@@ -187,14 +187,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // Every message the ViewModels raise lands in the toast stack, carrying its own type so a later
     // message can never repaint an earlier one. clearMessage() right after keeps the single UiState
     // slot free for the next one, which stacks below instead of queueing behind.
-    LaunchedEffect(message) {
-        message?.let { msg ->
-            toasts.show(msg, messageType)
-            // The one arrival haptic: every message the app raises is felt, at the lightest weight.
-            haptics.arrive()
-            vm.clearMessage()
-        }
-    }
+    MessageToastEffect(message, messageType, toasts, haptics, vm)
 
     // The one search anchor: the search element publishes its resting rect/dock here and the toasts
     // and page spacers read it. See SearchAnchor.kt.
@@ -203,15 +196,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // Hardware-keyboard shortcuts (see KeyboardShortcuts.kt): the ones the root owns are heard here.
     var showShortcuts by remember { mutableStateOf(false) }
     val goBack = rememberBackAction()
-    LaunchedEffect(vm) {
-        vm.shortcutEvents.collect { event ->
-            when (event) {
-                Shortcut.Help -> showShortcuts = !showShortcuts
-                Shortcut.Back -> if (showShortcuts) showShortcuts = false else goBack()
-                else -> Unit
-            }
-        }
-    }
+    ShortcutEffect(vm, goBack, showShortcuts) { showShortcuts = it }
     // The accessibility suite, resolved once here; everything below reads LocalAccessibility, not the stored switches.
     val a11y = rememberAccessibility(appearance, powerPolicy)
     CompositionLocalProvider(
@@ -530,6 +515,33 @@ private fun LoadingSweepEffect(busy: Boolean, haptics: Haptics) {
             while (true) {
                 haptics.loadingSweep()
                 delay(560)
+            }
+        }
+    }
+}
+
+/** Every message the ViewModels raise lands in the toast stack, with its own type; the message is cleared straight away to free the slot. */
+@Composable
+private fun MessageToastEffect(message: String?, messageType: ToastKind, toasts: ToastState, haptics: Haptics, vm: AppViewModel) {
+    LaunchedEffect(message) {
+        message?.let { msg ->
+            toasts.show(msg, messageType)
+            // The one arrival haptic: every message the app raises is felt, at the lightest weight.
+            haptics.arrive()
+            vm.clearMessage()
+        }
+    }
+}
+
+/** The hardware-keyboard shortcuts the root owns: help toggles the sheet, back closes it or goes back. */
+@Composable
+private fun ShortcutEffect(vm: AppViewModel, goBack: () -> Unit, showShortcuts: Boolean, setShowShortcuts: (Boolean) -> Unit) {
+    LaunchedEffect(vm) {
+        vm.shortcutEvents.collect { event ->
+            when (event) {
+                Shortcut.Help -> setShowShortcuts(!showShortcuts)
+                Shortcut.Back -> if (showShortcuts) setShowShortcuts(false) else goBack()
+                else -> Unit
             }
         }
     }
