@@ -95,51 +95,43 @@ internal fun TripPlannerDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation, on
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Plan a trip", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onDismiss) { Text("Close") }
+    FullScreenDialog(title = "Plan a trip", onDismiss = onDismiss) {
+        Text(
+            "From the car's last position. The stops are where it charges on the way.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("Destination") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { search() }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Button(onClick = { search() }, enabled = !searching && query.isNotBlank(), modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(if (searching) "Searching…" else "Search")
+        }
+        note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            places.forEach { p ->
+                OutlinedButton(onClick = { planTo(p) }, enabled = !planning, modifier = Modifier.fillMaxWidth()) {
+                    Text(p.name, maxLines = 2)
                 }
-                Text(
-                    "From the car's last position. The stops are where it charges on the way.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Destination") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { search() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(onClick = { search() }, enabled = !searching && query.isNotBlank(), modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text(if (searching) "Searching…" else "Search")
-                }
-                note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    places.forEach { p ->
-                        OutlinedButton(onClick = { planTo(p) }, enabled = !planning, modifier = Modifier.fillMaxWidth()) {
-                            Text(p.name, maxLines = 2)
-                        }
-                    }
-                    if (planning) CircularProgressIndicator(Modifier.padding(8.dp))
-                    val result = plan
-                    val dest = chosen
-                    if (result != null && dest != null) {
-                        result.routes.forEach { RouteCard(it) }
-                        Button(
-                            onClick = { openDirections(context, dest) },
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        ) { Text("Navigate in Google Maps") }
-                    }
-                }
+            }
+            if (planning) CircularProgressIndicator(Modifier.padding(8.dp))
+            val result = plan
+            val dest = chosen
+            if (result != null && dest != null) {
+                result.routes.forEach { RouteCard(it) }
+                Button(
+                    onClick = { openDirections(context, dest) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                ) { Text("Navigate in Google Maps") }
             }
         }
     }
