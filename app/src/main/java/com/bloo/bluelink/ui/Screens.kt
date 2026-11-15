@@ -182,16 +182,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // quiet.
     val busy by remember { derivedStateOf { state.loading || state.pending.isNotEmpty() } }
     // The compose-ui LocalLifecycleOwner is deprecated.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(busy) {
-        if (!busy) return@LaunchedEffect
-        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
-                haptics.loadingSweep()
-                delay(560)
-            }
-        }
-    }
+    LoadingSweepEffect(busy, haptics)
 
     // Every message the ViewModels raise lands in the toast stack, carrying its own type so a later
     // message can never repaint an earlier one. clearMessage() right after keeps the single UiState
@@ -526,6 +517,21 @@ private fun ToastLayer(toasts: ToastState, searchHazeState: HazeState, onCopy: (
             onCopy = onCopy,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+    }
+}
+
+/** While the app is busy, the loading sweep is felt every 560 ms, for as long as the screen is started. */
+@Composable
+private fun LoadingSweepEffect(busy: Boolean, haptics: Haptics) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(busy) {
+        if (!busy) return@LaunchedEffect
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                haptics.loadingSweep()
+                delay(560)
+            }
+        }
     }
 }
 
