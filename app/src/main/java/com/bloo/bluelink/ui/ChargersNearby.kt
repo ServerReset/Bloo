@@ -82,43 +82,35 @@ internal fun ChargersNearbyDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation,
             .onSuccess { stations = it }
             .onFailure { error = it.message ?: "Bluelink wouldn't give the chargers near this car." }
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Chargers nearby", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
-                // The map is Google Maps, centred on the car, searching for EV charging: the same hand-off the trip planner uses.
-                TextButton(onClick = { openUrl(context, "https://www.google.com/maps/search/EV+charging+stations/@${at.latitude},${at.longitude},13z") }) {
-                    Text("Show on map")
-                }
-                Text(
-                    "Public chargers within $NEARBY_RADIUS_KM km of the car, nearest first. Tap one to start a paid charge.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-                active?.let { charge ->
-                    ActiveChargePanel(vm, v, charge) {
-                        store.clear(v.vin)
-                        active = null
-                    }
-                }
-                val list = stations
-                when {
-                    error != null -> Text(error.orEmpty())
-                    list == null -> CircularProgressIndicator()
-                    list.isEmpty() -> Text("No public chargers within $NEARBY_RADIUS_KM km.")
-                    else -> Column(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        list.forEach { s ->
-                            // Only a station with a charger to start, and no charge already running, can be picked.
-                            val pickable = s.chargerIds.isNotEmpty() && active == null
-                            ChargerRow(s, Modifier.fillMaxWidth().then(if (pickable) Modifier.clickable { picked = s } else Modifier))
-                        }
-                    }
+    FullScreenDialog(title = "Chargers nearby", onDismiss = onDismiss) {
+        // The map is Google Maps, centred on the car, searching for EV charging: the same hand-off the trip planner uses.
+        TextButton(onClick = { openUrl(context, "https://www.google.com/maps/search/EV+charging+stations/@${at.latitude},${at.longitude},13z") }) {
+            Text("Show on map")
+        }
+        Text(
+            "Public chargers within $NEARBY_RADIUS_KM km of the car, nearest first. Tap one to start a paid charge.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        active?.let { charge ->
+            ActiveChargePanel(vm, v, charge) {
+                store.clear(v.vin)
+                active = null
+            }
+        }
+        val list = stations
+        when {
+            error != null -> Text(error.orEmpty())
+            list == null -> CircularProgressIndicator()
+            list.isEmpty() -> Text("No public chargers within $NEARBY_RADIUS_KM km.")
+            else -> Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                list.forEach { s ->
+                    // Only a station with a charger to start, and no charge already running, can be picked.
+                    val pickable = s.chargerIds.isNotEmpty() && active == null
+                    ChargerRow(s, Modifier.fillMaxWidth().then(if (pickable) Modifier.clickable { picked = s } else Modifier))
                 }
             }
         }

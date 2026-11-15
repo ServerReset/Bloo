@@ -43,36 +43,28 @@ internal fun ChargeHistoryDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> 
             .onSuccess { orders = it }
             .onFailure { error = it.message ?: "Bluelink wouldn't give the charging history for this car." }
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Charging history", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
+    FullScreenDialog(title = "Charging history", onDismiss = onDismiss) {
+        Text(
+            "Paid sessions this month (${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${month.year}).",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+        val list = orders
+        when {
+            error != null -> Text(error.orEmpty())
+            list == null -> CircularProgressIndicator()
+            list.isEmpty() -> Text("No paid charging sessions this month.")
+            else -> {
+                val kwh = list.sumOf { it.kwh ?: 0.0 }
+                val spent = list.sumOf { it.total ?: 0.0 }
+                val currency = list.firstNotNullOfOrNull { it.currency }
                 Text(
-                    "Paid sessions this month (${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${month.year}).",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    "${list.size} sessions · ${"%.1f".format(kwh)} kWh · ${"%.2f".format(spent)}${currency?.let { " $it" }.orEmpty()}",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-                val list = orders
-                when {
-                    error != null -> Text(error.orEmpty())
-                    list == null -> CircularProgressIndicator()
-                    list.isEmpty() -> Text("No paid charging sessions this month.")
-                    else -> {
-                        val kwh = list.sumOf { it.kwh ?: 0.0 }
-                        val spent = list.sumOf { it.total ?: 0.0 }
-                        val currency = list.firstNotNullOfOrNull { it.currency }
-                        Text(
-                            "${list.size} sessions · ${"%.1f".format(kwh)} kWh · ${"%.2f".format(spent)}${currency?.let { " $it" }.orEmpty()}",
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            list.forEach { ChargeOrderRow(it) }
-                        }
-                    }
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    list.forEach { ChargeOrderRow(it) }
                 }
             }
         }

@@ -109,49 +109,41 @@ internal fun Surround3DDialog(v: Vehicle, onDismiss: () -> Unit) {
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().padding(16.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("3D surroundings", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
-                val current = scene
-                when {
-                    newest == null -> SurroundNote("Ask the car for surround-view photos first, then come back here.")
-                    needsDownload -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            "The 3D view needs three models, about ${ModelStore.TOTAL_BYTES / 1_000_000} MB, downloaded once from their " +
-                                "makers' GitHub pages. Best on Wi-Fi.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Button(onClick = { start(downloadFirst = true) }) { Text("Download and build") }
-                    }
-                    busy -> Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-                        Text(stage.ifBlank { "Building the 3D view" }, style = MaterialTheme.typography.bodySmall)
-                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                    }
-                    current != null -> {
-                        Surround3DView(
-                            envGlb = current.glb,
-                            vehicles = current.vehicles,
-                            painted = painted,
-                            modifier = Modifier.fillMaxWidth().weight(1f),
-                            body = CarBody.forModel(v.model),
-                            paint = CarPaint.WHITE,
-                            onHasPainted = { hasPainted = it },
-                        )
-                        if (hasPainted) {
-                            OutlinedButton(onClick = { painted = !painted }, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (painted) "Show the simple view" else "Show the painted view")
-                            }
-                        }
-                    }
-                    else -> Button(onClick = { start(downloadFirst = false) }) { Text("Build the 3D view") }
-                }
-                error?.let { SurroundNote(it, emphasised = true) }
+    FullScreenDialog(title = "3D surroundings", onDismiss = onDismiss) {
+        val current = scene
+        when {
+            newest == null -> SurroundNote("Ask the car for surround-view photos first, then come back here.")
+            needsDownload -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "The 3D view needs three models, about ${ModelStore.TOTAL_BYTES / 1_000_000} MB, downloaded once from their " +
+                        "makers' GitHub pages. Best on Wi-Fi.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(onClick = { start(downloadFirst = true) }) { Text("Download and build") }
             }
+            busy -> Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                Text(stage.ifBlank { "Building the 3D view" }, style = MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            }
+            current != null -> {
+                Surround3DView(
+                    envGlb = current.glb,
+                    vehicles = current.vehicles,
+                    painted = painted,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    body = CarBody.forModel(v.model),
+                    paint = CarPaint.WHITE,
+                    onHasPainted = { hasPainted = it },
+                )
+                if (hasPainted) {
+                    OutlinedButton(onClick = { painted = !painted }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (painted) "Show the simple view" else "Show the painted view")
+                    }
+                }
+            }
+            else -> Button(onClick = { start(downloadFirst = false) }) { Text("Build the 3D view") }
         }
+        error?.let { SurroundNote(it, emphasised = true) }
     }
 }
 
