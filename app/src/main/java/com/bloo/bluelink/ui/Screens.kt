@@ -122,8 +122,6 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     // Adding an account shows the login form even while signed in. Above the Scaffold so the map overlay, drawn outside it, can read it too.
     val target = if (addingAccount) Screen.Login else screen
     val accounts by remember { derivedStateOf { state.accounts } }
-    val kiaOtp by remember { derivedStateOf { state.kiaOtp } }
-    val canadaOtp by remember { derivedStateOf { state.canadaOtp } }
     val onSettingsPageSlot by vm.onSettingsPageSlot.collectAsStateWithLifecycle()
     val mapExpanded by remember { derivedStateOf { state.mapExpanded } }
     // The search bar comes up from below the bottom edge, as it does when the app opens, whenever nothing hides it, and drops out
