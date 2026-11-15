@@ -269,7 +269,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     if (target == Screen.Garage && !(locked && !unlockedThisSession)) CentralMapHost(stateHolder, vm, centralMap, searchHazeState)
     // The status bar's own strip: a blur of what is behind it, strongest at the top and nearly gone
     // by the bottom of the strip. It is the ONLY edge treatment in the app.
-    StatusBarScrim(searchHazeState)
+    StatusBarScrim(searchHazeState, mapOpen = centralMap.vin != null)
     // The app-wide pull-to-refresh disc, drawn above content; refracts searchHazeState. The lock overlay
     // and dialogs sit above it.
     PullRefreshIndicatorHost(state = refreshIndicator, hazeState = searchHazeState)
