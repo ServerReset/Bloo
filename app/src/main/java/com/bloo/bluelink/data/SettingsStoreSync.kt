@@ -183,6 +183,8 @@ private suspend fun SettingsStore.importRemoteSettings(
     remoteTs: Long,
     pullPrimary: Boolean,
 ): Boolean {
+    // Nothing to import without content: the same answer the gate below gives, read once here for the calls that need a String.
+    val json = remoteJson ?: return false
     // Adopt-mode + import-gate decision.
     val syncedEver = syncSyncedEver()
     // Change gate: prefer the content HASH (skew-immune, and it self-detects a no-op so two devices
@@ -197,9 +199,9 @@ private suspend fun SettingsStore.importRemoteSettings(
     // requires it, and K2 proves it -- the extra check was dead code.
     if (shouldImport) {
         imported = if (fullAdopt) {
-            adoptSettingsJson(remoteJson)
+            adoptSettingsJson(json)
         } else {
-            mergeSettingsJson(remoteJson, protect = dirtyKeys())
+            mergeSettingsJson(json, protect = dirtyKeys())
         }
         if (imported) {
             AppLog.log(if (fullAdopt) "Drive sync: adopted settings from file" else "Drive sync: imported newer settings")
@@ -259,6 +261,8 @@ suspend fun SettingsStore.performMainToMainSync(
     if (resolvedFileId != cachedFileId) setSyncFileId(resolvedFileId)
 
     val pullPrimary = syncPullPrimary()
+    val syncedEver = syncSyncedEver()
+    val fullAdopt = pullPrimary || !syncedEver
     val imported = importRemoteSettings(remoteJson, remoteHasContent, remoteHash, remoteTs, pullPrimary)
     // `!syncedEver` right above doesn't have this problem -- it's derived from persisted state, not
     // a flag this function clears itself, so a failed pass naturally retries it next time; this
