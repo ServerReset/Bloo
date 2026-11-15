@@ -362,27 +362,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.
         val searchable = target == Screen.Garage
-        val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
-        // On the Settings pager page search is always shown (how you find a setting);
-        // onSettingsPageSlot tracks it.
-        val effectivelyInSettings = onSettingsPageSlot
-        // Hidden while the map overlay is expanded: its bottom action row occupies the same corner.
-        if (searchable) {
-            // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
-            // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
-            // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
-            Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
-                SearchLayer(
-                    vm = vm,
-                    state = stateHolder,
-                    appearance = appearance,
-                    notif = notifPrefs,
-                    onSettings = effectivelyInSettings,
-                    onOpenChanged = { searchOpen = it },
-                    hazeState = searchHazeState,
-                )
-            }
-        }
+        SearchRiseLayer(vm, stateHolder, appearance, onSettingsPageSlot, searchable, searchRise, screenHeightPx, searchHazeState) { searchOpen = it }
     }
     }
     }
@@ -497,6 +477,43 @@ private fun GarageLayer(
             if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, centralMap, hazeState = searchHazeState)
             }
         }
+}
+
+/**
+ * The search bar's layer, above the pages: it rises with [searchRise] and is only shown where [searchable] (the garage). Its own notification
+ * preferences come from the app state; [onSearchOpenChanged] tells the screen whether the search panel is open.
+ */
+@Composable
+private fun SearchRiseLayer(
+    vm: AppViewModel,
+    stateHolder: State<UiState>,
+    appearance: SettingsStore.Appearance,
+    inSettingsPage: Boolean,
+    searchable: Boolean,
+    searchRise: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    screenHeightPx: Float,
+    searchHazeState: HazeState,
+    onSearchOpenChanged: (Boolean) -> Unit,
+) {
+    val notifPrefs by vm.notifications.collectAsStateWithLifecycle()
+    // On the Settings pager page search is always shown (how you find a setting); the screen tracks it and passes it in.
+    // Hidden while the map overlay is expanded: its bottom action row occupies the same corner.
+    if (searchable) {
+        // No `.padding(padding)`: SearchLayer reads WindowInsets itself, and padding here would
+        // subtract the nav bar twice. The rise is a layout offset, not a graphicsLayer translation: the glass samples the
+        // backdrop by layout position, so a translated layer drew its blur a few pixels off from the content it sits behind.
+        Box(Modifier.fillMaxSize().offset { IntOffset(0, (searchRise.value * screenHeightPx).roundToInt()) }) {
+            SearchLayer(
+                vm = vm,
+                state = stateHolder,
+                appearance = appearance,
+                notif = notifPrefs,
+                onSettings = inSettingsPage,
+                onOpenChanged = onSearchOpenChanged,
+                hazeState = searchHazeState,
+            )
+        }
+    }
 }
 
 /** The toasts, drawn from behind the search element. Their copy action is the caller's. */
