@@ -350,49 +350,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                 // and the cars detected later.
                 Screen.Onboarding -> OnboardingScreen(vm)
                 is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
-                Screen.Garage -> {
-                    StartupTrace.once("screen-garage", StartupLabels.SCREEN_GARAGE_COMPOSED)
-                    // Reuses the outer `appearance`.
-                    val auroraTouch = remember { AuroraTouch() }
-                    val auroraReactions = remember { AuroraReactions() }
-                    Box(
-                        Modifier.fillMaxSize().pointerInput(auroraTouch) {
-                            // Watches the finger for the aurora without taking it: the Initial pass sees every touch
-                            // first and nothing is consumed, so scrolling, swiping and taps behave exactly as before.
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    val pressed = event.changes.firstOrNull { it.pressed }
-                                    if (pressed != null) {
-                                        // Only a real move is published: every write restarts the glow's follow spring,
-                                        // and a panel delivers 120-240 move events a second.
-                                        val last = auroraTouch.pos.value
-                                        if (last == null || (pressed.position - last).getDistance() >= AuroraTouchStepPx) {
-                                            auroraTouch.pos.value = pressed.position
-                                        }
-                                    } else {
-                                        auroraTouch.pos.value = null
-                                    }
-                                }
-                            }
-                        },
-                    ) {
-                        // `paused = searchOpen`: the search panel sits ABOVE this background, and
-                        // while it's up (typing frames, panel scrolling) the ambient drift would
-                        // otherwise keep redrawing the blurred backdrop underneath at ~12fps --
-                        // real contention on exactly the frames search is using.
-                        // The aurora leans with the pager/scroll and springs on a page settle; both
-                        // screens publish into this holder, read in the aurora's draw phase.
-                        CompositionLocalProvider(LocalAuroraReactions provides auroraReactions) {
-                        if (appearance.auroraBackground) CompositionLocalProvider(LocalAuroraTouch provides auroraTouch) {
-                            AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze).hazeSource(searchHazeState, zIndex = -1f), appearance, refreshing = refreshing, paused = searchOpen)
-                        }
-                        // Cold-start lock: don't compose (and blur) the full garage behind a lock
-                        // the user hasn't passed; it composes once `locked` flips.
-                        if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, centralMap, hazeState = searchHazeState)
-                        }
-                    }
-                }
+                Screen.Garage -> GarageLayer(appearance, refreshing, searchOpen, locked, unlockedThisSession, stateHolder, vm, centralMap, backdropHaze, searchHazeState)
             }
             }
         }
@@ -489,6 +447,63 @@ internal const val FOUR_COLUMN_MIN_DP = 1500
  * (An earlier take collapsed this to `width / 600`, which showed one wide car instead of the grid --
  * wrong: a large screen wants MORE columns, not fewer.)
  */
+
+/** The garage behind the screen: its aurora and the pager, under the touch that drives the aurora. Moved out of the screen body as it was. */
+@Composable
+private fun GarageLayer(
+    appearance: SettingsStore.Appearance,
+    refreshing: Boolean,
+    searchOpen: Boolean,
+    locked: Boolean,
+    unlockedThisSession: Boolean,
+    stateHolder: State<UiState>,
+    vm: AppViewModel,
+    centralMap: CentralMap,
+    backdropHaze: HazeState,
+    searchHazeState: HazeState,
+) {
+        StartupTrace.once("screen-garage", StartupLabels.SCREEN_GARAGE_COMPOSED)
+        // Reuses the outer `appearance`.
+        val auroraTouch = remember { AuroraTouch() }
+        val auroraReactions = remember { AuroraReactions() }
+        Box(
+            Modifier.fillMaxSize().pointerInput(auroraTouch) {
+                // Watches the finger for the aurora without taking it: the Initial pass sees every touch
+                // first and nothing is consumed, so scrolling, swiping and taps behave exactly as before.
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val pressed = event.changes.firstOrNull { it.pressed }
+                        if (pressed != null) {
+                            // Only a real move is published: every write restarts the glow's follow spring,
+                            // and a panel delivers 120-240 move events a second.
+                            val last = auroraTouch.pos.value
+                            if (last == null || (pressed.position - last).getDistance() >= AuroraTouchStepPx) {
+                                auroraTouch.pos.value = pressed.position
+                            }
+                        } else {
+                            auroraTouch.pos.value = null
+                        }
+                    }
+                }
+            },
+        ) {
+            // `paused = searchOpen`: the search panel sits ABOVE this background, and
+            // while it's up (typing frames, panel scrolling) the ambient drift would
+            // otherwise keep redrawing the blurred backdrop underneath at ~12fps --
+            // real contention on exactly the frames search is using.
+            // The aurora leans with the pager/scroll and springs on a page settle; both
+            // screens publish into this holder, read in the aurora's draw phase.
+            CompositionLocalProvider(LocalAuroraReactions provides auroraReactions) {
+            if (appearance.auroraBackground) CompositionLocalProvider(LocalAuroraTouch provides auroraTouch) {
+                AuroraBackground(Modifier.matchParentSize().hazeSource(backdropHaze).hazeSource(searchHazeState, zIndex = -1f), appearance, refreshing = refreshing, paused = searchOpen)
+            }
+            // Cold-start lock: don't compose (and blur) the full garage behind a lock
+            // the user hasn't passed; it composes once `locked` flips.
+            if (!(locked && !unlockedThisSession)) GarageScreen(stateHolder, vm, centralMap, hazeState = searchHazeState)
+            }
+        }
+}
 
 /**
  * The layers drawn over the app: the photo picker, the share intake, the welcome cards, the install guide, the shortcuts sheet and
