@@ -24,6 +24,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalRippleConfiguration
@@ -286,33 +287,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
                     StartupTrace.once("screen-loading", StartupLabels.SCREEN_LOADING_COMPOSED)
                     LoadingScreen(Modifier.padding(padding))
                 }
-                Screen.Login -> Box(Modifier.padding(padding)) {
-                    StartupTrace.once("screen-login", StartupLabels.SCREEN_LOGIN_COMPOSED)
-                    val loginUpdateAvailable by remember { derivedStateOf { stateHolder.value.updateAvailable } }
-                    val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
-                    val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
-                    val loginContext = LocalContext.current
-                    // After a restart the phone's lock is asked for as the sign-in screen opens (see promptDeviceLockForBoot).
-                    LaunchedEffect(bootReauth) {
-                        if (bootReauth) vm.promptDeviceLockForBoot(loginContext.findFragmentActivity())
-                    }
-                    LoginScreen(
-                        loading = loading,
-                        onLogin = if (bootReauth) ({ user, password, pin, brand ->
-                            vm.reauthAfterRestart(user, password, pin, brand, loginContext.findFragmentActivity())
-                        }) else vm::login,
-                        onCancel = if (accounts.isNotEmpty()) ({ vm.cancelAddAccount() }) else null,
-                        // Logged-out users have no Settings, so Login offers its own forced update
-                        // check.
-                        onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
-                        updateChecking = loginUpdateChecking,
-                        updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
-                        // Once the phone's lock is confirmed for this boot, the login screen does not offer the fingerprint button again.
-                        onFingerprint = if (vm.canUseBiometrics() && !stateHolder.value.bootDeviceLockProven) ({ vm.promptBiometricUnlock(loginContext) }) else null,
-                    )
-                    kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
-                    canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
-                }
+                Screen.Login -> LoginPage(vm, stateHolder, padding, loading, accounts.isNotEmpty())
                 // One deck of cards for every setup flow: first run (restore, setup, look, cars),
                 // and the cars detected later.
                 Screen.Onboarding -> OnboardingScreen(vm)
@@ -546,6 +521,46 @@ private fun AnimatedContentTransitionScope<Screen>.screenSwitchSpec(): ContentTr
     val slideSpec = softSpring<IntOffset>(Spring.StiffnessMediumLow)
     return (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
         (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
+}
+
+/** The sign-in page, under the scaffold's padding: the login form, and the one-time-code dialogs when the sign-in asks for one. */
+@Composable
+private fun LoginPage(
+    vm: AppViewModel,
+    stateHolder: State<UiState>,
+    padding: PaddingValues,
+    loading: Boolean,
+    hasAccounts: Boolean,
+) {
+    val kiaOtp = stateHolder.value.kiaOtp
+    val canadaOtp = stateHolder.value.canadaOtp
+    Box(Modifier.padding(padding)) {
+            StartupTrace.once("screen-login", StartupLabels.SCREEN_LOGIN_COMPOSED)
+            val loginUpdateAvailable by remember { derivedStateOf { stateHolder.value.updateAvailable } }
+            val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
+            val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
+            val loginContext = LocalContext.current
+            // After a restart the phone's lock is asked for as the sign-in screen opens (see promptDeviceLockForBoot).
+            LaunchedEffect(bootReauth) {
+                if (bootReauth) vm.promptDeviceLockForBoot(loginContext.findFragmentActivity())
+            }
+            LoginScreen(
+                loading = loading,
+                onLogin = if (bootReauth) ({ user, password, pin, brand ->
+                    vm.reauthAfterRestart(user, password, pin, brand, loginContext.findFragmentActivity())
+                }) else vm::login,
+                onCancel = if (hasAccounts) ({ vm.cancelAddAccount() }) else null,
+                // Logged-out users have no Settings, so Login offers its own forced update
+                // check.
+                onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
+                updateChecking = loginUpdateChecking,
+                updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
+                // Once the phone's lock is confirmed for this boot, the login screen does not offer the fingerprint button again.
+                onFingerprint = if (vm.canUseBiometrics() && !stateHolder.value.bootDeviceLockProven) ({ vm.promptBiometricUnlock(loginContext) }) else null,
+            )
+            kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
+            canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
+    }
 }
 
 /**
