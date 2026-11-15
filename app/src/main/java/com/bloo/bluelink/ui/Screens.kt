@@ -7,6 +7,8 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import android.content.ClipData
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
@@ -255,19 +257,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         SideEffect { tilt.paused = searchOpen }
         AnimatedContent(
             targetState = target,
-            transitionSpec = {
-                // A real spring (this app's own SoftDamping/StiffnessMediumLow, the same feel the
-                // garage's own expand/collapse AnimatedContent uses a few screens down) rather than
-                // AnimatedContent's bare default -- the default spec is tuned for a small content
-                // swap settling quickly, and on a screen-sized slide that read as slightly
-                // clipped/mechanical next to every other full-screen motion in the app.
-                // fadeIn/fadeOut keep their own (fast, linear-feeling) defaults on purpose: only
-                // the SLIDE -- the part that actually travels screen-sized distance -- needed the
-                // softer landing.
-                val slideSpec = softSpring<IntOffset>(Spring.StiffnessMediumLow)
-                (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
-                    (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
-            },
+            transitionSpec = { screenSwitchSpec() },
             label = "screen",
         ) { screen ->
             // The same page-turn, on whole-screen changes too: the leaving screen leans away and
@@ -545,6 +535,17 @@ private fun ShortcutEffect(vm: AppViewModel, goBack: () -> Unit, showShortcuts: 
             }
         }
     }
+}
+
+/**
+ * The slide between whole screens. A real spring (the app's own soft spring), not AnimatedContent's bare default, so a screen-sized slide
+ * lands like the rest of the app's full-screen motion. The fade keeps its own fast defaults: only the slide, which travels screen-sized
+ * distance, needs the softer landing.
+ */
+private fun AnimatedContentTransitionScope<Screen>.screenSwitchSpec(): ContentTransform {
+    val slideSpec = softSpring<IntOffset>(Spring.StiffnessMediumLow)
+    return (slideInHorizontally(slideSpec) { w -> -w } + fadeIn()) togetherWith
+        (slideOutHorizontally(slideSpec) { w -> w } + fadeOut())
 }
 
 /**
