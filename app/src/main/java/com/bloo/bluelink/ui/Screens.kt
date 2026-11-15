@@ -3,6 +3,7 @@ package com.bloo.bluelink.ui
 import com.bloo.uicommon.softSpring
 import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.compose.foundation.layout.offset
+import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.StartupLabels
 import com.bloo.bluelink.data.StartupTrace
 import android.content.ClipData
