@@ -281,7 +281,6 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         onShortcutsDismiss = { showShortcuts = false },
     )
     }
-    }
 }
 
 // Owns the lock-blur animation in its own small recompose scope so animating it doesn't invalidate
