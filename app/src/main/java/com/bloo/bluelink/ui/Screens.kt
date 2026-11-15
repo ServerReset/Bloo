@@ -252,20 +252,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
             ) { state -> if (state == EnterExitState.Visible) 0f else 1f }
             Box(Modifier.fillMaxSize().screenTurnLayer { turn }) {
             // The garage draws full-bleed; other screens are inset by the Scaffold.
-            when (screen) {
-                // Bootstrapping placeholder (see Screen.Loading): same aurora + wordmark as Login,
-                // nothing interactive.
-                Screen.Loading -> {
-                    StartupTrace.once("screen-loading", StartupLabels.SCREEN_LOADING_COMPOSED)
-                    LoadingScreen(Modifier.padding(padding))
-                }
-                Screen.Login -> LoginPage(vm, stateHolder, padding, loading, accounts.isNotEmpty())
-                // One deck of cards for every setup flow: first run (restore, setup, look, cars),
-                // and the cars detected later.
-                Screen.Onboarding -> OnboardingScreen(vm)
-                is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
-                Screen.Garage -> GarageLayer(appearance, refreshing, searchOpen, locked, unlockedThisSession, stateHolder, vm, centralMap, backdropHaze, searchHazeState)
-            }
+            ScreenPage(screen, vm, stateHolder, padding, loading, accounts.isNotEmpty(), appearance, refreshing, searchOpen, locked, unlockedThisSession, centralMap, backdropHaze, searchHazeState)
             }
         }
         // Toasts pop up from BEHIND the search element, so they are drawn before it (and after the page).
@@ -574,6 +561,40 @@ private fun Modifier.screenTurnLayer(turn: () -> Float): Modifier = graphicsLaye
     alpha = 1f - 0.4f * away
     translationY = away * 8.dp.toPx()
     cameraDistance = 420.dp.toPx()
+}
+
+/** The page for one screen, under the scaffold's padding: each screen's own page, drawn by the screen switch. */
+@Composable
+private fun ScreenPage(
+    screen: Screen,
+    vm: AppViewModel,
+    stateHolder: State<UiState>,
+    padding: PaddingValues,
+    loading: Boolean,
+    hasAccounts: Boolean,
+    appearance: SettingsStore.Appearance,
+    refreshing: Boolean,
+    searchOpen: Boolean,
+    locked: Boolean,
+    unlockedThisSession: Boolean,
+    centralMap: CentralMap,
+    backdropHaze: HazeState,
+    searchHazeState: HazeState,
+) {
+    when (screen) {
+        // Bootstrapping placeholder (see Screen.Loading): same aurora + wordmark as Login,
+        // nothing interactive.
+        Screen.Loading -> {
+            StartupTrace.once("screen-loading", StartupLabels.SCREEN_LOADING_COMPOSED)
+            LoadingScreen(Modifier.padding(padding))
+        }
+        Screen.Login -> LoginPage(vm, stateHolder, padding, loading, hasAccounts)
+        // One deck of cards for every setup flow: first run (restore, setup, look, cars),
+        // and the cars detected later.
+        Screen.Onboarding -> OnboardingScreen(vm)
+        is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
+        Screen.Garage -> GarageLayer(appearance, refreshing, searchOpen, locked, unlockedThisSession, stateHolder, vm, centralMap, backdropHaze, searchHazeState)
+    }
 }
 
 /**
