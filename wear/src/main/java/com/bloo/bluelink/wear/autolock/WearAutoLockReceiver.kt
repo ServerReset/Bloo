@@ -26,6 +26,9 @@ class WearAutoLockReceiver : BroadcastReceiver() {
         val result = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
+                // A fresh read before the cars are judged: the saved snapshot can be older than the car, so a car that was started or
+                // unlocked since would be judged on stale data.
+                runCatching { WearCredentialSync.refresh(app) }
                 val vehicles = runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList())
                 for (vin in WearAutoLock.targets(vehicles)) {
                     val locked = lockWithRetry(app, vin)
