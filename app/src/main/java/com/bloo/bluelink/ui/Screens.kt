@@ -624,7 +624,7 @@ private fun ScreenScaffold(
         // Search lives above the AnimatedContent so one element survives the transition (corner
         // bubble morphing into the settings pill). Only the garage is searchable.
         val searchable = target == Screen.Garage
-        SearchRiseLayer(vm, stateHolder, appearance, onSettingsPageSlot, searchable, searchRise, screenHeightPx, searchHazeState) { searchOpen = it }
+        SearchRiseLayer(vm, stateHolder, appearance, inSettingsPage, searchable, searchRise, screenHeightPx, searchHazeState) { searchOpen = it }
     }
 }
 
