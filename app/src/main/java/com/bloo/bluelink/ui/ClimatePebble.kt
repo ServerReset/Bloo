@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.AnimatedSlider
 import com.bloo.bluelink.data.FEEL_STEP_F
@@ -409,13 +410,17 @@ private fun SmartClimateSection(
     onStartUnread: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
-        SectionLabel(CarLabels.SMART_CLIMATE)
+        // The label and the outside temperature share one line; the target is the card's one big number.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel(CarLabels.SMART_CLIMATE)
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+            if (ambientF != null) RevealMutedText("${degLabel(ambientF.toString(), fahrenheit)} outside")
+        }
         if (plan == null || ambientF == null) {
             MorphActionButton(label = CarLabels.SMART_CLIMATE, icon = Icons.Filled.AcUnit, onClick = onStartUnread, enabled = enabled)
             return@Column
         }
         RevealText(degLabel(plan.targetF.toString(), fahrenheit), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
-        RevealMutedText("${degLabel(ambientF.toString(), fahrenheit)} outside")
 
         // Influence: lean the target colder or hotter than the plan. It opens in the middle, on the plan as it stands.
         var influence by remember(plan.targetF) { mutableFloatStateOf(0f) }
@@ -448,8 +453,14 @@ private fun SmartClimateSection(
             onClick = { onSubmitFeel(step * FEEL_STEP_F) },
             enabled = enabled,
         )
-        // Every factor that moved the target, one per line, so the number is never a mystery.
-        plan.reasons.joinToString("\n").takeIf { it.isNotBlank() }?.let { RevealMutedText(it) }
+        // The factors that moved the target sit behind a toggle: the number, the slider and the button are the card; the reasons are there
+        // when someone asks why the number is what it is, one per line.
+        var showWhy by remember { mutableStateOf(false) }
+        val reasons = plan.reasons.joinToString("\n").takeIf { it.isNotBlank() }
+        if (reasons != null) {
+            MorphTextButton(if (showWhy) "Hide why" else "Why this temperature?", onClick = { showWhy = !showWhy })
+            if (showWhy) RevealMutedText(reasons)
+        }
     }
 }
 
