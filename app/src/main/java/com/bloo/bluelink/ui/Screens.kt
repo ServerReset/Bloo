@@ -12,6 +12,7 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.spring
@@ -30,6 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -228,40 +231,8 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
     Box(Modifier.fillMaxSize()) {
     // The app's backdrop: the Haze source every glass card blurs (a sibling under everything).
     AppBackdrop(backdropHaze, Modifier.matchParentSize(), alsoInto = searchHazeState)
-    Scaffold(
-        containerColor = Color.Transparent,
-        // Toasts render in ToastHost below, above search, not in the Scaffold's snackbar.
-        snackbarHost = {},
-    ) { padding ->
-        // Hoisted above the screen switch: the aurora pauses while search is open.
-        var searchOpen by remember { mutableStateOf(false) }
-        // The search panel's IME animation freezes the tilt, sparing the redraws it would cause under the blur.
-        SideEffect { tilt.paused = searchOpen }
-        AnimatedContent(
-            targetState = target,
-            transitionSpec = { screenSwitchSpec() },
-            label = "screen",
-        ) { screen ->
-            // The same page-turn, on whole-screen changes too: the leaving screen leans away and
-            // dims, the arriving one leans back in. Read in the draw phase.
-            val turn by transition.animateFloat(
-                transitionSpec = { tween(MotionMedium) },
-                label = "screenTurn",
-            ) { state -> if (state == EnterExitState.Visible) 0f else 1f }
-            Box(Modifier.fillMaxSize().screenTurnLayer { turn }) {
-            // The garage draws full-bleed; other screens are inset by the Scaffold.
-            ScreenPage(screen, vm, stateHolder, padding, loading, accounts.isNotEmpty(), appearance, refreshing, searchOpen, locked, unlockedThisSession, centralMap, backdropHaze, searchHazeState)
-            }
-        }
-        // Toasts pop up from BEHIND the search element, so they are drawn before it (and after the page).
-        ToastLayer(toasts, searchHazeState) { text ->
-            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
-        }
-        // Search lives above the AnimatedContent so one element survives the transition (corner
-        // bubble morphing into the settings pill). Only the garage is searchable.
-        val searchable = target == Screen.Garage
-        SearchRiseLayer(vm, stateHolder, appearance, onSettingsPageSlot, searchable, searchRise, screenHeightPx, searchHazeState) { searchOpen = it }
-    }
+    ScreenScaffold(target, tilt, vm, stateHolder, appearance, loading, accounts.isNotEmpty(), refreshing, locked, unlockedThisSession,
+        centralMap, backdropHaze, searchHazeState, toasts, scope, clipboard, onSettingsPageSlot, searchRise, screenHeightPx)
     }
     }
     // The map is drawn OUTSIDE the blur layer above, so the open map itself is never blurred; only the app behind it is. It sits over
@@ -592,6 +563,68 @@ private fun ScreenPage(
         Screen.Onboarding -> OnboardingScreen(vm)
         is Screen.CarSetup -> OnboardingScreen(vm, OnboardingMode.NewCars(screen.vins))
         Screen.Garage -> GarageLayer(appearance, refreshing, searchOpen, locked, unlockedThisSession, stateHolder, vm, centralMap, backdropHaze, searchHazeState)
+    }
+}
+
+/**
+ * The scaffold of the app's screens: the screen switch between pages, the page turn, the toasts and the search bar. The app's
+ * state is read by the caller and passed in, so this composable only lays the screens out.
+ */
+@Composable
+private fun ScreenScaffold(
+    target: Screen,
+    tilt: TiltState,
+    vm: AppViewModel,
+    stateHolder: State<UiState>,
+    appearance: SettingsStore.Appearance,
+    loading: Boolean,
+    hasAccounts: Boolean,
+    refreshing: Boolean,
+    locked: Boolean,
+    unlockedThisSession: Boolean,
+    centralMap: CentralMap,
+    backdropHaze: HazeState,
+    searchHazeState: HazeState,
+    toasts: ToastState,
+    scope: CoroutineScope,
+    clipboard: Clipboard,
+    inSettingsPage: Boolean,
+    searchRise: Animatable<Float, AnimationVector1D>,
+    screenHeightPx: Float,
+) {
+    Scaffold(
+        containerColor = Color.Transparent,
+        // Toasts render in ToastHost below, above search, not in the Scaffold's snackbar.
+        snackbarHost = {},
+    ) { padding ->
+        // Hoisted above the screen switch: the aurora pauses while search is open.
+        var searchOpen by remember { mutableStateOf(false) }
+        // The search panel's IME animation freezes the tilt, sparing the redraws it would cause under the blur.
+        SideEffect { tilt.paused = searchOpen }
+        AnimatedContent(
+            targetState = target,
+            transitionSpec = { screenSwitchSpec() },
+            label = "screen",
+        ) { screen ->
+            // The same page-turn, on whole-screen changes too: the leaving screen leans away and
+            // dims, the arriving one leans back in. Read in the draw phase.
+            val turn by transition.animateFloat(
+                transitionSpec = { tween(MotionMedium) },
+                label = "screenTurn",
+            ) { state -> if (state == EnterExitState.Visible) 0f else 1f }
+            Box(Modifier.fillMaxSize().screenTurnLayer { turn }) {
+            // The garage draws full-bleed; other screens are inset by the Scaffold.
+            ScreenPage(screen, vm, stateHolder, padding, loading, hasAccounts, appearance, refreshing, searchOpen, locked, unlockedThisSession, centralMap, backdropHaze, searchHazeState)
+            }
+        }
+        // Toasts pop up from BEHIND the search element, so they are drawn before it (and after the page).
+        ToastLayer(toasts, searchHazeState) { text ->
+            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("bloo", text))) }
+        }
+        // Search lives above the AnimatedContent so one element survives the transition (corner
+        // bubble morphing into the settings pill). Only the garage is searchable.
+        val searchable = target == Screen.Garage
+        SearchRiseLayer(vm, stateHolder, appearance, onSettingsPageSlot, searchable, searchRise, screenHeightPx, searchHazeState) { searchOpen = it }
     }
 }
 
