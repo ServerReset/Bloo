@@ -47,10 +47,6 @@ import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.weatherIcon
 import com.bloo.uicommon.weatherTint
 
-/** The icon for a condition, picking a sun/moon variant by day vs night. */
-internal fun weatherIcon(code: WeatherCode, isDay: Boolean): ImageVector =
-    com.bloo.uicommon.weatherIcon(code, isDay)
-
 /**
  * A weather symbol in its condition's own tint -- the icon + tint + size every weather surface
  * repeated.
