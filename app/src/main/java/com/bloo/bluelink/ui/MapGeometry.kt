@@ -117,6 +117,16 @@ internal class CarMarker(val vin: String, val x: Float, val y: Float, val scale:
  */
 internal fun spreadApart(markers: List<CarMarker>, spacing: Float, rowHeight: Float): List<CarMarker> {
     if (markers.size < 2) return markers
+    // Most frames have no two cars close enough to overlap: find that out without allocating, and return the markers as they are.
+    var anyOverlap = false
+    loop@ for (i in markers.indices) for (j in i + 1 until markers.size) {
+        if (markers[i].offEdge || markers[j].offEdge) continue
+        if (abs(markers[i].y - markers[j].y) < rowHeight && abs(markers[i].x - markers[j].x) < spacing) {
+            anyOverlap = true
+            break@loop
+        }
+    }
+    if (!anyOverlap) return markers
     val x = FloatArray(markers.size) { markers[it].x }
     val y = FloatArray(markers.size) { markers[it].y }
     repeat(4) {

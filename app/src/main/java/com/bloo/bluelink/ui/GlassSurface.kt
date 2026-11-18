@@ -15,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
@@ -79,15 +78,17 @@ internal fun GlassSurface(
     val windowSize = LocalWindowInfo.current.containerSize
     val density = LocalDensity.current
     val marginPx = with(density) { 32.dp.toPx() }
+    val windowW = windowSize.width.toFloat()
+    val windowH = windowSize.height.toFloat()
     var inView by remember { mutableStateOf(true) }
     Box(
         modifier = modifier
             .glassEdge(shape, shadow = shadow)
             .onGloballyPositioned { c ->
+                // Plain comparisons, not Rect objects: this runs on every layout pass of every glass surface during a swipe.
                 val p = c.positionInWindow()
-                val r = Rect(p.x, p.y, p.x + c.size.width, p.y + c.size.height)
-                val window = Rect(-marginPx, -marginPx, windowSize.width + marginPx, windowSize.height + marginPx)
-                val now = r.overlaps(window)
+                val now = p.x < windowW + marginPx && p.x + c.size.width > -marginPx &&
+                    p.y < windowH + marginPx && p.y + c.size.height > -marginPx
                 if (now != inView) inView = now
             }
             .then(
