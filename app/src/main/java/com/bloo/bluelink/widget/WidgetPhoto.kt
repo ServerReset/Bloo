@@ -23,12 +23,12 @@ internal object WidgetPhoto {
     const val BLUR_MEDIUM = 1
     const val BLUR_STRONG = 2
 
-    /** The blurred photo for [vin], or null when the car has no photo (or it cannot be read). */
     /** Whether the phone is in its dark theme: the widget's veil, and so the band baked into the photo, follow it. */
     fun isNight(context: Context): Boolean =
         (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
 
+    /** The blurred photo for [vin], or null when the car has no photo (or it cannot be read). */
     suspend fun load(context: Context, vin: String, blur: Int, night: Boolean): Bitmap? = withContext(Dispatchers.IO) {
         runCatching {
             val url = SettingsStore(context).imageUrl(vin)?.takeIf { it.isNotBlank() } ?: return@runCatching null
