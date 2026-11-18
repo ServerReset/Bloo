@@ -43,9 +43,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.Measured
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import com.bloo.uicommon.MotionShort
-import com.bloo.uicommon.MorphedCornerPercent
-import com.bloo.uicommon.PillCornerPercent
-import com.bloo.uicommon.SoftDamping
 import com.bloo.uicommon.content
 
 /**
@@ -54,14 +51,6 @@ import com.bloo.uicommon.content
  */
 
 // ---- Motion -------------------------------------------------------------------
-
-// Aliases onto :uicommon so the phone reads the shared motion tokens.
-internal val SoftDamping get() = com.bloo.uicommon.SoftDamping
-
-// The morph button's two corner states, aliased like SoftDamping above.
-internal val PillCornerPercent get() = com.bloo.uicommon.PillCornerPercent
-
-internal val MorphedCornerPercent get() = com.bloo.uicommon.MorphedCornerPercent
 
 /**
  * The app's collapse/expand transition, supplied by the Material theme. M3 Expressive delivers
