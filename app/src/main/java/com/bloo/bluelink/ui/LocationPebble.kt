@@ -187,7 +187,11 @@ internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifi
                     .then(
                         if (host == null) Modifier else Modifier
                             .bringIntoViewRequester(revealRequester)
-                            .onGloballyPositioned { cardSlot.bounds = Rect(it.positionOnScreen(), it.size.toSize()) },
+                            .onGloballyPositioned {
+                                // Written only when it changed: a card that stays put writes nothing, so the map is not refreshed on frames where nothing moved.
+                                val r = Rect(it.positionOnScreen(), it.size.toSize())
+                                if (cardSlot.bounds != r) cardSlot.bounds = r
+                            },
                     )
                     .clip(StandardShape)
                     .semantics { contentDescription = "Map showing where ${v.name} is" }
