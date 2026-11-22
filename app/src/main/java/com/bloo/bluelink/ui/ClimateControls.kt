@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -213,7 +214,7 @@ private fun PresetEditor(
     var name by remember(preset.id) { mutableStateOf(preset.name) }
     val form = rememberClimateForm(preset.id, preset.request)
     // Its own panel, with an accent edge, so it reads as the one preset being edited and where its controls are.
-    val panel = RoundedCornerShape(16.dp)
+    val panel = StandardShape
     Column(
         Modifier
             .fillMaxWidth()
@@ -433,7 +434,8 @@ internal fun ClimateTileGrid(tiles: List<ClimateTile>) {
 @Composable
 private fun ClimateTileCell(tile: ClimateTile, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val fill by animateColorAsState(
+    // Read in the draw phase, not here: the fill's animation then repaints the tile without recomposing it every frame.
+    val fill = animateColorAsState(
         targetValue = if (tile.active) scheme.primaryContainer else scheme.surfaceVariant.copy(alpha = 0.5f),
         animationSpec = lowPowerCalm(Spring.StiffnessMediumLow),
         label = "climateTileFill",
@@ -442,8 +444,8 @@ private fun ClimateTileCell(tile: ClimateTile, modifier: Modifier) {
     Column(
         modifier
             .heightIn(min = 76.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(fill)
+            .clip(PanelShape)
+            .drawBehind { drawRect(fill.value) }
             .clickable(role = Role.Button, onClickLabel = tile.label, onClick = tile.onTap)
             .padding(GapGroup),
         horizontalAlignment = Alignment.CenterHorizontally,

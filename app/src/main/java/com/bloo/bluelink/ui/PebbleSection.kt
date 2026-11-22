@@ -44,7 +44,7 @@ internal fun PebbleSection(
         SectionHeading(title, icon, trailing = trailing, trailingColor = trailingColor)
         if (panel) {
             Column(
-                Modifier.tintedPanel(LocalContentColor.current.copy(alpha = 0.06f), RoundedCornerShape(20.dp), PaddingValues(GapGroup)),
+                Modifier.tintedPanel(LocalContentColor.current.copy(alpha = 0.06f), PanelShape, PaddingValues(GapGroup)),
                 verticalArrangement = Arrangement.spacedBy(GapGroup),
                 content = content,
             )

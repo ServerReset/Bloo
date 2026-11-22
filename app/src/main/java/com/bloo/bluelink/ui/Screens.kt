@@ -669,11 +669,6 @@ private fun AppOverlays(
             onContinue = { vm.confirmInstallUpdate() },
         )
     }
-    // The migration bridge's notice used to live here. It, and the whole dev-key signing path that
-    // produced the build it shipped in, is gone -- that build is published and immutable, and no
-    // build from this repo may be signed with the development key again. What reaches installs on
-    // the old key now is the release text itself: see the title and changelog steps in
-    // .github/workflows/android.yml.
     if (showShortcuts) ShortcutsDialog(onDismiss = { onShortcutsDismiss() })
     // Every open dialog, above everything else.
     DialogLayer(dialogHost)

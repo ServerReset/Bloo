@@ -48,6 +48,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.chargingLabel
 import com.bloo.bluelink.data.stateLineOrParked
+import com.bloo.bluelink.ui.ExtraLargeShape
 
 /** The widget sizes the settings preview can show: launcher cells as the widget sees them (110dp is 2 cells). */
 internal enum class PreviewSize(val label: String, val width: Dp, val height: Dp) {
@@ -86,7 +87,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
     }
     // A stand-in wallpaper, so the widget reads as an object on a screen.
     Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+        Modifier.fillMaxWidth().clip(ExtraLargeShape)
             .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer)))
             .padding(18.dp),
         contentAlignment = Alignment.Center,

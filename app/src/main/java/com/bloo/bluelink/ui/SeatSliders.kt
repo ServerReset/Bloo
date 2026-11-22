@@ -84,7 +84,7 @@ private fun SeatSliderRow(seat: SeatSlider) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(PanelShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             .padding(GapGroup),
     ) {

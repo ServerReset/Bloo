@@ -388,7 +388,7 @@ internal fun LoginHero(modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .size(64.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .clip(PanelShape)
                 .background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary))),
             contentAlignment = Alignment.Center,
         ) {

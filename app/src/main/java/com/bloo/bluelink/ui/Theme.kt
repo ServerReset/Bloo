@@ -133,8 +133,6 @@ internal fun ColorScheme.applyPalette(palette: ColorPalette): ColorScheme {
     )
 }
 
-// Widget theme functions removed - widget system deleted
-
 // --- Expressive color palettes -------------------------------------------
 // A vibrant, high-emphasis Material 3 palette used when dynamic color
 // (Material You) is unavailable or disabled.

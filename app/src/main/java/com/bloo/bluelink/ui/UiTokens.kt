@@ -102,6 +102,7 @@ internal val SplitSeam = 3.dp
 internal val TinyShape = RoundedCornerShape(8.dp)    // Inline tap targets, swatches
 internal val SmallShape = RoundedCornerShape(12.dp)   // Smaller components, chips
 internal val StandardShape = RoundedCornerShape(16.dp) // Buttons, most cards
+internal val PanelShape = RoundedCornerShape(PebbleCornerExpanded) // A tinted panel inside a card: the open card's own corner
 internal val ExtraLargeShape = RoundedCornerShape(28.dp) // Modal dialogs
 
 // ---- Icons ----------------------------------------------------------------------

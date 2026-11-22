@@ -338,13 +338,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     internal var liveLocationJob: kotlinx.coroutines.Job? = null
 
-    // Appearance/preference setters each just write one field to SettingsStore; `appearance` is a
-    // StateFlow mirroring it, so the UI follows once the DataStore write re-emits (none touch
-    // _state). setThemeMode / setFontChoice / setDynamicColor / setColorPalette / saveCustomPalette
-    // / deleteCustomPalette / setActiveCustomPaletteId moved to AppViewModelAppearance.kt.
-
-    // exportSettings / importSettings / setSyncUri / clearSyncUri / importSettingsAndSync /
-    // importSettingsAndSyncSuspend / setSyncWifiOnly moved to AppViewModelSync.kt.
+    // The appearance and preference setters live in AppViewModelAppearance.kt and the sync ones in AppViewModelSync.kt. Each writes one
+    // field to SettingsStore; `appearance` mirrors it as a StateFlow, so the UI follows once the write re-emits (none touch _state).
 
     // --- Weather ---------------------------------------------------------
     internal val weather = WeatherController(getApplication(), settingsStore, _state, viewModelScope)
@@ -356,11 +351,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = weather.loadCarWeather(v, force)
 
     fun loadPhoneWeather(force: Boolean = false) = weather.loadPhoneWeather(force)
-
-    // setColumnsFlipped / setUiScaleSoon / setVibrancySoon / setHapticsEnabled /
-    // setShowSearch / searchBubblePosition / setSearchBubblePosition / setSeamlessInstallShizuku /
-    // refreshShizukuAvailable / setAuroraBackground / setUnitSystem moved to
-    // AppViewModelAppearance.kt.
 
     /**
      * Wipe the in-memory activity log shown in Settings (not persisted, so nothing to clear on

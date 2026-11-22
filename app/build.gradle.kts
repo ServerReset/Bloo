@@ -327,8 +327,6 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     // The homescreen widget (see widget/BlooWidget.kt).
     implementation("androidx.glance:glance-appwidget:1.1.1")
-    implementation("androidx.glance:glance-material3:1.1.1")
-    implementation("androidx.security:security-crypto:1.1.0")
 
     // Real car photos (URL or the system photo picker)
     implementation("io.coil-kt:coil-compose:2.7.0")
@@ -366,7 +364,6 @@ dependencies {
     "sideloadImplementation"("org.bouncycastle:bcpkix-jdk15to18:1.81")
 
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     // The 3D car (Filament renders it; gltfio loads the model). Same versions as open-blue-android.
     implementation("com.google.android.filament:filament-android:1.54.5")

@@ -530,7 +530,7 @@ private fun ClimateHighlight(label: String, value: String) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(PanelShape)
             .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(horizontal = GapGroup, vertical = GapRow),
         verticalAlignment = Alignment.CenterVertically,

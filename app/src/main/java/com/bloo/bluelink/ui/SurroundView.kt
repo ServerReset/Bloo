@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 internal fun SurroundNote(text: String, emphasised: Boolean = false) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = SmallShape,
         color = if (emphasised) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Text(
@@ -162,7 +162,7 @@ private fun SurroundCard(c: SurroundCapture, onSave: () -> Unit) {
     val bitmap = remember(c.jpeg) { BitmapFactory.decodeByteArray(c.jpeg, 0, c.jpeg.size)?.asImageBitmap() }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = StandardShape,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -179,7 +179,7 @@ private fun SurroundCard(c: SurroundCapture, onSave: () -> Unit) {
                     bitmap = it,
                     contentDescription = "Surround-view photo",
                     contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
+                    modifier = Modifier.fillMaxWidth().clip(SmallShape),
                 )
             }
         }
