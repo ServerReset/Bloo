@@ -199,35 +199,40 @@ suspend fun CanadaApi.chargeOffer(s: CanadaSession, vehicleId: String, poiId: St
  * Starts a paid charge (iac/startCharge). Returns null when Bluelink accepted it, or the reason it gave when it did not.
  */
 suspend fun CanadaApi.startCharge(s: CanadaSession, vehicleId: String, paymentId: String, poiId: String, payCardId: String?): String? =
-    withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("paymentId", paymentId)
-            put("storeId", "CHARGEPOINT")
-            put("poiId", poiId)
-            putJsonObject("orderInfo") { put("payCardId", payCardId.orEmpty()) }
-            put("tncAgree", true)
-            put("genType", GEN_TYPE)
-        }.toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url(apiUrl + "iac/startCharge").post(body).vehicleHeaders(s, vehicleId).build()
-        val result = call(req).path("result")
-        val code = result.path("resultCode").intLoose()
-        if (code == null || code == 0) null else result.path("errorCaseId").str() ?: result.path("resultMsg").str() ?: "Bluelink did not start the charge"
+    chargeOrder(s, vehicleId, "iac/startCharge", paymentId, poiId, refusal = "Bluelink did not start the charge") {
+        putJsonObject("orderInfo") { put("payCardId", payCardId.orEmpty()) }
+        put("tncAgree", true)
     }
 
 /** Stops a paid charge (iac/stopCharge). Returns null when Bluelink accepted it, or the reason it gave when it did not. */
 suspend fun CanadaApi.stopCharge(s: CanadaSession, vehicleId: String, paymentId: String, poiId: String): String? =
-    withContext(Dispatchers.IO) {
-        val body = buildJsonObject {
-            put("paymentId", paymentId)
-            put("storeId", "CHARGEPOINT")
-            put("poiId", poiId)
-            put("genType", GEN_TYPE)
-        }.toString().toRequestBody(jsonMedia)
-        val req = Request.Builder().url(apiUrl + "iac/stopCharge").post(body).vehicleHeaders(s, vehicleId).build()
-        val result = call(req).path("result")
-        val code = result.path("resultCode").intLoose()
-        if (code == null || code == 0) null else result.path("errorCaseId").str() ?: result.path("resultMsg").str() ?: "Bluelink did not stop the charge"
-    }
+    chargeOrder(s, vehicleId, "iac/stopCharge", paymentId, poiId, refusal = "Bluelink did not stop the charge")
+
+/**
+ * Posts a paid-charge order ([path]) for a ChargePoint station: the payment, the station and [extra] fields. Null when Bluelink accepted
+ * it, else the reason it gave, or [refusal] when it gave none.
+ */
+private suspend fun CanadaApi.chargeOrder(
+    s: CanadaSession,
+    vehicleId: String,
+    path: String,
+    paymentId: String,
+    poiId: String,
+    refusal: String,
+    extra: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit = {},
+): String? = withContext(Dispatchers.IO) {
+    val body = buildJsonObject {
+        put("paymentId", paymentId)
+        put("storeId", "CHARGEPOINT")
+        put("poiId", poiId)
+        extra()
+        put("genType", GEN_TYPE)
+    }.toString().toRequestBody(jsonMedia)
+    val req = Request.Builder().url(apiUrl + path).post(body).vehicleHeaders(s, vehicleId).build()
+    val result = call(req).path("result")
+    val code = result.path("resultCode").intLoose()
+    if (code == null || code == 0) null else result.path("errorCaseId").str() ?: result.path("resultMsg").str() ?: refusal
+}
 
 /** The live numbers for a charge in progress (iac/chargeStatus). */
 suspend fun CanadaApi.chargeStatus(s: CanadaSession, vehicleId: String, vin: String, paymentId: String): ChargeStatus =

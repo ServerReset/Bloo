@@ -113,9 +113,10 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 StartupTrace.trace(StartupLabels.CREDENTIAL_CRYPTO_WARM_UP) {
                     com.bloo.bluelink.data.CredentialStore(applicationContext).warmUp()
                 }
-                // OkHttp's class graph is the heaviest class-load chain; a throwaway client loads it here.
+                // OkHttp's class graph is the heaviest class-load chain. Building the app's one shared client here loads it, and
+                // the first real request then finds the client ready instead of building it on the way.
                 StartupTrace.trace(StartupLabels.OKHTTP_CLASS_WARM_UP) {
-                    okhttp3.OkHttpClient.Builder().build()
+                    com.bloo.bluelink.data.ApiHttp.client
                 }
                 // Coil's singleton loader otherwise builds on main at the first map tile.
                 StartupTrace.trace(StartupLabels.COIL_IMAGE_LOADER_WARM_UP) {

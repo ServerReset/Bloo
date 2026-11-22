@@ -4,8 +4,8 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import android.content.Context
-import com.google.android.gms.tasks.Task
-import com.google.common.util.concurrent.ListenableFuture
+import androidx.concurrent.futures.await
+import kotlinx.coroutines.tasks.await
 import com.google.mlkit.genai.common.DownloadCallback
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
@@ -13,7 +13,6 @@ import com.google.mlkit.genai.summarization.Summarization
 import com.google.mlkit.genai.summarization.SummarizationRequest
 import com.google.mlkit.genai.summarization.Summarizer
 import com.google.mlkit.genai.summarization.SummarizerOptions
-import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -24,10 +23,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  */
 class Ai(context: Context) {
     private val app = context.applicationContext
-    // A same-thread "executor" used only to bridge Google's ListenableFuture callback API into a
-    // coroutine below; it just runs the callback inline on whichever thread completes the future;
-    // there's no actual thread pool here.
-    private val direct = Executor { it.run() }
 
     private companion object {
         // ML Kit's ARTICLE summarizer requires at least this many input characters.
@@ -166,26 +161,5 @@ class Ai(context: Context) {
                 })
             }
         }
-    }
-
-    // Adapts Google Play Services' Task callback API (onSuccess/onFailure listeners) into a single
-    // suspend call: whichever listener fires first resumes the coroutine with a value or an
-    // exception respectively.
-    private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
-        addOnSuccessListener { if (cont.isActive) cont.resume(it) }
-        addOnFailureListener { if (cont.isActive) cont.resumeWithException(it) }
-    }
-
-    // Same idea as the Task.await() above but for Guava's ListenableFuture, which only offers a
-    // Runnable-callback + Executor API rather than separate success/failure listeners.
-    private suspend fun <T> ListenableFuture<T>.await(): T = suspendCancellableCoroutine { cont ->
-        addListener({
-            try {
-                if (cont.isActive) cont.resume(get())
-            } catch (e: Throwable) {
-                if (cont.isActive) cont.resumeWithException(e)
-            }
-        }, direct)
-        cont.invokeOnCancellation { cancel(false) }
     }
 }

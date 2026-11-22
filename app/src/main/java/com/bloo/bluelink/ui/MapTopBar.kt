@@ -525,17 +525,7 @@ private fun MapBarCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // The car's side: it fades and slides in from the start as the bar grows, and is silent while nothing is selected.
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .clipToBounds()
-                        .graphicsLayer {
-                            val p = lineProgress()
-                            alpha = p
-                            translationX = -(1f - p) * slidePx
-                        }
-                        .then(if (selected) Modifier else Modifier.clearAndSetSemantics {}),
-                ) {
+                Box(Modifier.weight(1f).barSideReveal(lineProgress, slidePx, fromStart = true, selected = selected)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -569,17 +559,7 @@ private fun MapBarCard(
                     )
                 }
                 // The charge and the range at the end: they fade and slide in from the end, as the car's side does from the start.
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .clipToBounds()
-                        .graphicsLayer {
-                            val p = lineProgress()
-                            alpha = p
-                            translationX = (1f - p) * slidePx
-                        }
-                        .then(if (selected) Modifier else Modifier.clearAndSetSemantics {}),
-                ) {
+                Box(Modifier.weight(1f).barSideReveal(lineProgress, slidePx, fromStart = false, selected = selected)) {
                     // The charge and the range on one line at the end, so the car's figures read as a pair.
                     Row(
                         Modifier.fillMaxWidth(),
@@ -630,3 +610,15 @@ private fun MapBarCard(
     }
 }
 
+/**
+ * One side of the open map bar's car line: clipped to its slot, it fades in and slides in from its own edge (the start, or the end) as the
+ * bar grows ([progress] 0 to 1), and is hidden from accessibility while no car is selected.
+ */
+private fun Modifier.barSideReveal(progress: () -> Float, slidePx: Float, fromStart: Boolean, selected: Boolean): Modifier =
+    clipToBounds()
+        .graphicsLayer {
+            val p = progress()
+            alpha = p
+            translationX = (if (fromStart) -1f else 1f) * (1f - p) * slidePx
+        }
+        .then(if (selected) Modifier else Modifier.clearAndSetSemantics {})

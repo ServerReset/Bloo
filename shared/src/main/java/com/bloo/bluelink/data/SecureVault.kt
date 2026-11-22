@@ -203,21 +203,10 @@ internal object UserAuthKeystoreWrapper : VaultKeyWrapper {
 
     override val locked: Boolean get() = lockedFlag.get()
 
-    private fun key(): SecretKey {
-        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
-        val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        gen.init(
-            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .setUserAuthenticationRequired(true)
-                .setUserAuthenticationValidityDurationSeconds(WINDOW_SECONDS)
-                .setInvalidatedByBiometricEnrollment(false)
-                .build(),
-        )
-        return gen.generateKey()
+    private fun key(): SecretKey = keystoreAesKey(ALIAS) {
+        setUserAuthenticationRequired(true)
+        setUserAuthenticationValidityDurationSeconds(WINDOW_SECONDS)
+        setInvalidatedByBiometricEnrollment(false)
     }
 
     override fun wrap(dek: ByteArray): ByteArray {
@@ -249,19 +238,7 @@ internal object UserAuthKeystoreWrapper : VaultKeyWrapper {
 private object KeystoreWrapper : VaultKeyWrapper {
     private const val ALIAS = "bloo_vault_key_v1"
 
-    private fun key(): SecretKey {
-        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
-        val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        gen.init(
-            KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .build(),
-        )
-        return gen.generateKey()
-    }
+    private fun key(): SecretKey = keystoreAesKey(ALIAS)
 
     override fun wrap(dek: ByteArray): ByteArray {
         val c = Cipher.getInstance("AES/GCM/NoPadding")
@@ -274,4 +251,23 @@ private object KeystoreWrapper : VaultKeyWrapper {
         c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, blob.copyOfRange(0, 12)))
         c.doFinal(blob, 12, blob.size - 12)
     }.getOrNull()
+}
+
+/**
+ * The AES-256-GCM Keystore key under [alias], made on first use and never exportable. [extra] adds a slot's own conditions (the
+ * unlock-bound slot requires a recent screen unlock); the base settings are the same for every slot.
+ */
+private fun keystoreAesKey(alias: String, extra: KeyGenParameterSpec.Builder.() -> Unit = {}): SecretKey {
+    val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    (ks.getKey(alias, null) as? SecretKey)?.let { return it }
+    val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+    gen.init(
+        KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .apply(extra)
+            .build(),
+    )
+    return gen.generateKey()
 }

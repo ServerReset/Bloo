@@ -30,7 +30,7 @@ import com.bloo.bluelink.data.setPrimaryDevice
 import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.wear.WatchPresence
 import com.bloo.bluelink.wear.WatchSignIn
-import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.ReorderableRows
 import kotlinx.coroutines.delay
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
@@ -100,7 +100,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
     // Read again when the sign-in moves on, so the sign-in button goes away the moment the watch acknowledges it.
     val signedIn = remember(liveWatch, signInState) { liveWatch?.let { WatchSignIn.isSignedIn(context, it.id) } ?: false }
 
-    ReorderColumn(
+    ReorderableRows(
         items = phones,
         keyOf = { it.id },
         // Dropped in a new order → the new TOP device becomes primary. setPrimaryDevice persists it
@@ -108,7 +108,7 @@ private fun SyncDevicesContent(state: UiState, vm: AppViewModel) {
         onReorder = { reordered -> reordered.firstOrNull()?.let { vm.setPrimaryDevice(it.id) } },
         spacing = GapRow,
     ) { device, itemDragHandle, dragging ->
-        // A Column, not loose children: a ReorderColumn item slot stacks its children on top of
+        // A Column, not loose children: a reorderable row slot stacks its children on top of
         // each other, which drew the watch row and "Set up watch" straight over the phone row.
         //
         // spacedBy(GapRow), not a Spacer between each pair: that is how every other stack of rows in

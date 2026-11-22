@@ -1,6 +1,5 @@
 package com.bloo.bluelink.svm3d
 
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
@@ -46,7 +45,8 @@ class ModelStore(private val dir: File) {
     /** Downloads whatever is missing. [progress] gets 0..1 across what's missing. */
     fun download(progress: (Float) -> Unit) {
         dir.mkdirs()
-        val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).followRedirects(true).build()
+        // The shared HTTP stack's pool and threads, with only the read timeout a large download needs (redirects are followed by default).
+        val client = com.bloo.bluelink.data.ApiHttp.client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()
         val todo = missingBytes.coerceAtLeast(1)
         var done = 0L
         for (m in ALL) {

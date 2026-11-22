@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -124,13 +123,11 @@ object LiveCharge {
             // tick, plus V more per persistSnapshots() -- which runs up to three times per
             // command and is also the debounced target for text-field edits, so typing a
             // license plate cost V durable writes.
-            runCatching { if (settings.liveChargeDismissed(vin)) settings.setLiveChargeDismissed(vin, false) }
+            com.bloo.bluelink.suspendRunCatching { if (settings.liveChargeDismissed(vin)) settings.setLiveChargeDismissed(vin, false) }
             update(context, vin, carName, charging = false)
             return
         }
-        if (runCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
-        // Large icon removed - widget system deleted
-        val carPhoto = null
+        if (com.bloo.bluelink.suspendRunCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
         update(
             context = context,
             vin = vin,
@@ -141,7 +138,6 @@ object LiveCharge {
             pluggedInLabel = pluggedInLabel,
             enabled = true,
             chargeLimit = chargeLimit,
-            carPhoto = carPhoto,
         )
     }
 
@@ -159,11 +155,6 @@ object LiveCharge {
         pluggedInLabel: String? = null,
         enabled: Boolean = true,
         chargeLimit: Int? = null,
-        /**
-         * The car's own photo, already decoded (see [sync]) -- shown as the notification's large
-         * icon so the bar reads as THIS car, the same way the hero card's photo does.
-         */
-        carPhoto: Bitmap? = null,
     ) {
         val id = idFor(vin)
         // Check THIS feature's own channel, not the alerts channel: the charging bar posts to
@@ -250,7 +241,6 @@ object LiveCharge {
             // background: a promoted notification can never have a custom background image, because
             // that means customContentView (RemoteViews), and RemoteViews is promotion condition
             // 6's explicit disqualifier.
-            .apply { carPhoto?.let { setLargeIcon(it) } }
             // VISIBILITY_PUBLIC, restored from the working version. Without it the default is
             // VISIBILITY_PRIVATE, and a secured lock screen hides a private notification's content
             // -- on the lock screen and the always-on display, which are two of the three places a

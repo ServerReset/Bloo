@@ -124,52 +124,58 @@ object WearNotifier {
      * Recents while it charges, not only in the shade. The activity's status carries the percentage, and the card is rebuilt (and so
      * re-applied) each time the car's state changes; stopping the charge cancels it.
      */
-    private fun chargingCard(app: Context, v: VehicleSnapshot): Notification {
-        val touch = openApp(app)
-        val builder = NotificationCompat.Builder(app, CHANNEL_CHARGING)
-            .setSmallIcon(R.drawable.ic_stat_bloo)
-            .setContentTitle("${v.name} charging")
-            .setContentText(listOfNotNull(v.percent?.let { "$it%" }, v.rangeMi?.let { "$it mi" }).joinToString(" · "))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setContentIntent(touch)
-            .apply {
-                v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) }
-                addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
-            }
-        val status = Status.Builder()
+    private fun chargingCard(app: Context, v: VehicleSnapshot): Notification = ongoingCard(
+        app, v, kind = "charging", channel = CHANNEL_CHARGING, category = NotificationCompat.CATEGORY_PROGRESS,
+        title = "${v.name} charging",
+        status = Status.Builder()
             .addTemplate("#what# #level#")
             .addPart("what", Status.TextPart("Charging"))
             .addPart("level", Status.TextPart(v.percent?.let { "$it%" } ?: ""))
-            .build()
-        OngoingActivity.Builder(app, idFor(v.vin, "charging"), builder)
-            .setStaticIcon(R.drawable.ic_stat_bloo)
-            .setTouchIntent(touch)
-            .setStatus(status)
-            .build()
-            .apply(app)
-        return builder.build()
+            .build(),
+    ) {
+        setContentText(listOfNotNull(v.percent?.let { "$it%" }, v.rangeMi?.let { "$it mi" }).joinToString(" · "))
+        v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) }
+        addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
     }
 
     /**
      * The live climate card: an ongoing notification and activity while the car's climate runs, with a Stop. Same shape as the charging card.
      */
-    private fun climateCard(app: Context, v: VehicleSnapshot): Notification {
-        val touch = openApp(app)
-        val builder = NotificationCompat.Builder(app, CHANNEL_LIVE)
-            .setSmallIcon(R.drawable.ic_stat_bloo)
-            .setContentTitle("${v.name} climate on")
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setContentIntent(touch)
-            .addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CLIMATE_OFF))
-        val status = Status.Builder()
+    private fun climateCard(app: Context, v: VehicleSnapshot): Notification = ongoingCard(
+        app, v, kind = "climate", channel = CHANNEL_LIVE, category = NotificationCompat.CATEGORY_STATUS,
+        title = "${v.name} climate on",
+        status = Status.Builder()
             .addTemplate("#what#")
             .addPart("what", Status.TextPart("Climate on"))
-            .build()
-        OngoingActivity.Builder(app, idFor(v.vin, "climate"), builder)
+            .build(),
+    ) {
+        addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CLIMATE_OFF))
+    }
+
+    /**
+     * An ongoing card for [v]: an ongoing notification that opens the app, paired with an ongoing activity carrying [status], so it shows
+     * on the watch face and in Recents as well as in the shade. [extra] adds the card's own text, progress and actions.
+     */
+    private fun ongoingCard(
+        app: Context,
+        v: VehicleSnapshot,
+        kind: String,
+        channel: String,
+        category: String,
+        title: String,
+        status: Status,
+        extra: NotificationCompat.Builder.() -> Unit,
+    ): Notification {
+        val touch = openApp(app)
+        val builder = NotificationCompat.Builder(app, channel)
+            .setSmallIcon(R.drawable.ic_stat_bloo)
+            .setContentTitle(title)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(category)
+            .setContentIntent(touch)
+            .apply(extra)
+        OngoingActivity.Builder(app, idFor(v.vin, kind), builder)
             .setStaticIcon(R.drawable.ic_stat_bloo)
             .setTouchIntent(touch)
             .setStatus(status)

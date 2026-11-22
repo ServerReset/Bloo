@@ -3,7 +3,6 @@ package com.bloo.bluelink.data
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -28,7 +27,8 @@ object PrivacyCopy {
     private const val FILE = "privacy-plain.html"
 
     private val client by lazy {
-        OkHttpClient.Builder()
+        // The shared HTTP stack's pool and threads, with this page's own short timeouts.
+        com.bloo.bluelink.data.ApiHttp.client.newBuilder()
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(8, TimeUnit.SECONDS)
             .callTimeout(12, TimeUnit.SECONDS)

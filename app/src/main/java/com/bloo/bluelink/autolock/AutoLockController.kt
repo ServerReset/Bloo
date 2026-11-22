@@ -57,7 +57,7 @@ data class AutoLockEvalState(
 object AutoLockController {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     // ConcurrentHashMap, not a plain HashMap guarded by nothing: the Bluetooth receiver's
-    // coroutine, the service's, and a geofence/activity receiver's can all touch these for
+    // coroutine, the service's, and the Activity Recognition receiver can all touch these for
     // different VINs (or race the same one) from different threads.
     private val locks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
     private val jobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
@@ -73,7 +73,6 @@ object AutoLockController {
 
     private fun mutexFor(vin: String): Mutex = locks.getOrPut(vin) { Mutex() }
 
-    /** Bluetooth (or manual "simulate leaving") trigger: begin an evaluation for [vin]. */
     /** Sign-out: forget every car in [vins] -- cancel its evaluation and drop its state. */
     fun forgetAll(vins: Collection<String>) {
         if (vins.isEmpty()) return
@@ -87,6 +86,7 @@ object AutoLockController {
         _state.update { it - vins.toSet() }
     }
 
+    /** Bluetooth (or manual "simulate leaving") trigger: begin an evaluation for [vin]. */
     fun onTriggerFired(context: Context, vin: String) {
         jobs[vin]?.cancel()
         jobs[vin] = scope.launch { runEvaluation(context.applicationContext, vin) }
@@ -109,11 +109,6 @@ object AutoLockController {
         _state.value.filterValues { it.detection == DetectionState.CONFIRMING }.keys.forEach { onWalkingConfirmed(it) }
     }
 
-    fun onMovedBeyondGeofence(vin: String) {
-        walkAwayConfirmed.add(vin)
-        machines[vin]?.let { advance(vin, it.next(stateFor(vin).detection, DetectionEvent.MovedBeyondGeofence)) }
-    }
-
     /** Reconnect or user cancel: abort a pending evaluation for [vin], if any. */
     fun cancel(vin: String) {
         jobs[vin]?.cancel()
@@ -127,7 +122,7 @@ object AutoLockController {
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
             // Physical detection is mandatory: a walk must be confirmed by Activity Recognition before a lock, whatever is saved.
-            val settings = SettingsStore(context).autoLockConfig(vin).copy(useActivityRecognition = true)
+            val settings = SettingsStore(context).autoLockConfig(vin)
             if (!settings.enabled) return@withLock
 
             // Without Activity Recognition no walk can ever be confirmed, so every evaluation would end in silence. Say so instead.
@@ -144,20 +139,20 @@ object AutoLockController {
                 return@withLock
             }
 
-            val sm = LockStateMachine(settings.useActivityRecognition, settings.useGeofence).also { machines[vin] = it }
+            val sm = LockStateMachine().also { machines[vin] = it }
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
             ActivityRecognitionManager.start(context)
             startedActivityRecognition = true
 
-            // Wait for corroborating signals (activity + geofence) to promote CONFIRMING -> GRACE,
-            // or time out and either proceed on the Bluetooth signal alone or skip, per settings.
+            // Wait for Activity Recognition to confirm a walk (CONFIRMING -> GRACE). With no walk by the deadline, skip: a Bluetooth
+            // disconnect alone never locks.
             val confirmDeadline = System.currentTimeMillis() + CONFIRM_TIMEOUT_MS
             while (stateFor(vin).detection == DetectionState.CONFIRMING) {
                 if (System.currentTimeMillis() > confirmDeadline) {
                     val confirmed = walkAwayConfirmed.contains(vin)
-                    if ((settings.useActivityRecognition || settings.useGeofence) && !confirmed) {
+                    if (!confirmed) {
                         _state.update {
                             it + (vin to AutoLockEvalState(
                                 detection = DetectionState.SKIPPED,
@@ -204,7 +199,7 @@ object AutoLockController {
                 return@withLock
             }
 
-            when (val decision = LockPolicy.decide(status, dontLockIfOpen = settings.dontLockIfOpen)) {
+            when (val decision = LockPolicy.decide(status)) {
                 is LockDecision.Skip -> {
                     _state.update {
                         it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED, lastOutcome = "Skipped. ${decision.reason}."))

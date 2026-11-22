@@ -219,17 +219,7 @@ object Notifications {
         // Returns whether the notification actually went out. Every caller but one ignores
         // it; UpdateCheckWorker must not, because it records "already told them about this
         // build" and had been doing so even when this returned early.
-        // Re-check explicitly right before the call (not just through
-        // [hasPermission], which lint can't reason through): the check above is
-        // still the TOCTOU race the runCatching guards, but this local read makes
-        // the permission contract explicit at the call site and keeps lint's
-        // MissingPermission analysis honest.
-        if (androidx.core.app.ActivityCompat.checkSelfPermission(
-                context, android.Manifest.permission.POST_NOTIFICATIONS,
-            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
-        }
+        // postBuilt re-reads the permission right before notify() (lint's contract at the call site) and guards the race.
         return postBuilt(context, id, builder)
     }
 }

@@ -60,14 +60,14 @@ import kotlinx.coroutines.launch
  */
 val coldStartIntroPlayed = mutableSetOf<Any>()
 
-/** The spring a released pebble flies into its drop target on (see [ReorderColumn]'s onDragEnd). */
 /** A put-down that is not a pin: a short, slightly springy settle into the slot it belongs in. */
 private val DragSettleSpec = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
 
+/** The spring a released pebble flies into its drop target on (see [ReorderColumn]'s onDragEnd). */
 private val DragFlightSpec = spring<Float>(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
 
 @Composable
-fun <T> ReorderColumn(
+internal fun <T> ReorderColumn(
     items: List<T>,
     keyOf: (T) -> Any,
     onReorder: (List<T>) -> Unit,

@@ -142,7 +142,7 @@ object WeatherApi {
     // isLenient to tolerate minor JSON quirks from the API.
     private val json = BlooLenientJson
 
-    // A dedicated client (its own pool) with generous-but-bounded timeouts: weather is a
+    // The shared stack with generous-but-bounded timeouts: weather is a
     // nice-to-have, so give a flaky connection a real chance to succeed, but still cap it so a hung
     // request doesn't block a caller indefinitely. See ApiHttp.shortTimeoutClient.
     private val client: OkHttpClient = ApiHttp.shortTimeoutClient()

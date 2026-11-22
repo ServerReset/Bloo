@@ -258,7 +258,6 @@ class MainActivity : FragmentActivity() {
         handleShareIntent(intent)
     }
 
-    /** Route an app-icon shortcut (lock/unlock/climate/open a car) to the VM. */
     /** A picture or a settings file shared into the app from another app's share sheet; see ShareIntake.kt. */
     private fun handleShareIntent(intent: Intent?) {
         if (intent?.action != Intent.ACTION_SEND) return
@@ -268,6 +267,7 @@ class MainActivity : FragmentActivity() {
         intent.action = null
     }
 
+    /** Route an app-icon shortcut (lock/unlock/climate/open a car) to the VM. */
     private fun handleShortcutIntent(intent: Intent?) {
         if (intent?.action != Shortcuts.ACTION) return
         val vin = intent.getStringExtra(Shortcuts.EXTRA_VIN) ?: return

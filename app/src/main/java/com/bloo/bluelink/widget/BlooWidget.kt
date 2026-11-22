@@ -274,15 +274,18 @@ private fun StatusChips(car: VehicleSnapshot, maxChips: Int = 3) {
     }
 }
 
+/** The controls the widget offers for [car], in order, honouring its options: lock always, then climate, charge (a car with a battery) and lights, at most [max]. */
+private fun widgetActions(car: VehicleSnapshot, opts: WidgetOptions, max: Int): List<CarAction> = buildList {
+    add(CarAction.TOGGLE_LOCK)
+    if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
+    if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
+    if (opts.flash) add(CarAction.FLASH_LIGHTS)
+}.take(max)
+
 /** SIDE: the controls as a grid of circles beside the readout. */
 @Composable
 private fun ControlGrid(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, plan: WidgetPlan) {
-    val actions = buildList {
-        add(CarAction.TOGGLE_LOCK)
-        if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
-        if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
-        if (opts.flash) add(CarAction.FLASH_LIGHTS)
-    }.take(plan.maxActions)
+    val actions = widgetActions(car, opts, plan.maxActions)
     val cols = plan.gridColumns.coerceAtLeast(1)
     Column(verticalAlignment = Alignment.CenterVertically) {
         actions.chunked(cols).forEachIndexed { r, rowActions ->
@@ -363,12 +366,7 @@ private fun RefreshButton(car: VehicleSnapshot, pending: String?) {
  */
 @Composable
 private fun Actions(car: VehicleSnapshot, pending: String?, armed: Boolean, opts: WidgetOptions, maxActions: Int, heightDp: Float, gridColumns: Int = 0) {
-    val actions = buildList {
-        add(CarAction.TOGGLE_LOCK)
-        if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
-        if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
-        if (opts.flash) add(CarAction.FLASH_LIGHTS)
-    }.take(maxActions)
+    val actions = widgetActions(car, opts, maxActions)
     // The controls SHARE the row, each an equal slice: no empty run beside them, and every tap target is as
     // big as the widget allows (never under the 44dp the row is tall).
     if (gridColumns > 0) {

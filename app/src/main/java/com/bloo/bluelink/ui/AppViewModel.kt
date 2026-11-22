@@ -221,10 +221,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val cacheWrite = Mutex()
 
-    /**
-     * Write the current live status/location maps to disk (survives restart). One write at a time, and the state is read
-     * once the write's turn comes: a save started earlier can no longer land after (and overwrite) a newer one.
-     */
     /** The logging choice: Off, Simple (the activity log) or Advanced (plus the performance and watch detail). */
     fun setLogLevel(level: com.bloo.bluelink.data.LogLevel) {
         com.bloo.bluelink.data.DiagSettings.setLevel(getApplication(), level)
@@ -233,16 +229,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Advanced logging on or off: the perf monitor's detailed timing and the watch's own log. The watch learns of it with the next sync,
-     * which is pushed straight away so its log starts at once.
+     * Write the current live status/location maps to disk (survives restart). One write at a time, and the state is read
+     * once the write's turn comes: a save started earlier can no longer land after (and overwrite) a newer one.
      */
-    fun setAdvancedLoggingOn(on: Boolean) {
-        com.bloo.bluelink.data.DiagSettings.setAdvanced(getApplication(), on)
-        com.bloo.bluelink.perf.PerfMonitor.setAdvanced(com.bloo.bluelink.data.DiagSettings.advanced)
-        com.bloo.bluelink.data.AppLog.log("Advanced logging ${if (com.bloo.bluelink.data.DiagSettings.advanced) "on" else "off"}")
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
-    }
-
     internal fun persistCache() {
         viewModelScope.launch {
             cacheWrite.withLock {
@@ -329,9 +318,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val currentBuildNumber: Int get() = com.bloo.bluelink.BuildConfig.BUILD_RUN_NUMBER
 
-    /** Per-VIN pending debounced climate save (see saveClimateDebounced). */
     /** Keyboard shortcuts for the screen that owns them (help, search, settings, back); see [onShortcut]. */
     internal val shortcutEvents = kotlinx.coroutines.flow.MutableSharedFlow<Shortcut>(extraBufferCapacity = 8)
+    /** Per-VIN pending debounced climate save (see saveClimateDebounced). */
     internal val climateSaveJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
     /** The watch-the-car-until-it-agrees job for each command key; a newer command for the same action replaces it. */
     internal val commandConfirmJobs = mutableMapOf<String, kotlinx.coroutines.Job>()

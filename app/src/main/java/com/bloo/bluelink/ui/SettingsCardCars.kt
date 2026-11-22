@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.bloo.uicommon.ReorderColumn
+import com.bloo.uicommon.ReorderableRows
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalHaptics
@@ -37,7 +37,7 @@ internal fun CarsCardContent(state: UiState, vm: AppViewModel, pick: (String) ->
         androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(GapRow)) {
         // The reorder gesture is a long-press, so say so (TalkBack users get Move up / Move down).
         BodySmallText("Hold a car and drag to change their order.")
-        ReorderColumn(
+        ReorderableRows(
             items = state.vehicles,
             keyOf = { it.vin },
             onReorder = { vm.reorderVehicles(it) },
