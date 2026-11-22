@@ -134,7 +134,8 @@ adb shell wm size
 
 # Brings the app back to the front if anything (a stray gesture, the system) sent it away.
 front() {
-  if ! adb shell dumpsys activity activities | grep -q "mResumedActivity.*$PKG"; then
+  # mCurrentFocus names the window in front on every recent release (mResumedActivity is gone from Android 14's dumpsys).
+  if ! adb shell dumpsys window | grep -E "mCurrentFocus|mFocusedApp" | grep -q "$PKG"; then
     echo "app not in front before $1: relaunching"
     launch 15
   fi

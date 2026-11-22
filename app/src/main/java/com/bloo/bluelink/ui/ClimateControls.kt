@@ -425,7 +425,6 @@ internal fun ClimateTileGrid(tiles: List<ClimateTile>) {
         tiles.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GapRow)) {
                 row.forEach { tile -> ClimateTileCell(tile, Modifier.weight(1f)) }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }

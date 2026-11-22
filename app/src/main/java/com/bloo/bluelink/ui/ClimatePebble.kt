@@ -347,7 +347,9 @@ internal fun ClimatePebble(
         // in reach without opening anything first. They give way to the running summary while climate is on.
         ExpandVisibility(!climateOn) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                ClimateSubPanel {
+                // Only once there is a preset: with none, the panel was an empty pill (the way to make one is "Save as preset" below).
+                // It folds away with the list, so deleting the last preset still animates out.
+                ExpandVisibility(presets.isNotEmpty()) { ClimateSubPanel {
                     ClimatePresetSection(
                         presets = presets,
                         activeId = activePresetId,
@@ -363,9 +365,10 @@ internal fun ClimatePebble(
                         seats = seats,
                         showSeats = showSeatControls,
                     )
-                }
+                } }
+                // No heading: the panel is the temperature, the duration and the features as well as the seats and wheel, and a
+                // heading naming the card again ("Climate") would add a word and no meaning.
                 ClimateSubPanel {
-                    SectionLabel("Seats & wheel")
                     ClimateControlsSection(
                         form = form,
                         fahrenheit = fahrenheit,
@@ -420,7 +423,8 @@ private fun SmartClimateSection(
             if (ambientF != null) RevealMutedText("${degLabel(ambientF.toString(), fahrenheit)} outside")
         }
         if (plan == null || ambientF == null) {
-            MorphActionButton(label = CarLabels.SMART_CLIMATE, icon = Icons.Filled.AcUnit, onClick = onStartUnread, enabled = enabled)
+            // Not the section's own name again: the heading above already says "Smart climate". The button reads the weather and starts.
+            MorphActionButton(label = "Start smart climate", icon = Icons.Filled.AcUnit, onClick = onStartUnread, enabled = enabled)
             return@Column
         }
         RevealText(degLabel(plan.targetF.toString(), fahrenheit), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
