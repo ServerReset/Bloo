@@ -70,6 +70,7 @@ import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.Powertrain
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
+import com.bloo.uicommon.tempColor
 
 // --- Climate --------------------------------------------------------------
 
@@ -436,6 +437,8 @@ private fun SmartClimateSection(
             text = degLabel(target.toString(), fahrenheit),
             style = MaterialTheme.typography.displaySmall,
             fontWeight = FontWeight.Black,
+            // The same warm-to-cool tint as the temperature control below, so both temperatures on the card read alike.
+            color = tempColor(target, CLIMATE_TEMP_RANGE_F.first.toFloat(), CLIMATE_TEMP_RANGE_F.last.toFloat()),
         )
         val scheme = MaterialTheme.colorScheme
         val haptics = LocalHaptics.current
