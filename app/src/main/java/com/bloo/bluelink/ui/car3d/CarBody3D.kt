@@ -119,9 +119,11 @@ class CarShape(
         /** tools/model/generic.py's anchors file. */
         fun parse(text: String): CarShape {
             val o = Json.parseToJsonElement(text).jsonObject
-            fun d(k: String) = o[k]!!.jsonPrimitive.double
+            // A missing anchor is a broken model file: name it, rather than a bare NullPointerException.
+            fun at(k: String) = requireNotNull(o[k]) { "Car model anchors are missing \"$k\"" }
+            fun d(k: String) = at(k).jsonPrimitive.double
             fun vec(e: kotlinx.serialization.json.JsonElement) = e.jsonArray.map { it.jsonPrimitive.double }.toDoubleArray()
-            fun pair(k: String) = vec(o[k]!!).let { it[0] to it[1] }
+            fun pair(k: String) = vec(at(k)).let { it[0] to it[1] }
             val cowl = pair("cowl")
             val top = pair("windshieldTop")
             // 85 % of the way up the windshield, just inside it.
@@ -129,8 +131,8 @@ class CarShape(
             val defrost = (cowl.first - f * (cowl.first - top.first)) to (cowl.second + f * (top.second - cowl.second) - 0.04)
             return CarShape(
                 halfLength = d("length") / 2, halfWidth = d("width") / 2 + 0.03, height = d("height"), nose = d("nose"),
-                chargePort = vec(o["chargePort"]!!),
-                chargePortNormal = vec(o["chargePortNormal"]!!),
+                chargePort = vec(at("chargePort")),
+                chargePortNormal = vec(at("chargePortNormal")),
                 cable = (o["cablePath"] as JsonArray).map { vec(it) },
                 hood = (o["hood"] as JsonArray).map { vec(it).let { p -> p[0] to p[1] } },
                 cowl = cowl,

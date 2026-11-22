@@ -5,20 +5,26 @@ plugins {
 }
 
 // The plain privacy policy the app's viewer shows comes from docs/ (the GitHub Pages site). It is copied into the build here, so
-// changing the page changes what the app shows, and no code or copy in the app needs editing.
-val privacyAssets = layout.buildDirectory.dir("generated/privacyAssets").get().asFile
-val copyPrivacyPolicy by tasks.registering(Copy::class) {
-    from(rootProject.file("docs/privacy-plain.html"))
-    into(privacyAssets)
+// changing the page changes what the app shows, and no code or copy in the app needs editing. Each variant registers the copy as a
+// generated assets directory (see androidComponents below), so the tasks that read assets depend on it and nothing else does: a
+// blanket dependsOn on every task made even `clean` and `help` copy it.
+abstract class CopyPrivacyPolicy : DefaultTask() {
+    @get:InputFile
+    abstract val source: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile
+        out.mkdirs()
+        source.get().asFile.copyTo(out.resolve("privacy-plain.html"), overwrite = true)
+    }
 }
-// Every task that could read the assets (merging, lint, packaging) runs after the copy, so none reads a stale or missing file.
-tasks.configureEach { if (name != copyPrivacyPolicy.name) dependsOn(copyPrivacyPolicy) }
 
 android {
     namespace = "com.bloo.bluelink"
-    sourceSets.getByName("main") {
-        assets.srcDir(privacyAssets)
-    }
     compileSdk = 37
 
     defaultConfig {
@@ -179,6 +185,10 @@ android {
 
 androidComponents {
     onVariants { variant ->
+        val copyPrivacy = tasks.register<CopyPrivacyPolicy>("copy${variant.name.replaceFirstChar { it.uppercase() }}PrivacyPolicy") {
+            source.set(rootProject.file("docs/privacy-plain.html"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(copyPrivacy, CopyPrivacyPolicy::outputDir)
         // The sideload APK keeps the plain name: it is what the rolling GitHub Release has always
         // attached, and the in-app updater matches on exactly that name (see UpdateApi). The Play
         // flavor is uploaded as an AAB, so its APK name only has to be distinct.

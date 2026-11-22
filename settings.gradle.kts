@@ -1,16 +1,6 @@
 pluginManagement {
     repositories {
-        // Sonatype OSS Repository (often has cached Android artifacts)
-        maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots/") }
-        maven { url = uri("https://oss.sonatype.org/content/repositories/releases/") }
-        // JCenter (legacy but may have cached artifacts)
-        maven { url = uri("https://jcenter.bintray.com/") }
-        // Maven Central mirrors
-        maven { url = uri("https://repo1.maven.org/maven2/") }
-        maven { url = uri("https://repo.maven.apache.org/maven2/") }
-        mavenCentral()
-        gradlePluginPortal()
-        // Google repo - may be blocked by proxy
+        // Google first: the Android Gradle plugin and AndroidX live there.
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -18,6 +8,8 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
+        mavenCentral()
+        gradlePluginPortal()
     }
 }
 dependencyResolutionManagement {

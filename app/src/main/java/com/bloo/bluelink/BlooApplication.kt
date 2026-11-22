@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.bloo.uicommon.content
+import kotlinx.coroutines.launch
 
 /**
  * Installs a process-wide uncaught exception handler first thing, handing a crash off to
@@ -76,12 +77,10 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         .respectCacheHeaders(false)
         .build()
 
-    // Deliberately not chaining to the default handler: it owns the whole crash path (report, CrashActivity,
-    // kill), and delegating would show the system "app has stopped" dialog over CrashActivity.
-    @android.annotation.SuppressLint("DefaultUncaughtExceptionDelegation")
     override fun onCreate() {
         StartupTrace.mark(StartupLabels.APPLICATION_ON_CREATE_BEGIN)
         super.onCreate()
+        installCrashHandler()
         // The activity log is kept in a file as well as in the panel's buffer, so a long session can be saved in full.
         com.bloo.bluelink.data.ActivityLogFile.init(this)
         com.bloo.bluelink.data.AppLog.sink = { com.bloo.bluelink.data.ActivityLogFile.append(it) }
@@ -95,7 +94,10 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         // on the first launch after install (1ms once warm) -- that is class-load/JIT of a very
         // large class, not its fields, and it lands inside AppViewModel's constructor, i.e. before
         // the first frame.
-        Thread {
+        // On the IO pool at normal priority, not a MIN_PRIORITY thread: the main thread can wait on this work (a class being
+        // initialised here holds its init lock, and the first garage read waits for the same DataStore), and a thread at the
+        // lowest priority can be starved for a long time while main waits behind it.
+        com.bloo.bluelink.ioScope().launch {
             runCatching {
                 StartupTrace.trace(StartupLabels.CLASS_WARM_UP_STORES) {
                     val app = applicationContext
@@ -133,17 +135,15 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // Settings DataStore first read (file open + preferences protobuf parse), which the
                 // auto-login's own appearance.first() otherwise pays on the path to the garage --
                 // 452ms measured on the API 34 emulator.
-                StartupTrace.trace(StartupLabels.SETTINGS_DATASTORE_WARM_UP) {
-                    kotlinx.coroutines.runBlocking {
-                        com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
-                        com.bloo.bluelink.data.StatusCache(applicationContext).warmUp()
-                        // Snapshot and session stores feed the first garage reads.
-                        com.bloo.bluelink.data.SnapshotStore(applicationContext).warmUp()
-                        com.bloo.bluelink.data.SessionStore(applicationContext).warmUp()
-                    }
-                }
-            }
-        }.apply { priority = Thread.MIN_PRIORITY }.start()
+                val dataStoreStarted = StartupTrace.begin()
+                com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
+                com.bloo.bluelink.data.StatusCache(applicationContext).warmUp()
+                // Snapshot and session stores feed the first garage reads.
+                com.bloo.bluelink.data.SnapshotStore(applicationContext).warmUp()
+                com.bloo.bluelink.data.SessionStore(applicationContext).warmUp()
+                StartupTrace.end(StartupLabels.SETTINGS_DATASTORE_WARM_UP, dataStoreStarted)
+            }.onFailure { com.bloo.bluelink.rethrowIfCancellation(it) }
+        }
         AppLog.log("▶ App starting: ${deviceSummary()}")
         // Watch presence + the live snapshot push (see app/.../wear/). Off the main thread, guarded
         // internally: a phone with no watch, or no Play Services at all, just reads as "no watch
@@ -156,6 +156,16 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
             runCatching { com.bloo.bluelink.update.UpdateCleanup.clearStagedDownloads(applicationContext) }
         }.apply { priority = Thread.MIN_PRIORITY }.start()
         StartupTrace.mark(StartupLabels.APPLICATION_ON_CREATE_END)
+    }
+
+    /**
+     * Sends any uncaught exception to [CrashActivity] with a report. Installed first thing in [onCreate], before any background work
+     * starts, so a crash in that work (or in onCreate itself) still reaches the crash screen.
+     */
+    // Deliberately not chaining to the default handler: it owns the whole crash path (report, CrashActivity,
+    // kill), and delegating would show the system "app has stopped" dialog over CrashActivity.
+    @android.annotation.SuppressLint("DefaultUncaughtExceptionDelegation")
+    private fun installCrashHandler() {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val trace = Log.getStackTraceString(throwable)
             Log.e("BlooCrash", "Uncaught exception on ${thread.name}:\n$trace")
