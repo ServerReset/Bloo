@@ -15,7 +15,10 @@ private val Context.dataStore by safePreferencesDataStore("bloo_session")
  * at the same time. The service PIN is required as a header on every remote command, so it is
  * stored locally on-device only, in the encrypted [SecureVault] with the credentials.
  */
-class SessionStore(private val context: Context) {
+class SessionStore(context: Context) {
+    // The application context: a store can outlive whatever screen or worker created it (repositories are kept per brand, see repositoryFor).
+    private val context: Context = context.applicationContext
+
     data class Session(
         val accessToken: String,
         val refreshToken: String?,
@@ -29,6 +32,11 @@ class SessionStore(private val context: Context) {
         // refreshed on its own), so they must persist alongside it. See EuApiCci.
         val cci: CciTokens = CciTokens(),
     ) {
+        /** Never the tokens, PIN or account name: a logged object or an exception message must not carry them. */
+        override fun toString(): String =
+            "Session(brand=$brand, accessToken=<redacted>, refreshToken=${if (refreshToken != null) "<redacted>" else "null"}, " +
+                "username=<redacted>, pin=<redacted>, deviceId=${if (deviceId != null) "<set>" else "null"}, cci=$cci)"
+
         companion object {
             /**
              * Build a [Session] from a brand API's own logged-in session. Taking those fields plus

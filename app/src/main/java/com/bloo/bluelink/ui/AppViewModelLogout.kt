@@ -27,6 +27,7 @@ fun AppViewModel.logout(brand: Brand) {
         runCatching { repoFor(brand).logout() }
         credentialStore.clear(brand)
         repos.remove(brand)
+        com.bloo.bluelink.data.forgetRepository(brand)
         AppLog.log("Signed out of ${brand.label}")
         val remaining = credentialStore.loadAll()
         if (remaining.isEmpty()) {

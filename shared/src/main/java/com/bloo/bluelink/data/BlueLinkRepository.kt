@@ -37,12 +37,29 @@ interface VehicleRepository {
     suspend fun hornAndLights(v: Vehicle) {}
 }
 
+/** One repository per brand for the whole process (see [repositoryFor]). */
+private val repositories = java.util.concurrent.ConcurrentHashMap<Brand, VehicleRepository>()
+
 /**
- * Build the right repository for a brand. Kia US rides a different backend ([KiaRepository]); the
+ * The repository for a brand: one per brand for the whole process, so the screen, the background workers, AutoLock and the widgets share
+ * its in-memory session, vehicle list and control tokens. Building one per caller threw those away on every background wake, and each
+ * wake then paid again for the account's vehicle list and a PIN control token against rate-limited brand APIs. The stores are thin
+ * wrappers over process-wide storage, so whichever caller builds the repository first, every caller sees the same data.
+ */
+fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository =
+    repositories[brand] ?: repositories.computeIfAbsent(brand) { buildRepository(brand, store, credentials) }
+
+/** Drops a signed-out brand's repository, so a later sign-in starts from a new one with nothing left from the old account. */
+fun forgetRepository(brand: Brand) {
+    repositories.remove(brand)
+}
+
+/**
+ * Builds the right repository for a brand. Kia US rides a different backend ([KiaRepository]); the
  * three Canada brands share [CanadaApi]; Europe (CCS2) rides [EuApi]; Hyundai/Genesis US share the
  * Hyundai-shaped [BlueLinkApi].
  */
-fun repositoryFor(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository {
+private fun buildRepository(brand: Brand, store: SessionStore, credentials: CredentialStore): VehicleRepository {
     // Timed as a whole: constructing an Api builds an OkHttpClient (dispatcher, thread pools,
     // interceptors), which is real work and, for the cold-start path, lands on whichever thread
     // first calls a repository -- the main thread for a cold auto-login.
@@ -153,6 +170,8 @@ class BlueLinkRepository(
     }
 
     override fun SessionStore.Session.toSession(): SessionStore.Session = this
+
+    override suspend fun adoptRenewedSession(fresh: SessionStore.Session): SessionStore.Session = fresh.also { cachedSession = it }
 
     /** Only with a refresh token to trade in: without one there is nothing to refresh, so the failure stands. */
     override fun isSessionFailure(e: BlueLinkException, session: SessionStore.Session): Boolean =

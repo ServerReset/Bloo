@@ -22,7 +22,20 @@ data class CciTokens(
     val nonCcsToken: String? = null,
     val nonCcsRefreshToken: String? = null,
     val idToken: String? = null,
-)
+) {
+    /** Which tokens are present, never their values. */
+    override fun toString(): String {
+        val present = listOfNotNull(
+            "cciAccessToken".takeIf { cciAccessToken != null },
+            "exchangeableToken".takeIf { exchangeableToken != null },
+            "exchangeableRefreshToken".takeIf { exchangeableRefreshToken != null },
+            "nonCcsToken".takeIf { nonCcsToken != null },
+            "nonCcsRefreshToken".takeIf { nonCcsRefreshToken != null },
+            "idToken".takeIf { idToken != null },
+        )
+        return "CciTokens(present=$present)"
+    }
+}
 
 data class ControlSession(
     val token: String,
@@ -31,7 +44,12 @@ data class ControlSession(
     override val pin: String?,
     // Europe's OneApp/CCI token set: a token refresh needs the CCI set, so it is carried and persisted. Null for every other brand.
     val cci: CciTokens = CciTokens(),
-) : PinnedSession
+) : PinnedSession {
+    /** Never the tokens or PIN: a logged object or an exception message must not carry them. */
+    override fun toString(): String =
+        "ControlSession(token=<redacted>, refresh=${if (refresh != null) "<redacted>" else "null"}, deviceId=<set>, " +
+            "pin=${if (pin != null) "<redacted>" else "null"}, cci=$cci)"
+}
 
 typealias CanadaSession = ControlSession
 typealias KiaSession = ControlSession
@@ -90,6 +108,12 @@ abstract class ControlledAccountRepository<S : PinnedSession, Sum : AccountVehic
     override fun clearCaches() {
         summaries.clear()
         controlTokens.clear()
+    }
+
+    /** The cached control tokens and car keys (Kia's vinkeys) were minted for the dead session, so they go with it. */
+    override suspend fun adoptRenewedSession(fresh: SessionStore.Session): S {
+        clearCaches()
+        return fresh.toSession()
     }
 
     override suspend fun vehicles(): List<Vehicle> = withSession { s -> fetchSummaries(s).map { it.asVehicle() } }
