@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.uicommon.AppIcons
 import com.bloo.bluelink.ui.rememberPhotoModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -200,7 +200,7 @@ private fun PreviewControls(choice: Choice, car: VehicleSnapshot?, plan: WidgetP
         add(Icons.Filled.Lock to "Lock")
         if (choice.climate) add(Icons.Filled.AcUnit to "Climate")
         if (choice.charge && (car?.hasBattery != false)) add(Icons.Filled.Bolt to "Charge")
-        if (choice.flash) add(Icons.Filled.FlashOn to "Flash")
+        if (choice.flash) add(AppIcons.Flash to "Flash")
     }.take(plan.maxActions)
     val d = plan.buttonHeightDp.dp
     if (circles) {

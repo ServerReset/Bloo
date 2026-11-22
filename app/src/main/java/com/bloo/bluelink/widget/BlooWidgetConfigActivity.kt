@@ -1,5 +1,6 @@
 package com.bloo.bluelink.widget
 
+import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.IconBadge
 import com.bloo.uicommon.segmentsOf
 import com.bloo.bluelink.ui.rememberPhotoModel
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Widgets
@@ -309,7 +309,7 @@ private fun ConfigScreen(loaded: Loaded, widgetId: Int, finish: (Int) -> Unit) {
                         MorphTextButton("Lock", onClick = {}, icon = Icons.Filled.Lock, active = true, enabled = false)
                         MorphTextButton("Climate", onClick = { choice = choice.copy(climate = !choice.climate) }, icon = Icons.Filled.AcUnit, active = choice.climate)
                         MorphTextButton("Charge", onClick = { choice = choice.copy(charge = !choice.charge) }, icon = Icons.Filled.Bolt, active = choice.charge)
-                        MorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = Icons.Filled.FlashOn, active = choice.flash)
+                        MorphTextButton("Flash", onClick = { choice = choice.copy(flash = !choice.flash) }, icon = AppIcons.Flash, active = choice.flash)
                         MorphTextButton("Refresh", onClick = { choice = choice.copy(refresh = !choice.refresh) }, icon = Icons.Filled.Refresh, active = choice.refresh)
                     }
                 }
@@ -369,7 +369,7 @@ private fun stripControlIcon(c: StripControl) = when (c) {
     StripControl.LOCK -> Icons.Filled.Lock
     StripControl.CLIMATE -> Icons.Filled.AcUnit
     StripControl.CHARGE -> Icons.Filled.Bolt
-    StripControl.FLASH -> Icons.Filled.FlashOn
+    StripControl.FLASH -> AppIcons.Flash
 }
 
 /** The strip as the settings draw it: its shape, photo and the first [count] chosen buttons, as the real strip would keep them. */

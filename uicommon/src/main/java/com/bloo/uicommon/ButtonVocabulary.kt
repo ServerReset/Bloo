@@ -27,7 +27,7 @@ import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -74,7 +74,8 @@ object AppIcons {
   val SmartClimate = Icons.Filled.AutoMode
   val Thermostat = Icons.Filled.Thermostat
   val Refresh = Icons.Filled.Refresh
-  val Flash = Icons.Filled.FlashOn
+  // A light bulb, not a lightning bolt: the bolt means charging everywhere else in the app.
+  val Flash = Icons.Filled.Lightbulb
   val LockOpen = Icons.Filled.LockOpen
   val Notifications = Icons.Filled.Notifications
   val Tune = Icons.Filled.Tune

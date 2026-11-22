@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Icon
@@ -265,7 +264,7 @@ internal fun PrimaryActions(
                             onClick = { vm.flashLights(v) },
                             enabled = !hlPending,
                             contentPadding = PaddingValues(0.dp),
-                        ) { Icon(Icons.Filled.FlashOn, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) },
+                        ) { Icon(AppIcons.Flash, contentDescription = "Flash lights", modifier = Modifier.size(22.dp)) },
                     )
                     add(
                         ClusterButton(
