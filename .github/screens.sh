@@ -141,9 +141,10 @@ front() {
   fi
 }
 
-# Swipes between cars well inside the screen: a swipe from near the edge is the system's back gesture.
-next_car() { adb shell input swipe 820 1250 260 1250 300; sleep 3; }
-prev_car() { adb shell input swipe 260 1250 820 1250 300; sleep 3; }
+# Swipes between cars across the car card at the top, well inside the screen: a swipe from near the edge is the system's back
+# gesture, and one lower down can land on a slider, which takes it.
+next_car() { adb shell input swipe 820 600 260 600 300; sleep 3; }
+prev_car() { adb shell input swipe 260 600 820 600 300; sleep 3; }
 scroll_down() { adb shell input swipe 540 1800 540 900 600; sleep 3; }
 scroll_up() { adb shell input swipe 540 900 540 1800 600; sleep 3; }
 

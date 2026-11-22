@@ -22,7 +22,6 @@ import com.bloo.bluelink.data.FEEL_STEP_F
 import com.bloo.bluelink.data.smartClimateMode
 import com.bloo.bluelink.data.smartComfort
 import com.bloo.bluelink.data.SeatConfig
-import com.bloo.bluelink.data.feelLabel
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.PrimaryTextStyle
@@ -427,12 +426,17 @@ private fun SmartClimateSection(
             MorphActionButton(label = "Start smart climate", icon = Icons.Filled.AcUnit, onClick = onStartUnread, enabled = enabled)
             return@Column
         }
-        RevealText(degLabel(plan.targetF.toString(), fahrenheit), style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold)
-
         // Influence: lean the target colder or hotter than the plan. It opens in the middle, on the plan as it stands.
         var influence by remember(plan.targetF) { mutableFloatStateOf(0f) }
         val step = influence.roundToInt().coerceIn(-1, 1)
         val target = plan.targetF + step * FEEL_STEP_F
+        // The card's one big number: the temperature the car will take, following the slider as it leans. It was body-sized, and a
+        // second line under the slider repeated it ("Normal · 79°F") next to a button that says it a third time.
+        RollingNumber(
+            text = degLabel(target.toString(), fahrenheit),
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Black,
+        )
         val scheme = MaterialTheme.colorScheme
         val haptics = LocalHaptics.current
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -453,7 +457,6 @@ private fun SmartClimateSection(
             onSettle = { haptics?.click() },
             enabled = enabled,
         )
-        RevealMutedText("${feelLabel(step)} · ${degLabel(target.toString(), fahrenheit)}")
         MorphActionButton(
             label = "Start at ${degLabel(target.toString(), fahrenheit)}",
             icon = Icons.Filled.AcUnit,
