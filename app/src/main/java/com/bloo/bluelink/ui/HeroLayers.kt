@@ -47,6 +47,7 @@ import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.bounceSpring
 import kotlin.math.roundToInt
 import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.GapSection
 
 /*
  * The hero card's two layers: the photo with the charge readout over it, and the numbers that fly
@@ -214,7 +215,7 @@ internal fun HeroPhotoPreview(state: UiState, v: Vehicle, imageUrl: String?, met
             )
             RevealText(
                 v.name,
-                modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(GapSection),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = heroTitleOnPhoto(textTone),

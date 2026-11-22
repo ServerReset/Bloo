@@ -1,24 +1,18 @@
 package com.bloo.bluelink.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.RevealText
 
 /**
  * Sets the AC and DC charge limits on a Hyundai Canada car, in steps of 10 percent. Canadian cars do not report their current limits to
@@ -28,34 +22,40 @@ import com.bloo.bluelink.data.Vehicle
 internal fun ChargeLimitsSetOnlyDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> Unit) {
     var ac by remember(v.vin) { mutableIntStateOf(80) }
     var dc by remember(v.vin) { mutableIntStateOf(80) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = true)) {
-        Surface(color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Charge limits", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "The car's current limits are not shown for Canadian cars. Set the ones you want.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                LimitRow("DC fast charge", dc, onChange = { dc = it })
-                LimitRow("AC (home or work)", ac, onChange = { ac = it })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = {
-                        vm.setChargeLimits(v, ac, dc)
-                        onDismiss()
-                    }) { Text("Set limits") }
-                }
-            }
-        }
-    }
+    GlassAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = AppIcons.Bolt,
+        title = "Charge limits",
+        text = {
+            RevealText("The car's current limits are not shown for Canadian cars. Set the ones you want.")
+            LimitStepper("DC fast charge", dc) { dc = it }
+            LimitStepper("AC (home or work)", ac) { ac = it }
+        },
+        buttons = {
+            MorphTextButton(
+                text = "Set limits",
+                onClick = {
+                    vm.setChargeLimits(v, ac, dc)
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Confirm,
+            )
+            MorphTextButton("Cancel", onDismiss, modifier = Modifier.fillMaxWidth())
+        },
+    )
 }
 
+/** One limit, 50 to 100 percent in tens, as the same big value and stepped slider the climate controls use. */
 @Composable
-private fun LimitRow(label: String, value: Int, onChange: (Int) -> Unit) {
-    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, modifier = Modifier.padding(end = 8.dp))
-        OutlinedButton(onClick = { onChange((value - 10).coerceAtLeast(50)) }) { Text("−") }
-        Text("$value%", style = MaterialTheme.typography.titleSmall)
-        OutlinedButton(onClick = { onChange((value + 10).coerceAtMost(100)) }) { Text("+") }
-    }
+private fun LimitStepper(label: String, percent: Int, onChange: (Int) -> Unit) {
+    ClimateStepper(
+        value = "$percent%",
+        caption = label,
+        big = false,
+        current = percent / 10,
+        range = 5..10,
+        tint = MaterialTheme.colorScheme.onSurface,
+        onChange = { onChange(it * 10) },
+    )
 }

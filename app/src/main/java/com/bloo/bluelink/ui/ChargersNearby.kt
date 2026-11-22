@@ -1,22 +1,10 @@
 package com.bloo.bluelink.ui
 
 import android.content.Context
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,15 +14,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.ChargeOffer
 import com.bloo.bluelink.data.ChargeStatus
 import com.bloo.bluelink.data.ChargingStation
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.privatePrefs
+import com.bloo.bluelink.suspendRunCatching
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.RevealText
+import com.bloo.uicommon.TitleSubtitle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -78,19 +71,18 @@ internal fun ChargersNearbyDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation,
     var active by remember(v.vin) { mutableStateOf(store.load(v.vin)) }
     var picked by remember(v.vin) { mutableStateOf<ChargingStation?>(null) }
     LaunchedEffect(v.vin) {
-        runCatching { vm.canadaRepo(vm.brandOf(v)).chargingStations(v, at.latitude, at.longitude, NEARBY_RADIUS_KM) }
+        suspendRunCatching { vm.canadaRepo(vm.brandOf(v)).chargingStations(v, at.latitude, at.longitude, NEARBY_RADIUS_KM) }
             .onSuccess { stations = it }
             .onFailure { error = it.message ?: "Bluelink wouldn't give the chargers near this car." }
     }
     FullScreenDialog(title = "Chargers nearby", onDismiss = onDismiss) {
+        SheetNote("Public chargers within $NEARBY_RADIUS_KM km of the car, nearest first. Tap one to start a paid charge.")
         // The map is Google Maps, centred on the car, searching for EV charging: the same hand-off the trip planner uses.
-        TextButton(onClick = { openUrl(context, "https://www.google.com/maps/search/EV+charging+stations/@${at.latitude},${at.longitude},13z") }) {
-            Text("Show on map")
-        }
-        Text(
-            "Public chargers within $NEARBY_RADIUS_KM km of the car, nearest first. Tap one to start a paid charge.",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(vertical = 8.dp),
+        MorphTextButton(
+            text = "Show on map",
+            onClick = { openUrl(context, "https://www.google.com/maps/search/EV+charging+stations/@${at.latitude},${at.longitude},13z") },
+            modifier = Modifier.fillMaxWidth(),
+            icon = AppIcons.ArrowForward,
         )
         active?.let { charge ->
             ActiveChargePanel(vm, v, charge) {
@@ -98,19 +90,12 @@ internal fun ChargersNearbyDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation,
                 active = null
             }
         }
-        val list = stations
-        when {
-            error != null -> Text(error.orEmpty())
-            list == null -> CircularProgressIndicator()
-            list.isEmpty() -> Text("No public chargers within $NEARBY_RADIUS_KM km.")
-            else -> Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+        SheetLoad(stations, error, empty = "No public chargers within $NEARBY_RADIUS_KM km.") { list ->
+            SheetList {
                 list.forEach { s ->
                     // Only a station with a charger to start, and no charge already running, can be picked.
                     val pickable = s.chargerIds.isNotEmpty() && active == null
-                    ChargerRow(s, Modifier.fillMaxWidth().then(if (pickable) Modifier.clickable { picked = s } else Modifier))
+                    ChargerRow(s, onClick = if (pickable) ({ picked = s }) else null)
                 }
             }
         }
@@ -125,19 +110,17 @@ internal fun ChargersNearbyDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation,
 }
 
 @Composable
-private fun ChargerRow(s: ChargingStation, modifier: Modifier) {
-    Column(modifier) {
-        Text(s.name, style = MaterialTheme.typography.titleSmall)
-        val free = if (s.available != null && s.total != null) "${s.available} of ${s.total} free" else null
-        val line = listOfNotNull(
-            s.distanceKm?.let { "%.1f km".format(it) },
-            s.network,
-            s.maxKw?.let { "up to ${it.toInt()} kW" },
-            free,
-        ).joinToString(" · ")
-        if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall)
-        s.address?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-    }
+private fun ChargerRow(s: ChargingStation, onClick: (() -> Unit)?) {
+    val free = if (s.available != null && s.total != null) "${s.available} of ${s.total} free" else null
+    SheetRow(
+        title = s.name,
+        lines = listOf(
+            listOfNotNull(s.distanceKm?.let { "%.1f km".format(it) }, s.network, s.maxKw?.let { "up to ${it.toInt()} kW" }, free)
+                .joinToString(" · "),
+            s.address,
+        ),
+        onClick = onClick,
+    )
 }
 
 /**
@@ -157,53 +140,53 @@ private fun ConfirmChargeDialog(
     var starting by remember(station.id) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(station.id) {
-        runCatching { vm.canadaRepo(vm.brandOf(v)).chargeOffer(v, station.id, station.chargerIds.first()) }
+        suspendRunCatching { vm.canadaRepo(vm.brandOf(v)).chargeOffer(v, station.id, station.chargerIds.first()) }
             .onSuccess { offer = it }
             .onFailure { error = it.message ?: "Bluelink wouldn't give the price for this charger." }
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = true)) {
-        Surface(color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Start a paid charge?", style = MaterialTheme.typography.titleMedium)
-                Text(station.name, style = MaterialTheme.typography.titleSmall)
-                val o = offer
-                when {
-                    error != null -> Text(error.orEmpty())
-                    o == null -> CircularProgressIndicator()
-                    else -> {
-                        o.productName?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                        o.priceLines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                        o.cardLabel?.let { Text("Charged to $it", style = MaterialTheme.typography.bodySmall) }
-                        Text(
-                            "This spends money on your Bluelink account. Nothing starts until you tap Start.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-                val ready = offer
-                val failure = error
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onDismiss, enabled = !starting) { Text("Cancel") }
-                    Button(
-                        enabled = ready != null && failure == null && !starting,
-                        onClick = {
-                            val o2 = ready ?: return@Button
-                            starting = true
-                            scope.launch {
-                                runCatching { vm.canadaRepo(vm.brandOf(v)).startCharge(v, o2.paymentId, station.id, o2.cardId) }
-                                    .onSuccess { reason ->
-                                        if (reason == null) onStarted(ActiveCharge(o2.paymentId, station.id, station.name))
-                                        else error = reason
-                                    }
-                                    .onFailure { error = it.message ?: "The charge didn't start." }
-                                starting = false
-                            }
-                        },
-                    ) { Text(if (starting) "Starting…" else "Start") }
+    GlassAlertDialog(
+        onDismissRequest = { if (!starting) onDismiss() },
+        icon = AppIcons.Bolt,
+        title = "Start a paid charge?",
+        text = {
+            RevealText(station.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            val o = offer
+            val failure = error
+            when {
+                failure != null -> SheetNote(failure, isError = true)
+                o == null -> SheetLoading()
+                else -> {
+                    o.productName?.let { BodySmallText(it) }
+                    o.priceLines.forEach { RevealText(it) }
+                    o.cardLabel?.let { BodySmallText("Charged to $it") }
+                    BodySmallText("This spends money on your Bluelink account. Nothing starts until you tap Start.")
                 }
             }
-        }
-    }
+        },
+        buttons = {
+            val ready = offer
+            MorphTextButton(
+                text = if (starting) "Starting…" else "Start",
+                onClick = {
+                    val o = ready ?: return@MorphTextButton
+                    starting = true
+                    scope.launch {
+                        suspendRunCatching { vm.canadaRepo(vm.brandOf(v)).startCharge(v, o.paymentId, station.id, o.cardId) }
+                            .onSuccess { reason ->
+                                if (reason == null) onStarted(ActiveCharge(o.paymentId, station.id, station.name)) else error = reason
+                            }
+                            .onFailure { error = it.message ?: "The charge didn't start." }
+                        starting = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = ready != null && error == null && !starting,
+                pending = starting,
+                emphasis = ButtonEmphasis.Confirm,
+            )
+            MorphTextButton("Cancel", onDismiss, modifier = Modifier.fillMaxWidth(), enabled = !starting)
+        },
+    )
 }
 
 /** The charge in progress: its numbers, refreshed every [STATUS_EVERY_MS], and a Stop button that ends it. */
@@ -215,14 +198,16 @@ private fun ActiveChargePanel(vm: AppViewModel, v: Vehicle, charge: ActiveCharge
     val scope = rememberCoroutineScope()
     LaunchedEffect(charge.paymentId) {
         while (true) {
-            runCatching { vm.canadaRepo(vm.brandOf(v)).chargeStatus(v, charge.paymentId) }
+            suspendRunCatching { vm.canadaRepo(vm.brandOf(v)).chargeStatus(v, charge.paymentId) }
                 .onSuccess { status = it }
                 .onFailure { note = it.message }
             delay(STATUS_EVERY_MS)
         }
     }
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Charging at ${charge.stationName}", style = MaterialTheme.typography.titleSmall)
+    Column(
+        Modifier.fillMaxWidth().tintedPanel(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)),
+        verticalArrangement = Arrangement.spacedBy(GapRow),
+    ) {
         val s = status
         val currency = s?.currency?.let { " $it" }.orEmpty()
         val line = listOfNotNull(
@@ -230,21 +215,22 @@ private fun ActiveChargePanel(vm: AppViewModel, v: Vehicle, charge: ActiveCharge
             s?.powerKw?.let { "%.1f kW".format(it) },
             s?.cost?.let { "%.2f$currency".format(it) },
         ).joinToString(" · ")
-        Text(line.ifBlank { "Waiting for the first reading…" }, style = MaterialTheme.typography.bodySmall)
-        note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        Button(
-            enabled = !stopping,
+        TitleSubtitle("Charging at ${charge.stationName}", listOfNotNull(line.ifBlank { "Waiting for the first reading…" }, note).joinToString("\n"))
+        MorphTextButton(
+            text = if (stopping) "Stopping…" else "Stop charge",
             onClick = {
                 stopping = true
                 scope.launch {
-                    runCatching { vm.canadaRepo(vm.brandOf(v)).stopCharge(v, charge.paymentId, charge.poiId) }
-                        .onSuccess { reason ->
-                            if (reason == null) onStopped() else note = reason
-                        }
+                    suspendRunCatching { vm.canadaRepo(vm.brandOf(v)).stopCharge(v, charge.paymentId, charge.poiId) }
+                        .onSuccess { reason -> if (reason == null) onStopped() else note = reason }
                         .onFailure { note = it.message ?: "The charge didn't stop. Try again." }
                     stopping = false
                 }
             },
-        ) { Text(if (stopping) "Stopping…" else "Stop charge") }
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !stopping,
+            pending = stopping,
+            emphasis = ButtonEmphasis.Deny,
+        )
     }
 }

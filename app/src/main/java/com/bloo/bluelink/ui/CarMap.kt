@@ -75,6 +75,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.uicommon.GapRow
 
 /** How many frames the first map in a process waits before it composes, so it lands after the cards and photos the garage draws first. */
 private const val MapStartFrames = 6
@@ -584,7 +585,7 @@ private fun CarPillCluster(
                     CarPhotoTile(photo = photo, tint = tint, contentDescription = null, onClick = null, size = PillPhotoSize, glyphSize = 12.dp)
                 }
                 if (extra > 0) {
-                    RevealText("+$extra", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp))
+                    RevealText("+$extra", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, modifier = Modifier.padding(start = GapRow))
                 }
             }
         }

@@ -1,23 +1,13 @@
 package com.bloo.bluelink.ui
 
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,30 +18,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.font.FontWeight
+import coil.compose.AsyncImage
 import com.bloo.bluelink.data.SurroundCapture
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.suspendRunCatching
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.ProgressBar
+import com.bloo.uicommon.RevealText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** A status or error panel: the one look the surround-view screens use for their messages. */
 @Composable
 internal fun SurroundNote(text: String, emphasised: Boolean = false) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = SmallShape,
-        color = if (emphasised) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (emphasised) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(12.dp),
-        )
+    val scheme = MaterialTheme.colorScheme
+    Column(Modifier.tintedPanel(if (emphasised) scheme.errorContainer.copy(alpha = 0.6f) else scheme.surfaceVariant.copy(alpha = 0.5f))) {
+        BodySmallText(text, color = if (emphasised) scheme.onErrorContainer else scheme.onSurfaceVariant)
     }
 }
 
@@ -62,8 +51,9 @@ internal fun SurroundNote(text: String, emphasised: Boolean = false) {
 @Composable
 internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    // What is already on the phone shows at once; a refresh adds whatever the car has sent since.
-    var captures by remember(v.vin) { mutableStateOf<List<SurroundCapture>?>(SurroundHistory.load(context, v.vin)) }
+    // What is already on the phone shows first (read off the main thread: it is several photos); a refresh adds whatever the car has
+    // sent since.
+    var captures by remember(v.vin) { mutableStateOf<List<SurroundCapture>?>(null) }
     var note by remember(v.vin) { mutableStateOf<String?>(null) }
     var noteIsError by remember(v.vin) { mutableStateOf(false) }
     var busy by remember(v.vin) { mutableStateOf(false) }
@@ -73,10 +63,12 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
     fun refresh() {
         busy = true
         scope.launch {
-            runCatching { repo.lastSurroundView(v) }
+            suspendRunCatching { repo.lastSurroundView(v) }
                 .onSuccess {
-                    SurroundHistory.save(context, v.vin, it)
-                    captures = SurroundHistory.load(context, v.vin)
+                    captures = withContext(Dispatchers.IO) {
+                        SurroundHistory.save(context, v.vin, it)
+                        SurroundHistory.load(context, v.vin)
+                    }
                     noteIsError = false
                     note = if (captures.isNullOrEmpty()) "No photos stored for this car yet." else null
                 }
@@ -88,67 +80,62 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
         }
     }
 
-    LaunchedEffect(v.vin) { refresh() }
+    LaunchedEffect(v.vin) {
+        captures = withContext(Dispatchers.IO) { SurroundHistory.load(context, v.vin) }
+        refresh()
+    }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(
-                Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Surround view", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
-                Text(
-                    "Photos the car took of its surroundings. Asking takes a little while; Refresh reads what Bluelink has stored.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(
-                        enabled = !busy,
-                        onClick = {
-                            busy = true
-                            scope.launch {
-                                runCatching { repo.requestSurroundView(v) }
-                                    .onSuccess {
-                                        noteIsError = false
-                                        note = "Asked the car for new photos. Tap Refresh in a minute or two."
-                                    }
-                                    .onFailure {
-                                        // A refusal from Bluelink means this car cannot take surround-view photos: hide the feature for it.
-                                        val raw = it.message ?: "Bluelink didn't take the request."
-                                        val refused = raw.contains("HTTP 4") || raw.contains("HTTP 5") || raw.contains("errorMessage")
-                                        if (refused) vm.setSurroundRefused(v, true)
-                                        noteIsError = true
-                                        note = if (refused) {
-                                            "This car doesn't take surround-view photos, so Bloo hides the feature for it. Details: $raw"
-                                        } else {
-                                            raw
-                                        }
-                                    }
-                                busy = false
+    FullScreenDialog(title = "Surround view", onDismiss = onDismiss) {
+        SheetNote("Photos the car took of its surroundings. Asking takes a little while; Refresh reads what Bluelink has stored.")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GapRow)) {
+            MorphTextButton(
+                text = "Ask the car for photos",
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        suspendRunCatching { repo.requestSurroundView(v) }
+                            .onSuccess {
+                                noteIsError = false
+                                note = "Asked the car for new photos. Tap Refresh in a minute or two."
                             }
-                        },
-                    ) { Text("Ask the car for photos") }
-                    OutlinedButton(onClick = { refresh() }, enabled = !busy) { Text("Refresh") }
-                }
-                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                note?.let { SurroundNote(it, emphasised = noteIsError) }
-                val list = captures.orEmpty()
-                LazyColumn(
-                    Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    if (list.isEmpty() && !busy) {
-                        item { SurroundNote("No photos on this phone yet. Ask the car for photos, then tap Refresh in a minute or two.") }
+                            .onFailure {
+                                // A refusal from Bluelink means this car cannot take surround-view photos: hide the feature for it.
+                                val raw = it.message ?: "Bluelink didn't take the request."
+                                val refused = raw.contains("HTTP 4") || raw.contains("HTTP 5") || raw.contains("errorMessage")
+                                if (refused) vm.setSurroundRefused(v, true)
+                                noteIsError = true
+                                note = if (refused) {
+                                    "This car doesn't take surround-view photos, so Bloo hides the feature for it. Details: $raw"
+                                } else {
+                                    raw
+                                }
+                            }
+                        busy = false
                     }
-                    items(list) { c ->
-                        SurroundCard(c) {
-                            val where = saveSurroundPhoto(context, surroundPhotoName(c.utcTime), c.jpeg)
-                            noteIsError = where == null
-                            note = if (where != null) "Saved to $where" else "Couldn't save that photo."
-                        }
+                },
+                modifier = Modifier.weight(1f),
+                enabled = !busy,
+                emphasis = ButtonEmphasis.Confirm,
+            )
+            MorphTextButton("Refresh", onClick = { refresh() }, enabled = !busy, pending = busy)
+        }
+        if (busy) ProgressBar(null, Modifier.padding(vertical = GapRow))
+        note?.let { SurroundNote(it, emphasised = noteIsError) }
+        val list = captures.orEmpty()
+        LazyColumn(
+            Modifier.fillMaxWidth().weight(1f).padding(top = GapRow),
+            verticalArrangement = Arrangement.spacedBy(GapGroup),
+        ) {
+            if (list.isEmpty() && !busy) {
+                item { SurroundNote("No photos on this phone yet. Ask the car for photos, then tap Refresh in a minute or two.") }
+            }
+            items(list) { c ->
+                SurroundCard(c) {
+                    // A file write: off the main thread, so the tap does not stall the screen.
+                    scope.launch {
+                        val where = withContext(Dispatchers.IO) { saveSurroundPhoto(context, surroundPhotoName(c.utcTime), c.jpeg) }
+                        noteIsError = where == null
+                        note = if (where != null) "Saved to $where" else "Couldn't save that photo."
                     }
                 }
             }
@@ -156,32 +143,22 @@ internal fun SurroundViewDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> U
     }
 }
 
-/** One stored set of photos: when it was taken, the photo, and a Save button. */
+/**
+ * One stored set of photos: when it was taken, the photo, and a Save button. The photo is decoded off the main thread at the size it is
+ * shown, by the app's image loader: decoding the full JPEG during composition stalled the list on every card that scrolled in.
+ */
 @Composable
 private fun SurroundCard(c: SurroundCapture, onSave: () -> Unit) {
-    val bitmap = remember(c.jpeg) { BitmapFactory.decodeByteArray(c.jpeg, 0, c.jpeg.size)?.asImageBitmap() }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = StandardShape,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(c.utcTime ?: "Photos", style = MaterialTheme.typography.titleSmall)
-                OutlinedButton(onClick = onSave) { Text("Save") }
-            }
-            bitmap?.let {
-                Image(
-                    bitmap = it,
-                    contentDescription = "Surround-view photo",
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth().clip(SmallShape),
-                )
-            }
+    Column(Modifier.fillMaxWidth().innerGlassPanel(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            RevealText(c.utcTime ?: "Photos", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            MorphTextButton("Save", onSave)
         }
+        AsyncImage(
+            model = c.jpeg,
+            contentDescription = "Surround-view photo",
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth().clip(SmallShape),
+        )
     }
 }

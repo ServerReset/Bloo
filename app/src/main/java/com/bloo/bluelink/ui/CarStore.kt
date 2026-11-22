@@ -9,31 +9,21 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.bloo.bluelink.data.StoreAccess
 import com.bloo.bluelink.data.links
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.suspendRunCatching
+import com.bloo.uicommon.GapSection
 
 /** Cookie the store reads its token from (the official app's name for it). */
 private const val STORE_COOKIE = "t"
@@ -50,36 +40,22 @@ internal fun CarStoreDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> Unit)
     var access by remember(v.vin) { mutableStateOf<StoreAccess?>(null) }
     var error by remember(v.vin) { mutableStateOf<String?>(null) }
     LaunchedEffect(v.vin) {
-        runCatching { vm.canadaRepo(vm.brandOf(v)).storeAccess(v) }
+        suspendRunCatching { vm.canadaRepo(vm.brandOf(v)).storeAccess(v) }
             .onSuccess { access = it }
             .onFailure { error = it.message ?: "Bluelink wouldn't open the store for this car." }
     }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Car store", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(end = 8.dp))
-                    Text(
-                        "Features on demand from Hyundai. What you can buy is up to Hyundai.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
-                val token = access
-                when {
-                    error != null -> Text(error.orEmpty(), modifier = Modifier.padding(16.dp))
-                    token == null -> CircularProgressIndicator(Modifier.padding(16.dp))
-                    else -> CarStoreWeb(
-                        url = token.rerouteUrl ?: vm.brandOf(v).links.storeUrl,
-                        access = token,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+    FullScreenDialog(title = "Car store", onDismiss = onDismiss, edgeToEdge = true) {
+        SheetNote("Features on demand from Hyundai. What you can buy is up to Hyundai.", modifier = Modifier.padding(horizontal = GapSection))
+        val token = access
+        val failure = error
+        when {
+            failure != null -> SheetNote(failure, isError = true, modifier = Modifier.padding(horizontal = GapSection))
+            token == null -> SheetLoading()
+            else -> CarStoreWeb(
+                url = token.rerouteUrl ?: vm.brandOf(v).links.storeUrl,
+                access = token,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

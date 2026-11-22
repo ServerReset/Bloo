@@ -2,24 +2,11 @@ package com.bloo.bluelink.ui
 
 import android.location.Address
 import android.location.Geocoder
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,13 +15,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.input.ImeAction
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.TripPlan
 import com.bloo.bluelink.data.TripRoute
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.suspendRunCatching
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.MorphTextButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,7 +59,7 @@ internal fun TripPlannerDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation, on
         searching = true
         scope.launch {
             val found = withContext(Dispatchers.IO) {
-                runCatching { findPlaces(context, q) }.getOrElse { emptyList() }
+                suspendRunCatching { findPlaces(context, q) }.getOrElse { emptyList() }
             }
             places = found
             if (found.isEmpty()) note = "No place found for \"$q\"."
@@ -83,7 +73,7 @@ internal fun TripPlannerDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation, on
         note = null
         planning = true
         scope.launch {
-            runCatching {
+            suspendRunCatching {
                 vm.canadaRepo(vm.brandOf(v)).tripPlan(v, at.latitude, at.longitude, p.lat, p.lon, CHARGER_ARRIVAL_PERCENT, DESTINATION_ARRIVAL_PERCENT)
             }
                 .onSuccess { result ->
@@ -96,68 +86,65 @@ internal fun TripPlannerDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation, on
     }
 
     FullScreenDialog(title = "Plan a trip", onDismiss = onDismiss) {
-        Text(
-            "From the car's last position. The stops are where it charges on the way.",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(vertical = 8.dp),
-        )
-        OutlinedTextField(
+        SheetNote("From the car's last position. The stops are where it charges on the way.")
+        BlooTextField(
             value = query,
             onValueChange = { query = it },
             label = { Text("Destination") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { search() }),
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(onClick = { search() }, enabled = !searching && query.isNotBlank(), modifier = Modifier.padding(vertical = 8.dp)) {
-            Text(if (searching) "Searching…" else "Search")
-        }
-        note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            places.forEach { p ->
-                OutlinedButton(onClick = { planTo(p) }, enabled = !planning, modifier = Modifier.fillMaxWidth()) {
-                    Text(p.name, maxLines = 2)
-                }
-            }
-            if (planning) CircularProgressIndicator(Modifier.padding(8.dp))
+        MorphTextButton(
+            text = if (searching) "Searching…" else "Search",
+            onClick = { search() },
+            modifier = Modifier.fillMaxWidth().padding(vertical = GapRow),
+            enabled = !searching && query.isNotBlank(),
+            pending = searching,
+            icon = AppIcons.Search,
+            emphasis = ButtonEmphasis.Confirm,
+        )
+        note?.let { SheetNote(it) }
+        SheetList {
+            places.forEach { p -> SheetRow(p.name, emptyList(), onClick = if (planning) null else ({ planTo(p) })) }
+            if (planning) SheetLoading()
             val result = plan
             val dest = chosen
             if (result != null && dest != null) {
                 result.routes.forEach { RouteCard(it) }
-                Button(
+                MorphTextButton(
+                    text = "Navigate in Google Maps",
                     onClick = { openDirections(context, dest) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                ) { Text("Navigate in Google Maps") }
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = AppIcons.ArrowForward,
+                    emphasis = ButtonEmphasis.Confirm,
+                )
             }
         }
     }
 }
 
+/** One route: its distance, time and stops, then each charging stop with how long it charges there. */
 @Composable
 private fun RouteCard(r: TripRoute) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            "%.0f km · %d min · %d charging stop%s".format(r.distanceM / 1000.0, r.minutes, r.stops.size, if (r.stops.size == 1) "" else "s"),
-            style = MaterialTheme.typography.titleSmall,
-        )
-        if (!r.reachable) Text("Bluelink says this route can't be reached on the charge.", style = MaterialTheme.typography.bodySmall)
-        r.arriveSoc?.let { Text("Arrive with about $it%", style = MaterialTheme.typography.bodySmall) }
-        r.stops.forEach { s ->
-            val line = listOfNotNull(
-                s.network,
-                s.arriveSoc?.let { "arrive $it%" },
-                s.targetSoc?.let { "leave $it%" },
-                s.chargeMinutes?.let { "about $it min" },
-                s.powerKw?.let { "$it kW" },
-            ).joinToString(" · ")
-            Text(s.name, style = MaterialTheme.typography.bodyMedium)
-            if (line.isNotBlank()) Text(line, style = MaterialTheme.typography.bodySmall)
-        }
-    }
+    SheetRow(
+        title = "%.0f km · %d min · %d charging stop%s".format(r.distanceM / 1000.0, r.minutes, r.stops.size, if (r.stops.size == 1) "" else "s"),
+        lines = buildList {
+            if (!r.reachable) add("Bluelink says this route can't be reached on the charge.")
+            r.arriveSoc?.let { add("Arrive with about $it%") }
+            r.stops.forEach { s ->
+                val detail = listOfNotNull(
+                    s.network,
+                    s.arriveSoc?.let { "arrive $it%" },
+                    s.targetSoc?.let { "leave $it%" },
+                    s.chargeMinutes?.let { "about $it min" },
+                    s.powerKw?.let { "$it kW" },
+                ).joinToString(" · ")
+                add(if (detail.isBlank()) s.name else "${s.name}: $detail")
+            }
+        },
+    )
 }
 
 /** Places matching [query], from the phone's own geocoder. */

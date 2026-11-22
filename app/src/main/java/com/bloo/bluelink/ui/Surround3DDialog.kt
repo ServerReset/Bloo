@@ -3,18 +3,10 @@ package com.bloo.bluelink.ui
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,9 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import com.bloo.bluelink.data.SurroundCapture
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.svm3d.Backdrop
 import com.bloo.bluelink.svm3d.Fisheye
@@ -41,6 +31,10 @@ import com.bloo.bluelink.svm3d.SvmShot
 import com.bloo.bluelink.ui.car3d.CarBody
 import com.bloo.bluelink.ui.car3d.CarPaint
 import com.bloo.bluelink.ui.car3d.Surround3DView
+import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.uicommon.GapRow
+import com.bloo.uicommon.MorphTextButton
+import com.bloo.uicommon.ProgressBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,7 +52,13 @@ private class SurroundScene(val glb: ByteArray, val vehicles: List<com.bloo.blue
 internal fun Surround3DDialog(v: Vehicle, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val newest = remember(v.vin) { SurroundHistory.load(context, v.vin).firstOrNull() }
+    // The newest stored set, read off the main thread (photos on disk); [loaded] tells "still reading" from "there are none".
+    var newest by remember(v.vin) { mutableStateOf<SurroundCapture?>(null) }
+    var loaded by remember(v.vin) { mutableStateOf(false) }
+    LaunchedEffect(v.vin) {
+        newest = withContext(Dispatchers.IO) { SurroundHistory.load(context, v.vin).firstOrNull() }
+        loaded = true
+    }
     val models = remember(context) { ModelStore(File(context.filesDir, "models")) }
     val cacheBase = remember(v.vin, newest?.utcTime) { File(context.filesDir, "svm3d/v7_${newest?.utcTime ?: "latest"}") }
     var scene by remember(v.vin) { mutableStateOf<SurroundScene?>(null) }
@@ -112,18 +112,23 @@ internal fun Surround3DDialog(v: Vehicle, onDismiss: () -> Unit) {
     FullScreenDialog(title = "3D surroundings", onDismiss = onDismiss) {
         val current = scene
         when {
+            !loaded -> SheetLoading()
             newest == null -> SurroundNote("Ask the car for surround-view photos first, then come back here.")
-            needsDownload -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
+            needsDownload -> Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
+                SheetNote(
                     "The 3D view needs three models, about ${ModelStore.TOTAL_BYTES / 1_000_000} MB, downloaded once from their " +
                         "makers' GitHub pages. Best on Wi-Fi.",
-                    style = MaterialTheme.typography.bodySmall,
                 )
-                Button(onClick = { start(downloadFirst = true) }) { Text("Download and build") }
+                MorphTextButton(
+                    "Download and build",
+                    onClick = { start(downloadFirst = true) },
+                    modifier = Modifier.fillMaxWidth(),
+                    emphasis = ButtonEmphasis.Confirm,
+                )
             }
-            busy -> Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
-                Text(stage.ifBlank { "Building the 3D view" }, style = MaterialTheme.typography.bodySmall)
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            busy -> Column(verticalArrangement = Arrangement.spacedBy(GapRow), modifier = Modifier.padding(vertical = GapRow)) {
+                SheetNote(stage.ifBlank { "Building the 3D view" })
+                ProgressBar(progress)
             }
             current != null -> {
                 Surround3DView(
@@ -136,12 +141,19 @@ internal fun Surround3DDialog(v: Vehicle, onDismiss: () -> Unit) {
                     onHasPainted = { hasPainted = it },
                 )
                 if (hasPainted) {
-                    OutlinedButton(onClick = { painted = !painted }, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (painted) "Show the simple view" else "Show the painted view")
-                    }
+                    MorphTextButton(
+                        if (painted) "Show the simple view" else "Show the painted view",
+                        onClick = { painted = !painted },
+                        modifier = Modifier.fillMaxWidth().padding(top = GapRow),
+                    )
                 }
             }
-            else -> Button(onClick = { start(downloadFirst = false) }) { Text("Build the 3D view") }
+            else -> MorphTextButton(
+                "Build the 3D view",
+                onClick = { start(downloadFirst = false) },
+                modifier = Modifier.fillMaxWidth(),
+                emphasis = ButtonEmphasis.Confirm,
+            )
         }
         error?.let { SurroundNote(it, emphasised = true) }
     }

@@ -41,6 +41,7 @@ import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.content
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.bloo.uicommon.GapHairline
 
 /** What an onboarding card's header says: the same icon / title / summary a pebble carries. */
 internal data class OnboardingCardSpec(val icon: ImageVector, val title: String, val summary: String)
@@ -170,7 +171,7 @@ internal fun OnboardingBottomBar(
         modifier = Modifier.fillMaxWidth().padding(horizontal = GapPage, vertical = GapGroup),
     ) {
         Column(Modifier.fillMaxWidth().padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(GapHairline)) {
                 repeat(total.coerceAtLeast(1)) { i ->
                     Box(
                         Modifier.weight(1f).height(5.dp).clip(CircleShape)
