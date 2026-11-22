@@ -4,7 +4,6 @@ import android.os.Debug
 import android.os.Looper
 import android.os.Process
 import android.os.SystemClock
-import com.bloo.bluelink.StartupFrameMonitor
 import android.util.Log
 
 /**
@@ -23,7 +22,7 @@ import android.util.Log
  *   adb logcat -c && adb shell am start -n com.bloo.bluelink/.MainActivity && sleep 12
  *   adb logcat -d -s BlooStartup
  * Lines are chronological; `+Nms` is time since process start. The frame monitor
- * ([StartupFrameMonitor]) interleaves with the same tag, so janky
+ * ([com.bloo.bluelink.StartupFrameMonitor], in the app) interleaves with the same tag, so janky
  * frames line up against the phase that caused them.
  *
  * COST: [mark] is a String format, one Log.i, and one [AppLog] append (a synchronized

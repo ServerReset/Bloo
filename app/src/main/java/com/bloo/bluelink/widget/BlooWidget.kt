@@ -277,7 +277,7 @@ private fun StatusChips(car: VehicleSnapshot, maxChips: Int = 3) {
 }
 
 /** The controls the widget offers for [car], in order, honouring its options: lock always, then climate, charge (a car with a battery) and lights, at most [max]. */
-private fun widgetActions(car: VehicleSnapshot, opts: WidgetOptions, max: Int): List<CarAction> = buildList {
+private fun widgetActions(car: VehicleSnapshot, opts: WidgetOptions, max: Int): List<String> = buildList {
     add(CarAction.TOGGLE_LOCK)
     if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
     if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
