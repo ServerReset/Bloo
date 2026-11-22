@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.Battery12V
 import com.bloo.bluelink.data.Dte
 import com.bloo.bluelink.data.EvStatus
+import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.TempValue
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
@@ -42,6 +43,7 @@ internal object DebugSampleGarage {
     private const val PREFS = "bloo_debug_fixtures"
     private const val KEY_GARAGE = "sample_garage"
     private const val KEY_LOCK = "sample_lock"
+    private const val KEY_FULL = "sample_full"
 
     /** The car's synthetic identity. Deliberately not a valid VIN, and never displayed. */
     const val SAMPLE_VIN = "SAMPLEVIN00000001"
@@ -53,11 +55,19 @@ internal object DebugSampleGarage {
     fun locked(context: Context): Boolean =
         BuildConfig.DEBUG && prefs(context).getBoolean(KEY_LOCK, false)
 
-    fun set(context: Context, garage: Boolean?, lock: Boolean?) {
+    /**
+     * Whether the sample is the fuller one used to check the app's own look and motion (not for the store): a second car to swipe to,
+     * and both cars placed at a public landmark so the map draws. Off for store captures, which must show no location.
+     */
+    fun full(context: Context): Boolean =
+        BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FULL, false)
+
+    fun set(context: Context, garage: Boolean?, lock: Boolean?, full: Boolean? = null) {
         if (!BuildConfig.DEBUG) return
         prefs(context).edit().apply {
             garage?.let { putBoolean(KEY_GARAGE, it) }
             lock?.let { putBoolean(KEY_LOCK, it) }
+            full?.let { putBoolean(KEY_FULL, it) }
         }.apply()
     }
 
@@ -93,7 +103,7 @@ internal object DebugSampleGarage {
      * The fabricated state. No `locations` and no `placeNames` are set - that is what keeps the
      * Location pebble empty, and the car's position out of the screenshot.
      */
-    fun apply(state: UiState, locked: Boolean): UiState {
+    fun apply(state: UiState, locked: Boolean, full: Boolean = false): UiState {
         val car = Vehicle(
             vin = SAMPLE_VIN, regId = "sample-vehicle", name = "My Car", model = "IONIQ 5", generation = "1",
             brandIndicator = "H", isEv = true, odometer = "12,480 mi",
@@ -110,11 +120,40 @@ internal object DebugSampleGarage {
             airTemp = TempValue(value = "21", unit = 0),
             battery = Battery12V(batSoc = 88, batState = 0),
             evStatus = EvStatus(batteryCharge = false, batteryStatus = 72, batteryPlugin = 0))
+        if (full) return fuller(state, locked, car, status)
         return state.copy(
             screen = Screen.Garage,
             vehicles = listOf(car),
             statuses = mapOf(car.vin to status),
             lastFetched = mapOf(car.vin to System.currentTimeMillis()),
+            locked = locked,
+            loading = false,
+            refreshing = false,
+            garageLoadError = null,
+        )
+    }
+
+    /**
+     * The fuller sample: the same first car plus a second one, charging, and both parked a few streets apart at a public landmark (the
+     * CN Tower and Toronto City Hall), so the garage swipes and the map draws its cars. For checking the app, never for a listing.
+     */
+    private fun fuller(state: UiState, locked: Boolean, car: Vehicle, status: VehicleStatus): UiState {
+        val second = Vehicle(
+            vin = "SAMPLEVIN00000002", regId = "sample-vehicle-2", name = "Weekend Car", model = "KONA Electric", generation = "1",
+            brandIndicator = "H", isEv = true, odometer = "3,210 mi",
+        )
+        val secondStatus = status.copy(
+            doorLock = false,
+            dte = Dte(value = 118.0, unit = 1),
+            evStatus = EvStatus(batteryCharge = true, batteryStatus = 45, batteryPlugin = 1),
+        )
+        val now = System.currentTimeMillis()
+        return state.copy(
+            screen = Screen.Garage,
+            vehicles = listOf(car, second),
+            statuses = mapOf(car.vin to status, second.vin to secondStatus),
+            locations = mapOf(car.vin to GeoLocation(43.6426, -79.3871), second.vin to GeoLocation(43.6534, -79.3841)),
+            lastFetched = mapOf(car.vin to now, second.vin to now),
             locked = locked,
             loading = false,
             refreshing = false,

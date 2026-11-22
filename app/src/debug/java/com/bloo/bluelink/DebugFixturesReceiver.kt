@@ -15,6 +15,7 @@ import com.bloo.bluelink.ui.DebugSampleGarage
  * manifest receiver in a backgrounded app on modern Android:
  *
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd garage
+ *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd full
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd lock
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd light
@@ -28,7 +29,9 @@ class DebugFixturesReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val cmd = intent.getStringExtra("cmd") ?: "garage"
         when (cmd) {
-            "garage" -> DebugSampleGarage.set(context, garage = true, lock = false)
+            "garage" -> DebugSampleGarage.set(context, garage = true, lock = false, full = false)
+            // Two cars on the map, for checking the app's own look and motion (never a store capture: it has locations).
+            "full" -> DebugSampleGarage.set(context, garage = true, lock = false, full = true)
             "lock" -> DebugSampleGarage.set(context, garage = true, lock = true)
             "unlock" -> DebugSampleGarage.set(context, garage = true, lock = false)
             "off" -> DebugSampleGarage.set(context, garage = false, lock = false)

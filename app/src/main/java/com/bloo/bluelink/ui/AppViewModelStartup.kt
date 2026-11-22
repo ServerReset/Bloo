@@ -77,7 +77,7 @@ internal fun AppViewModel.coldStartAutoLogin() {
     if (DebugSampleGarage.enabled(getApplication())) {
         val sampleLocked = DebugSampleGarage.locked(getApplication())
         logStartup("Cold start: DEBUG SAMPLE GARAGE (locked=$sampleLocked), not a real account")
-        _state.update { DebugSampleGarage.apply(it, sampleLocked) }
+        _state.update { DebugSampleGarage.apply(it, sampleLocked, DebugSampleGarage.full(getApplication())) }
         return
     }
     if (com.bloo.bluelink.data.BootGate.isLocked(getApplication())) {
