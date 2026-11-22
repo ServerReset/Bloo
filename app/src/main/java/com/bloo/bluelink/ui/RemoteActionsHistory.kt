@@ -21,6 +21,7 @@ import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.SecondaryTextStyle
+import androidx.compose.ui.text.style.TextDecoration
 
 /**
  * Represents a single remote action taken on a vehicle. Used for displaying action history in
@@ -50,10 +51,15 @@ private fun statusColor(status: String) = when (status.lowercase()) {
 @Composable
 private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = GapHairline), verticalAlignment = Alignment.CenterVertically) {
+        // A failed command is recorded under what it would have done ("Unlocked"), so it is struck through and its reason is in the
+        // error colour: next to a card that says "Locked", a plain "Unlocked" read as the car's state rather than an attempt that failed.
+        val failed = action.status == "Failed"
         Dot(statusColor(action.status), 6.dp)
         Spacer(Modifier.width(GapRow))
         RevealText(
-            text = action.action, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurface,
+            text = action.action, style = SecondaryTextStyle(),
+            color = if (failed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            textDecoration = if (failed) TextDecoration.LineThrough else null,
             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
         )
         // Details ride on the SAME line, muted, and give up their space first -- a failure reason
@@ -62,7 +68,8 @@ private fun RemoteActionItem(action: RemoteAction, use24Hour: Boolean) {
             Spacer(Modifier.width(GapRow))
             RevealText(
                 text = action.details, style = SecondaryTextStyle(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
         } else {

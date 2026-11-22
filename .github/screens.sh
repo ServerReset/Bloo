@@ -162,15 +162,19 @@ front second-car; next_car
 shot 03-second-car-dark
 prev_car
 
-front climate; scroll_down; scroll_down
+front climate; scroll_down; scroll_down; scroll_down
 labels
 shot 04-garage-dark-lower
+scroll_down
+shot 04b-garage-dark-lowest
 tap_node '^Climate$'; sleep 4
 shot 05-climate-open-dark
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
 front map; launch 20
-scroll_down
+scroll_down; scroll_down; scroll_down; scroll_down; scroll_down
+labels
+shot 06a-garage-dark-bottom
 tap_node '(^Location$|Open the map|^Map$)'; sleep 6
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 3
