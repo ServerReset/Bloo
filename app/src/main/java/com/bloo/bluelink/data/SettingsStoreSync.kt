@@ -11,6 +11,7 @@ import com.bloo.uicommon.content
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 
 // --- Drive main-to-main sync engine (extracted from SettingsStore) --
 
@@ -66,11 +67,7 @@ suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
     // downloaded only if the provider gave no modified time and a peek is due.
     val remoteHash = suspend {
         kotlinx.coroutines.withContext(Dispatchers.IO) {
-            runCatching {
-                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.readUriText(parsed)
-                }
-            }.getOrNull()
+            runCatching { readDriveText(parsed) }.onFailure { rethrowUnlessTimeout(it) }.getOrNull()
         }?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }?.let { SyncMerge.parseMeta(it)?.hash }
     }
     val hash = if (due) remoteHash() else null
@@ -123,12 +120,9 @@ private fun registryChangedSince(
 private suspend fun SettingsStore.readDriveFile(parsed: android.net.Uri): Pair<String?, String?> {
     var error: String? = null
     val content = runCatching {
-        withDriveRetry {
-            kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                context.readUriText(parsed)
-            }
-        }
+        withDriveRetry { readDriveText(parsed) }
     }.onFailure {
+        rethrowUnlessTimeout(it)
         error = if (it is TimeoutCancellationException) "Timed out reading the Drive file" else it.message ?: "Couldn't read the Drive file"
     }.getOrNull()
     return content to error
@@ -425,12 +419,9 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
     return mainToMainSyncMutex.withLock {
         // 2. Read current bytes (an empty/new file reads as "" or null).
         val current = runCatching {
-            withDriveRetry {
-                kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
-                    context.readUriText(parsed)
-                }
-            }
+            withDriveRetry { readDriveText(parsed) }
         }.getOrElse { e ->
+            rethrowUnlessTimeout(e)
             val why = if (e is TimeoutCancellationException) "timed out reading" else (e.message ?: "couldn't read")
             return@withLock SettingsStore.SyncTestResult(false, "Couldn't read the Drive file ($why).")
         }
@@ -457,6 +448,29 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
             SettingsStore.SyncTestResult(false, "The write didn't verify: the provider may be dropping or truncating writes.")
         }
     }
+}
+
+/**
+ * Reads the Drive file, waiting at most [DRIVE_IO_TIMEOUT_MS]. The provider's read blocks its thread and cannot be interrupted, and a
+ * withTimeout wrapped straight around a blocking call never fires (it only acts when the block next suspends, which a blocking read never
+ * does). So the read runs on its own, and this waits for it with a timeout that does fire. A read that hangs is left to finish or fail on
+ * its own; nothing waits for it. Only reads go this way: an abandoned write could land after a retry's, so writes stay as they are.
+ */
+private suspend fun SettingsStore.readDriveText(parsed: android.net.Uri): String? {
+    val read = driveReads.async { context.readUriText(parsed) }
+    try {
+        return kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) { read.await() }
+    } finally {
+        read.cancel()
+    }
+}
+
+/** Where [readDriveText]'s reads run, apart from their callers, so a hung read never holds one up. */
+private val driveReads = com.bloo.bluelink.ioScope()
+
+/** In a catch-all around a Drive read: our own timeout is a failure to report, but the caller being cancelled is not. */
+private fun rethrowUnlessTimeout(e: Throwable) {
+    if (e is CancellationException && e !is TimeoutCancellationException) throw e
 }
 
 /**

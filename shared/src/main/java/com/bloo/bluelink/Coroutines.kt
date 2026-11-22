@@ -20,3 +20,15 @@ fun ioScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 fun rethrowIfCancellation(e: Throwable) {
     if (e is CancellationException) throw e
 }
+
+/**
+ * [runCatching] for suspending work: a failure becomes a [Result], but the caller being cancelled is rethrown, so a stopped worker or a
+ * left screen stops instead of carrying on with each later call failing. A timeout of the block's own (an inner withTimeout) is an
+ * ordinary failure, as it was with runCatching: code around these calls treats "took too long" as a result.
+ */
+inline fun <T> suspendRunCatching(block: () -> T): Result<T> = try {
+    Result.success(block())
+} catch (e: Throwable) {
+    if (e is CancellationException && e !is kotlinx.coroutines.TimeoutCancellationException) throw e
+    Result.failure(e)
+}

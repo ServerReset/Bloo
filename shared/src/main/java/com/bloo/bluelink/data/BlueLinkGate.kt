@@ -16,4 +16,4 @@ object BlueLinkGate {
  * keep the stored snapshots fresh read this way; a failed read has nothing to contribute.
  */
 suspend fun VehicleRepository.lastKnownStatus(v: Vehicle): VehicleStatus? =
-    runCatching { BlueLinkGate.statusMutex.withLock { status(v, refresh = false) } }.getOrNull()
+    com.bloo.bluelink.suspendRunCatching { BlueLinkGate.statusMutex.withLock { status(v, refresh = false) } }.getOrNull()

@@ -114,7 +114,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
             // never issue overlapping requests (Blue Link 502s otherwise).
             val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() }.orEmpty().ifEmpty {
                 AppLog.log("AlertWorker: requesting statusMutex for ${brand.label} vehicles()")
-                runCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }.getOrElse { emptyList() }
+                com.bloo.bluelink.suspendRunCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }.getOrElse { emptyList() }
             }
             for (v in vehicles) {
                 AppLog.log("AlertWorker: requesting statusMutex for ${v.name}")
@@ -124,7 +124,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
                 // and this is the exact shape that once deleted the live charging bar
                 // when the network blipped.
                 if (status != null) fetched[v.vin] = status
-                runCatching {
+                com.bloo.bluelink.suspendRunCatching {
                     // `prefs` is already loaded above; pass it so evaluate() doesn't
                     // re-read the same DataStore value once per vehicle per tick.
                     //
@@ -159,14 +159,14 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
                     // sees charging start -- 30 minutes between ticks is far
                     // too coarse for a bar meant to look live.
                     if (ev?.batteryCharge == true) LiveChargePollWorker.kick(applicationContext)
-                    runCatching {
+                    com.bloo.bluelink.suspendRunCatching {
                         LiveCharge.sync(context = applicationContext, settings = settings, v = v, ev = ev)
                     }
                 }
             }
         }
         // One write for every car, every brand.
-        runCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+        com.bloo.bluelink.suspendRunCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
         AppLog.log("AlertWorker: done in ${System.currentTimeMillis() - workerStartedAt}ms, ${fetched.size} status(es)")
         return Result.success()
     }

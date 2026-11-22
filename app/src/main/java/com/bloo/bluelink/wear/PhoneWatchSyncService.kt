@@ -160,9 +160,9 @@ class PhoneWatchSyncService : WearableListenerService() {
     private suspend fun runCommand(request: WatchCommandRequest) {
         val result = if (request.command.action == com.bloo.bluelink.data.CarAction.REFRESH) {
             // Not a car command: the watch is asking for fresh status. Fetch it, and the snapshot write pushes it back.
-            val ok = runCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
+            val ok = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
             com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
-        } else runCatching { com.bloo.bluelink.data.CarCommandRunner.execute(applicationContext, request.command) }
+        } else com.bloo.bluelink.suspendRunCatching { com.bloo.bluelink.data.CarCommandRunner.execute(applicationContext, request.command) }
             .getOrElse {
                 com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
             }

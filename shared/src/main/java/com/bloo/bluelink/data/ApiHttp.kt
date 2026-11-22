@@ -32,20 +32,27 @@ object ApiHttp {
         .readTimeout(60, TimeUnit.SECONDS)
         .addInterceptor(
             // BASIC logs the request/response LINE only (no bodies), so a password, PIN or token in
-            // an auth body is never written to the log.
-            HttpLoggingInterceptor { line -> AppLog.log(line) }.apply { level = HttpLoggingInterceptor.Level.BASIC },
+            // an auth body is never written to the log. The URL's query string is cut too: some
+            // calls carry a location or a token there (see [withoutQuery]).
+            HttpLoggingInterceptor { line -> AppLog.log(withoutQuery(line)) }.apply { level = HttpLoggingInterceptor.Level.BASIC },
         )
         .build()
 
     /**
-     * A fresh client for the side HTTP calls that want shorter, bounded timeouts than the brand APIs
+     * A client for the side HTTP calls that want shorter, bounded timeouts than the brand APIs
      * (weather, update checks): a slow or absent server should fail fast rather than hold a screen.
-     * A new instance per caller (its own pool), not the shared [client].
+     * Built from the shared [client], so it shares its connection pool and threads and only its
+     * timeouts differ; a separate builder gave every caller its own pool and dispatcher threads.
      */
-    fun shortTimeoutClient(): OkHttpClient = OkHttpClient.Builder()
+    fun shortTimeoutClient(): OkHttpClient = client.newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
+
+    /** A logged request or response line with any URL query string cut, so a location or token in a query never reaches the log. */
+    internal fun withoutQuery(line: String): String = query.replace(line, "?…")
+
+    private val query = Regex("\\?\\S+")
 }
 
 /**

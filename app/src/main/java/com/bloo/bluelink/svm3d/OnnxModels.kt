@@ -9,6 +9,7 @@ import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
 
+/** Session options are a native handle: the session copies what it needs, so each caller closes them once the session is built. */
 private fun sessionOptions() = OrtSession.SessionOptions().apply {
     setIntraOpNumThreads(max(1, Runtime.getRuntime().availableProcessors() - 1))
     setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
@@ -17,7 +18,7 @@ private fun sessionOptions() = OrtSession.SessionOptions().apply {
 /** Depth Anything V2 (small): relative inverse depth from one picture. */
 class OnnxDepth(file: File) : DepthModel, Closeable {
     private val env = OrtEnvironment.getEnvironment()
-    private val session = env.createSession(file.absolutePath, sessionOptions())
+    private val session = sessionOptions().use { env.createSession(file.absolutePath, it) }
     private val input = session.inputNames.first()
 
     override fun disparity(rgb: ByteArray, n: Int): FloatArray {
@@ -41,7 +42,7 @@ class OnnxDepth(file: File) : DepthModel, Closeable {
 /** YOLO11n: finds cars, vans, trucks, buses and motorbikes. */
 class OnnxVehicles(file: File) : VehicleDetector, Closeable {
     private val env = OrtEnvironment.getEnvironment()
-    private val session = env.createSession(file.absolutePath, sessionOptions())
+    private val session = sessionOptions().use { env.createSession(file.absolutePath, it) }
     private val input = session.inputNames.first()
     private val kinds = mapOf(2 to "car", 3 to "motorcycle", 5 to "bus", 7 to "truck")
     private val size = 640
@@ -101,7 +102,7 @@ class OnnxVehicles(file: File) : VehicleDetector, Closeable {
 /** LaMa (big-mask inpainting): paints in the masked part of a 512 x 512 picture. */
 class OnnxInpaint(file: File) : Inpainter, Closeable {
     private val env = OrtEnvironment.getEnvironment()
-    private val session = env.createSession(file.absolutePath, sessionOptions())
+    private val session = sessionOptions().use { env.createSession(file.absolutePath, it) }
 
     override fun inpaint(rgb: ByteArray, hole: BooleanArray): ByteArray {
         val s = Inpainter.SIZE

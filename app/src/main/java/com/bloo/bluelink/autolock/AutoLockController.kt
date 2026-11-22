@@ -195,7 +195,7 @@ object AutoLockController {
                 fail(context, vin, "Car no longer found.")
                 return@withLock
             }
-            val status = runCatching { statusFor(context, v) }.getOrElse {
+            val status = com.bloo.bluelink.suspendRunCatching { statusFor(context, v) }.getOrElse {
                 fail(context, vin, "Could not read vehicle status: ${it.message}")
                 return@withLock
             }
@@ -233,13 +233,13 @@ object AutoLockController {
         store.current().vehicles.firstOrNull { it.vin == vin }?.let { return it }
         val sessions = SessionStore(context)
         val credentials = CredentialStore(context)
-        for (brand in runCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
+        for (brand in com.bloo.bluelink.suspendRunCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
             // Inside the shared request lock like every other car request: BlueLink answers 502 to overlapping
             // ones, and an empty result here would read as "car not found" and skip the lock.
-            val fetched = runCatching { BlueLinkGate.statusMutex.withLock { repositoryFor(brand, sessions, credentials).vehicles() } }
+            val fetched = com.bloo.bluelink.suspendRunCatching { BlueLinkGate.statusMutex.withLock { repositoryFor(brand, sessions, credentials).vehicles() } }
                 .getOrDefault(emptyList())
             if (fetched.isEmpty()) continue
-            runCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
+            com.bloo.bluelink.suspendRunCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
             fetched.firstOrNull { it.vin == vin }?.let { return it.toSnapshot() }
         }
         return null
@@ -275,12 +275,12 @@ object AutoLockController {
         // reports an error. Nothing else in this flow is retried, and this is bounded at one.
         // Up to three attempts in all, 2.5s and then 5s apart: a network blip, or a token that expired a minute ago, should not leave
         // the car open. Every failed attempt is logged, so the last one's reason is never the only trace.
-        var result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+        var result = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         var attempt = 1
         while (result?.ok != true && attempt < 3) {
             AppLog.log("AutoLock: lock attempt $attempt failed for $vin (${result?.message ?: "no response"}); trying again.")
             delay(if (attempt == 1) 2_500L else 5_000L)
-            result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+            result = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
             attempt++
         }
         if (result?.ok == true) {
