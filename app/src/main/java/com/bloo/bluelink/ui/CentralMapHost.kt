@@ -90,7 +90,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
         when {
             // Opening grows from the card that was tapped. Closed, the map sits in its car's card; closing lands on the card of the car
             // the bar shows, and falls back to the middle of the screen when that card is off screen, never off the screen itself.
-            opening -> centralMap.cardBounds(openVin!!) ?: fallback
+            opening -> centralMap.cardBounds(openVin) ?: fallback
             else -> {
                 val screen = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
                 // The rectangle captured when the collapse began; only a card wholly on screen is a place to land.

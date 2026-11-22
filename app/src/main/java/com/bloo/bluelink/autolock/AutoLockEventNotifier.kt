@@ -93,7 +93,7 @@ object AutoLockEventNotifier {
             .setLocalOnly(false)
             // So an old "locked" is not mistaken for the latest one.
             .clearsAfterAWhile()
-        contentIntent?.let { builder.setContentIntent(it) }
+        builder.setContentIntent(contentIntent)
 
         postBuilt(context, notificationId(vin), builder)
     }

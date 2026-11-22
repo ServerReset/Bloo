@@ -192,7 +192,7 @@ object Notifications {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .apply {
-                pi?.let { setContentIntent(it) }
+                setContentIntent(pi)
                 if (clears) clearsAfterAWhile()
             }
 

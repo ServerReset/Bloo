@@ -6,6 +6,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class WatchLookPrefsTest {
+    private val lenient = Json { ignoreUnknownKeys = true }
+
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test fun theWatchsSettingsSurviveTheWire() {
@@ -50,7 +52,7 @@ class WatchNotifyDefaultsTest {
         assertEquals(true, p.lowBattery)
         assertEquals(true, p.autoLock)
         // A payload from an older phone has no autoLock field: it reads as on.
-        val old = Json { ignoreUnknownKeys = true }.decodeFromString(WatchNotifyPrefs.serializer(), """{"charging":false}""")
+        val old = lenient.decodeFromString(WatchNotifyPrefs.serializer(), """{"charging":false}""")
         assertEquals(true, old.autoLock)
         assertEquals(false, old.charging)
     }

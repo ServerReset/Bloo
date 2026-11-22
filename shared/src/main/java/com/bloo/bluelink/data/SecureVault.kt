@@ -203,6 +203,10 @@ internal object UserAuthKeystoreWrapper : VaultKeyWrapper {
 
     override val locked: Boolean get() = lockedFlag.get()
 
+    // The duration-only setter, deprecated on API 30+ in favour of setUserAuthenticationParameters, is kept on purpose: it is the one
+    // call that means the same thing from API 26 up (any unlock opens the window), and a slot key is made once and then kept, so a
+    // different spec on newer phones would only add a second behaviour to reason about.
+    @Suppress("DEPRECATION")
     private fun key(): SecretKey = keystoreAesKey(ALIAS) {
         setUserAuthenticationRequired(true)
         setUserAuthenticationValidityDurationSeconds(WINDOW_SECONDS)

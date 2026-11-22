@@ -64,7 +64,7 @@ class SvmShot(val utcTime: String?, val imageSize: List<Int>, private val read: 
         val opts = BitmapFactory.Options().apply { inSampleSize = sample }
         @Suppress("DEPRECATION")
         val decoder = if (Build.VERSION.SDK_INT >= 31) BitmapRegionDecoder.newInstance(data, 0, data.size) else BitmapRegionDecoder.newInstance(data, 0, data.size, false)
-        decoder?.decodeRegion(region, opts).also { decoder?.recycle() }
+        decoder.decodeRegion(region, opts).also { decoder.recycle() }
     }.getOrNull()
 
     companion object {

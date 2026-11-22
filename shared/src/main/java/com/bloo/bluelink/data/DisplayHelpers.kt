@@ -81,6 +81,16 @@ fun formatTripDistance(mi: Double, metric: Boolean): String =
 
     if (metric) "%.1f km".format(mi * KM_PER_MI) else "%.1f mi".format(mi)
 
+/** A distance the brand API gives in kilometres, in the preferred unit, with [decimals] places (one for a nearby charger, none for a route). */
+fun formatKmDistance(km: Double, metric: Boolean, decimals: Int = 1): String =
+    if (metric) "%.${decimals}f km".format(km) else "%.${decimals}f mi".format(km / KM_PER_MI)
+
+/** Energy, as the charging screens show it: one decimal of kWh. */
+fun formatKwh(kwh: Double): String = "%.1f kWh".format(kwh)
+
+/** An amount of money with its currency code after it when there is one: "12.40 CAD". */
+fun formatMoney(amount: Double, currency: String?): String = "%.2f".format(amount) + currency?.let { " $it" }.orEmpty()
+
 /** Raw signed miles until the next service: [lastServiceMiles] + [intervalMiles] - [odometerMiles].
  *  Null if any input is null; negative once overdue (callers clamp as needed). */
 fun serviceDue(odometerMiles: Int?, lastServiceMiles: Int?, intervalMiles: Int?): Int? {

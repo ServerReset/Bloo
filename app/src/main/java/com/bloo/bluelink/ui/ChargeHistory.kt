@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.bloo.bluelink.data.ChargeOrder
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.formatKwh
+import com.bloo.bluelink.data.formatMoney
 import com.bloo.bluelink.suspendRunCatching
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.RevealText
@@ -40,7 +42,7 @@ internal fun ChargeHistoryDialog(vm: AppViewModel, v: Vehicle, onDismiss: () -> 
             val spent = list.sumOf { it.total ?: 0.0 }
             val currency = list.firstNotNullOfOrNull { it.currency }
             RevealText(
-                "${list.size} sessions · ${"%.1f".format(kwh)} kWh · ${"%.2f".format(spent)}${currency?.let { " $it" }.orEmpty()}",
+                "${list.size} session${if (list.size == 1) "" else "s"} · ${formatKwh(kwh)} · ${formatMoney(spent, currency)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = GapRow),
@@ -56,10 +58,7 @@ private fun ChargeOrderRow(o: ChargeOrder) {
         title = o.place ?: "Charging session",
         lines = listOf(
             listOfNotNull(o.started, o.address).joinToString(" · "),
-            listOfNotNull(
-                o.kwh?.let { "%.1f kWh".format(it) },
-                o.total?.let { "%.2f${o.currency?.let { c -> " $c" }.orEmpty()}".format(it) },
-            ).joinToString(" · "),
+            listOfNotNull(o.kwh?.let(::formatKwh), o.total?.let { formatMoney(it, o.currency) }).joinToString(" · "),
         ),
     )
 }

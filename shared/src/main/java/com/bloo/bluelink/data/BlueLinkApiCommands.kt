@@ -143,5 +143,4 @@ suspend fun BlueLinkApi.svmRequest(token: String, username: String, pin: String,
     }.toString().toRequestBody(jsonMedia)
     val request = baseRequest("/ac/v2/svm/findMyCarSVM", token, username, pin, v).post(body).build()
     call(request)
-    Unit
 }

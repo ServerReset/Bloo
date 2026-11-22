@@ -5,7 +5,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidPath
@@ -41,7 +40,7 @@ fun Modifier.dropShadow(
     offsetY: Dp = 5.dp,
     offsetX: Dp = 0.dp,
 ): Modifier = this.drawWithCache {
-    val paint = Paint().asFrameworkPaint().apply {
+    val paint = android.graphics.Paint().apply {
         this.color = color.toArgb()
         isAntiAlias = true
         if (blurRadius > 0.dp) maskFilter = BlurMaskFilter(blurRadius.toPx(), BlurMaskFilter.Blur.NORMAL)

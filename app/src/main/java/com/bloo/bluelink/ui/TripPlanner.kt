@@ -20,6 +20,8 @@ import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.TripPlan
 import com.bloo.bluelink.data.TripRoute
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.fmtMinutes
+import com.bloo.bluelink.data.formatKmDistance
 import com.bloo.bluelink.suspendRunCatching
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.ButtonEmphasis
@@ -128,8 +130,10 @@ internal fun TripPlannerDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation, on
 /** One route: its distance, time and stops, then each charging stop with how long it charges there. */
 @Composable
 private fun RouteCard(r: TripRoute) {
+    val metric = LocalAppearance.current.metricDistance
     SheetRow(
-        title = "%.0f km · %d min · %d charging stop%s".format(r.distanceM / 1000.0, r.minutes, r.stops.size, if (r.stops.size == 1) "" else "s"),
+        title = "${formatKmDistance(r.distanceM / 1000.0, metric, decimals = 0)} · ${fmtMinutes(r.minutes)} · " +
+            "${r.stops.size} charging stop${if (r.stops.size == 1) "" else "s"}",
         lines = buildList {
             if (!r.reachable) add("Bluelink says this route can't be reached on the charge.")
             r.arriveSoc?.let { add("Arrive with about $it%") }

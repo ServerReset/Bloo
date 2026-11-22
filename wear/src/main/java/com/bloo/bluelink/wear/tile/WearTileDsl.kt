@@ -36,7 +36,9 @@ internal fun tileText(value: String, size: Float, color: Int, bold: Boolean = fa
                 .build(),
         )
         .setMaxLines(1)
-        .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
+        // ELLIPSIZE_END, not its replacement ELLIPSIZE: the replacement needs a newer tile renderer, and on an older watch an unknown
+        // overflow mode falls back to cutting the text off mid-letter. For one line the two look the same.
+        .setOverflow(@Suppress("DEPRECATION") LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
         .build()
 
 /** A tinted image from the tile's resources ([resourceId] is the name the resources were registered under). */

@@ -20,6 +20,9 @@ import com.bloo.bluelink.data.ChargeStatus
 import com.bloo.bluelink.data.ChargingStation
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Vehicle
+import com.bloo.bluelink.data.formatKmDistance
+import com.bloo.bluelink.data.formatKwh
+import com.bloo.bluelink.data.formatMoney
 import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.suspendRunCatching
 import com.bloo.uicommon.AppIcons
@@ -111,11 +114,12 @@ internal fun ChargersNearbyDialog(vm: AppViewModel, v: Vehicle, at: GeoLocation,
 
 @Composable
 private fun ChargerRow(s: ChargingStation, onClick: (() -> Unit)?) {
+    val metric = LocalAppearance.current.metricDistance
     val free = if (s.available != null && s.total != null) "${s.available} of ${s.total} free" else null
     SheetRow(
         title = s.name,
         lines = listOf(
-            listOfNotNull(s.distanceKm?.let { "%.1f km".format(it) }, s.network, s.maxKw?.let { "up to ${it.toInt()} kW" }, free)
+            listOfNotNull(s.distanceKm?.let { formatKmDistance(it, metric) }, s.network, s.maxKw?.let { "up to ${it.toInt()} kW" }, free)
                 .joinToString(" · "),
             s.address,
         ),
@@ -209,11 +213,10 @@ private fun ActiveChargePanel(vm: AppViewModel, v: Vehicle, charge: ActiveCharge
         verticalArrangement = Arrangement.spacedBy(GapRow),
     ) {
         val s = status
-        val currency = s?.currency?.let { " $it" }.orEmpty()
         val line = listOfNotNull(
-            s?.kwh?.let { "%.1f kWh".format(it) },
+            s?.kwh?.let(::formatKwh),
             s?.powerKw?.let { "%.1f kW".format(it) },
-            s?.cost?.let { "%.2f$currency".format(it) },
+            s?.let { st -> st.cost?.let { formatMoney(it, st.currency) } },
         ).joinToString(" · ")
         TitleSubtitle("Charging at ${charge.stationName}", listOfNotNull(line.ifBlank { "Waiting for the first reading…" }, note).joinToString("\n"))
         MorphTextButton(

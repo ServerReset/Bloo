@@ -56,7 +56,7 @@ class ModelStore(private val dir: File) {
             val tmp = File(dir, m.file + ".part")
             client.newCall(Request.Builder().url(m.url).build()).execute().use { resp ->
                 if (!resp.isSuccessful) throw IOException("Download failed (${resp.code}) for ${m.file}")
-                val body = resp.body ?: throw IOException("Empty download for ${m.file}")
+                val body = resp.body
                 tmp.outputStream().use { out ->
                     body.byteStream().use { input ->
                         val buf = ByteArray(1 shl 16)
