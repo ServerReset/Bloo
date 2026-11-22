@@ -60,6 +60,15 @@ launch() {
   sleep "${1:-20}"
 }
 
+# The main thread's stack from the newest "not responding" trace, if there is one: what the app was stuck on.
+anr_stack() {
+  local f
+  f=$(adb shell 'ls -t /data/anr/ 2>/dev/null | head -1' | tr -d '\r')
+  [ -z "$f" ] && return
+  echo "=====ANR TRACE $f"
+  adb shell "cat /data/anr/$f" | awk '/^"main"/{p=1} p{print} /^$/{if(p) exit}' | head -60
+}
+
 fixture() { adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd "$1" >/dev/null; sleep 2; }
 
 frames() {
@@ -71,7 +80,7 @@ alive() {
   if [ "$(adb get-state 2>/dev/null)" != "device" ]; then
     echo "=====DEVICE LOST before: $1"
     echo "=====LOGCAT TAIL"
-    grep -E " [EF] |FATAL|ANR in|lowmemorykiller|Killing" /tmp/logcat.txt | tail -80
+    grep -vE "chatty|netd|wifi|Wifi|bluetooth|Bluetooth|audio|Audio" /tmp/logcat.txt | tail -150
     adb emu kill >/dev/null 2>&1
     exit 0
   fi
@@ -86,12 +95,17 @@ adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 
 adb logcat -c
 (adb logcat -v brief > /tmp/logcat.txt 2>&1 &)
 
+adb root >/dev/null 2>&1; sleep 3; adb wait-for-device
 adb install -r -g "$APK"
 adb shell wm size
 fixture full
 fixture dark
-launch 25
+launch 8
+shot 00-garage-dark-8s
+anr_stack
+sleep 17
 shot 01-garage-dark
+anr_stack
 
 # The card list, scrolled.
 adb shell input swipe 540 1900 540 800 500; sleep 3
