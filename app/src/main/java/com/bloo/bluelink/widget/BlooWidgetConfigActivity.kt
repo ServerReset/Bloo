@@ -61,7 +61,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -100,6 +99,7 @@ import kotlinx.coroutines.launch
 import com.bloo.bluelink.suspendRunCatching
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * The widget's settings: a live preview at the top that changes as you choose, then the car (as photo cards),
@@ -336,9 +336,10 @@ private fun NoteGroup(text: String) = SettingsGroup { SettingsCaption(text, bott
 private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, onSelect: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val ring by animateColorAsState(if (selected) scheme.primary else Color.Transparent, label = "carRing")
-    val lift by animateFloatAsState(if (selected) 1f else 0.94f, spring(dampingRatio = 0.6f), label = "carLift")
+    // Read in the layer, not here: the pick's bounce then redraws the card without recomposing it every frame.
+    val lift = animateFloatAsState(if (selected) 1f else 0.94f, spring(dampingRatio = 0.6f), label = "carLift")
     Column(
-        Modifier.width(150.dp).scale(lift).clip(RoundedCornerShape(22.dp))
+        Modifier.width(150.dp).graphicsLayer { scaleX = lift.value; scaleY = lift.value }.clip(RoundedCornerShape(22.dp))
             .border(BorderStroke(2.dp, ring), RoundedCornerShape(22.dp))
             .background(if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
