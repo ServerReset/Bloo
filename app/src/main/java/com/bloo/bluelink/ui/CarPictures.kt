@@ -34,6 +34,8 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.PhotoTile
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 
 private val NonAlnum = Regex("[^a-z0-9]+")
 
@@ -178,7 +180,7 @@ private fun CarPictureGrid(
         ) {
             items(shown, key = { it.url }) { p ->
                 Column(
-                    Modifier.clip(StandardShape).clickable { onPick(p.url) },
+                    Modifier.clip(StandardShape).selectable(selected = p.url == current, role = Role.RadioButton) { onPick(p.url) },
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     AsyncImage(model = p.url, contentDescription = "${p.group} in ${p.colour}", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().height(70.dp))

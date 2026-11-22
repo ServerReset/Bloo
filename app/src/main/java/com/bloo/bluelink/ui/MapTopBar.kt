@@ -95,6 +95,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
+import androidx.compose.ui.semantics.Role
 
 private val DetailsPanelCorner = 28.dp
 
@@ -506,7 +507,13 @@ private fun MapBarCard(
             Row(
                 Modifier
                     .then(
-                        if (selected && onDetailsOpenChange != null) Modifier.clickable { onDetailsOpenChange(!detailsOpen) } else Modifier,
+                        if (selected && onDetailsOpenChange != null) {
+                            Modifier.clickable(role = Role.Button, onClickLabel = if (detailsOpen) "Hide the car's details" else "Show the car's details") {
+                                onDetailsOpenChange(!detailsOpen)
+                            }
+                        } else {
+                            Modifier
+                        },
                     )
                     .layout { measurable, constraints ->
                         val p = lineProgress().coerceIn(0f, 1f)

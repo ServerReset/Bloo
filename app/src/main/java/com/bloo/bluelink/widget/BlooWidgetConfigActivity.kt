@@ -98,6 +98,8 @@ import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.imageUrl
 import kotlinx.coroutines.launch
 import com.bloo.bluelink.suspendRunCatching
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 
 /**
  * The widget's settings: a live preview at the top that changes as you choose, then the car (as photo cards),
@@ -339,7 +341,7 @@ private fun CarCard(car: VehicleSnapshot, photoUrl: String?, selected: Boolean, 
         Modifier.width(150.dp).scale(lift).clip(RoundedCornerShape(22.dp))
             .border(BorderStroke(2.dp, ring), RoundedCornerShape(22.dp))
             .background(if (selected) scheme.secondaryContainer else scheme.surfaceContainerHighest)
-            .clickable(onClick = onSelect),
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
     ) {
         Box(Modifier.fillMaxWidth().height(84.dp).background(Brush.linearGradient(listOf(scheme.primary, scheme.tertiary)))) {
             if (photoUrl != null) {

@@ -81,6 +81,7 @@ import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.perf.PerfMonitor
 import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.lowPowerAwareSpring
+import androidx.compose.ui.semantics.Role
 
 /**
  * One entry in the full-screen map's bottom toolbar -- an icon, a label and an action, nothing
@@ -419,7 +420,7 @@ internal fun ExpandableMapLayer(
                     clip = true
                 }
                 .hazeSource(mapHazeState)
-                .then(if (!isExpanded) Modifier.clickable { onOpen() } else Modifier)
+                .then(if (!isExpanded) Modifier.clickable(role = Role.Button, onClickLabel = "Open the map") { onOpen() } else Modifier)
                 .onGloballyPositioned { c ->
                     chromeInsets?.let {
                         it.mapTop = c.positionOnScreen().y

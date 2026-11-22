@@ -76,6 +76,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.GapRow
+import androidx.compose.ui.semantics.Role
 
 /** How many frames the first map in a process waits before it composes, so it lands after the cards and photos the garage draws first. */
 private const val MapStartFrames = 6
@@ -577,7 +578,7 @@ private fun CarPillCluster(
             Modifier
                 .clip(RoundedCornerShape(50))
                 .background(scheme.surfaceContainerHigh)
-                .clickable(onClick = onClick)
+                .clickable(role = Role.Button, onClickLabel = "Show these cars", onClick = onClick)
                 .padding(horizontal = 4.dp, vertical = 3.dp),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy((-6).dp), verticalAlignment = Alignment.CenterVertically) {
