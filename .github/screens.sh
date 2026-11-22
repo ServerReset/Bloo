@@ -15,6 +15,8 @@ command -v convert >/dev/null || sudo apt-get install -y -qq imagemagick >/dev/n
 
 shot() {
   local name=$1
+  alive "$name"
+  adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
   adb exec-out screencap -p > "/tmp/$name.png"
   convert "/tmp/$name.png" -resize 540x -quality 80 "/tmp/$name.jpg"
   echo "=====SHOT $name BEGIN"
@@ -64,6 +66,25 @@ frames() {
   echo "=====FRAMES $1"
   adb shell dumpsys gfxinfo $PKG | grep -E "Total frames rendered|Janky frames|percentile|Number (Missed Vsync|High input latency|Slow UI thread|Slow bitmap uploads|Slow issue draw commands|Frame deadline missed)" | sed 's/^ *//'
 }
+
+alive() {
+  if [ "$(adb get-state 2>/dev/null)" != "device" ]; then
+    echo "=====DEVICE LOST before: $1"
+    echo "=====LOGCAT TAIL"
+    grep -E " [EF] |FATAL|ANR in|lowmemorykiller|Killing" /tmp/logcat.txt | tail -80
+    adb emu kill >/dev/null 2>&1
+    exit 0
+  fi
+}
+
+# Let the freshly booted system settle (the launcher was still starting when the first run began), and close any
+# "isn't responding" dialog it left behind.
+adb wait-for-device
+until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
+sleep 45
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
+adb logcat -c
+(adb logcat -v brief > /tmp/logcat.txt 2>&1 &)
 
 adb install -r -g "$APK"
 adb shell wm size
@@ -120,4 +141,6 @@ shot 09-climate-open-light
 echo "=====CRASHES"
 adb logcat -d -b crash | tail -60
 echo "=====PERF LOG"
-adb logcat -d | grep -E "BlooPerf|BlooStartup|Choreographer" | tail -80
+grep -E "BlooPerf|BlooStartup|Choreographer" /tmp/logcat.txt | tail -80
+adb emu kill >/dev/null 2>&1
+exit 0
