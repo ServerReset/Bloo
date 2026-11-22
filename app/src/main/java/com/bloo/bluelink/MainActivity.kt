@@ -45,6 +45,7 @@ import com.bloo.bluelink.data.DiagSettings
 import com.bloo.bluelink.perf.PerfMonitor
 import com.bloo.bluelink.update.PlayUpdates
 import com.bloo.bluelink.update.shizukuInstall
+import androidx.compose.runtime.LaunchedEffect
 
 /**
  * The app's single Activity: hosts the Compose UI tree ([BlooApp]) and owns the process-wide setup
@@ -152,6 +153,8 @@ class MainActivity : FragmentActivity() {
         StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_SET_CONTENT_BEGIN)
         setContent {
             val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+            // The next launch screen follows the theme chosen here, not the phone's (see syncSystemNightMode).
+            LaunchedEffect(appearance.themeMode) { com.bloo.bluelink.ui.syncSystemNightMode(this@MainActivity, appearance.themeMode) }
             // Memoize palette lookup to avoid repeated linear search through custom palettes
             val activeCustom = remember(
                 appearance.dynamicColor, appearance.customPalettes, appearance.activeCustomPaletteId

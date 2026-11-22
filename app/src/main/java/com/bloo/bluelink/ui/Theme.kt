@@ -283,3 +283,20 @@ fun blooColorScheme(
  * The app's root theme wrapper, applied once around the whole Compose tree (see
  * [MainActivity]).
  */
+
+/**
+ * Tells the system which theme the app is in (Android 12 and later), so the launch screen and the window behind the first frame match it.
+ * The system draws those before any of the app's code runs, from the light or night resources, so without this a dark app opened on a
+ * light phone flashed light first. [ThemeMode.SYSTEM] hands the choice back to the system. MainActivity handles uiMode changes itself, so
+ * this does not recreate the screen.
+ */
+internal fun syncSystemNightMode(context: android.content.Context, mode: ThemeMode) {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return
+    val uiModes = context.getSystemService(android.app.UiModeManager::class.java) ?: return
+    val night = when (mode) {
+        ThemeMode.LIGHT -> android.app.UiModeManager.MODE_NIGHT_NO
+        ThemeMode.DARK -> android.app.UiModeManager.MODE_NIGHT_YES
+        ThemeMode.SYSTEM -> android.app.UiModeManager.MODE_NIGHT_AUTO
+    }
+    runCatching { uiModes.setApplicationNightMode(night) }
+}
