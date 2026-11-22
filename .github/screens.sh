@@ -37,8 +37,7 @@ xml = open("/tmp/ui.xml", encoding="utf-8", errors="ignore").read()
 for m in re.finditer(r'<node [^>]*>', xml):
     n = m.group(0)
     t = re.search(r' text="([^"]*)"', n); d = re.search(r' content-desc="([^"]*)"', n)
-    label = (t.group(1) if t else "") + " " + (d.group(1) if d else "")
-    if pat.search(label):
+    if any(pat.search(x.group(1).strip()) for x in (t, d) if x):
         b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n)
         if b:
             x0, y0, x1, y1 = map(int, b.groups())
@@ -132,64 +131,61 @@ adb logcat -c
 
 adb install -r -g "$APK"
 adb shell wm size
+
+# Brings the app back to the front if anything (a stray gesture, the system) sent it away.
+front() {
+  if ! adb shell dumpsys activity activities | grep -q "mResumedActivity.*$PKG"; then
+    echo "app not in front before $1: relaunching"
+    launch 15
+  fi
+}
+
+# Swipes between cars well inside the screen: a swipe from near the edge is the system's back gesture.
+next_car() { adb shell input swipe 820 1250 260 1250 300; sleep 3; }
+prev_car() { adb shell input swipe 260 1250 820 1250 300; sleep 3; }
+scroll_down() { adb shell input swipe 540 1800 540 900 600; sleep 3; }
+scroll_up() { adb shell input swipe 540 900 540 1800 600; sleep 3; }
+
 fixture full
 fixture dark
-launch 8
-shot 00-garage-dark-8s
-anr_stack
-sleep 17
+launch 25
 shot 01-garage-dark
 anr_stack
-frames cold-start
 labels
 
-# The card list, scrolled.
-adb shell input swipe 540 1900 540 800 500; sleep 3
+front scrolled; scroll_down
 shot 02-garage-dark-scrolled
-adb shell input swipe 540 800 540 1900 500; sleep 3
+scroll_up
 
-# Swiping between the two cars, timed.
-adb shell dumpsys gfxinfo $PKG reset >/dev/null
-for i in 1 2 3 4 5 6; do
-  adb shell input swipe 950 1200 130 1200 280; sleep 1.5
-  adb shell input swipe 130 1200 950 1200 280; sleep 1.5
-done
-frames garage-swipes
-adb shell input swipe 950 1200 130 1200 280; sleep 3
+front second-car; next_car
 shot 03-second-car-dark
-adb shell input swipe 130 1200 950 1200 280; sleep 3
+prev_car
 
-# The climate card, opened.
-tap_node 'Climate'; sleep 3
-shot 04-climate-open-dark
-adb shell input keyevent KEYCODE_BACK; sleep 2
-
-# The map, opened from the location card.
-adb shell input swipe 540 1900 540 900 500; sleep 2
-tap_node 'map'; sleep 4
-shot 05-map-dark
-adb shell dumpsys gfxinfo $PKG reset >/dev/null
-adb shell input swipe 300 1400 800 900 400; sleep 1
-adb shell input swipe 800 900 300 1400 400; sleep 1
-frames map-pan
-adb shell input keyevent KEYCODE_BACK; sleep 2
-
-# Settings.
-launch 15
+front climate; scroll_down; scroll_down
 labels
-tap_node 'Settings'; sleep 4
-shot 06-settings-dark
-adb shell input swipe 540 1900 540 700 500; sleep 3
-shot 07-settings-dark-scrolled
+shot 04-garage-dark-lower
+tap_node '^Climate$'; sleep 4
+shot 05-climate-open-dark
+adb shell input keyevent KEYCODE_BACK; sleep 2
 
-lean_pass
+front map; launch 20
+scroll_down
+tap_node '(^Location$|Open the map|^Map$)'; sleep 6
+shot 06-map-dark
+adb shell input keyevent KEYCODE_BACK; sleep 3
+
+front settings; launch 20
+tap_node '^Settings$'; sleep 5
+shot 07-settings-dark
+scroll_down
+shot 08-settings-dark-scrolled
 
 # The light theme.
 fixture light
-launch 20
-shot 08-garage-light
-tap_node 'Climate'; sleep 3
-shot 09-climate-open-light
+launch 25
+shot 09-garage-light
+front light-second; next_car
+shot 10-second-car-light
 
 echo "=====CRASHES"
 adb logcat -d -b crash | tail -60
