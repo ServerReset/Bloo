@@ -10,6 +10,7 @@ import com.bloo.bluelink.data.imageUrl
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The car's own photo, softened into a backdrop for the widget. A widget cannot run a live blur, so the
@@ -30,8 +31,8 @@ internal object WidgetPhoto {
 
     /** The blurred photo for [vin], or null when the car has no photo (or it cannot be read). */
     suspend fun load(context: Context, vin: String, blur: Int, night: Boolean): Bitmap? = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = SettingsStore(context).imageUrl(vin)?.takeIf { it.isNotBlank() } ?: return@runCatching null
+        suspendRunCatching {
+            val url = SettingsStore(context).imageUrl(vin)?.takeIf { it.isNotBlank() } ?: return@suspendRunCatching null
             val source = if (url.startsWith("/")) decodeSmall(File(url)) else fetch(context, url)
             source?.let { soften(it, blur, night) }
         }.getOrNull()

@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.bloo.bluelink.ui.ThemeMode
 import kotlinx.coroutines.flow.first
+import com.bloo.bluelink.suspendRunCatching
 
 // --- Per-car identity, layout, AutoLock, climate, palettes, chargers and weather (extracted from SettingsStore) --
 
@@ -66,7 +67,7 @@ suspend fun SettingsStore.setVehicleOrder(order: List<String>) {
  * read, so loading it on the startup warm-up thread makes the real read ~free.
  */
 suspend fun SettingsStore.warmUp() {
-    runCatching { context.settingsDataStore.data.first() }
+    suspendRunCatching { context.settingsDataStore.data.first() }
 }
 
 /**

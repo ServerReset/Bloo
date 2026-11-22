@@ -97,6 +97,7 @@ import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.imageUrl
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The widget's settings: a live preview at the top that changes as you choose, then the car (as photo cards),
@@ -175,17 +176,17 @@ internal data class Choice(
 
 private suspend fun loadConfig(context: Context, widgetId: Int): Loaded {
     val sealed = BootGate.isLocked(context)
-    val cars = if (sealed) emptyList() else runCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
+    val cars = if (sealed) emptyList() else suspendRunCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
     val settings = SettingsStore(context)
     val photos = cars.mapNotNull { car ->
-        runCatching { settings.imageUrl(car.vin) }.getOrNull()?.takeIf { it.isNotBlank() }?.let { car.vin to it }
+        suspendRunCatching { settings.imageUrl(car.vin) }.getOrNull()?.takeIf { it.isNotBlank() }?.let { car.vin to it }
     }.toMap()
     // Existing options (a reconfigure), or the defaults when the widget is not bound yet.
-    val prefs: Preferences = runCatching {
+    val prefs: Preferences = suspendRunCatching {
         val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(widgetId)
         getAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId)
     }.getOrDefault(emptyPreferences())
-    val strip = runCatching {
+    val strip = suspendRunCatching {
         AppWidgetManager.getInstance(context).getAppWidgetInfo(widgetId)?.provider?.className == BlooStripWidgetReceiver::class.java.name
     }.getOrDefault(false)
     return Loaded(

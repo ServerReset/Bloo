@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.CarCommandResult
 import com.bloo.bluelink.data.ClimateRequest
 import com.bloo.bluelink.data.WatchCommandResult
 import kotlinx.coroutines.tasks.await
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The watch's window onto the phone: the cars are pushed from the
@@ -93,7 +94,7 @@ object WearDataLayerSync {
     /** Read every current data item the phone has pushed and mirror it. */
     suspend fun pullAll(context: Context) {
         val app = context.applicationContext
-        val items = runCatching { Wearable.getDataClient(app).dataItems.await() }.getOrNull() ?: return
+        val items = suspendRunCatching { Wearable.getDataClient(app).dataItems.await() }.getOrNull() ?: return
         for (item in items) {
             when (item.uri.path) {
                 WatchSyncProtocol.PATH_SNAPSHOT ->
@@ -115,7 +116,7 @@ object WearDataLayerSync {
     private suspend fun mirrorLocked(context: Context, bytes: ByteArray) {
         // The listener service can receive the first push before the Activity has ever opened.
         if (!started) start(context)
-        val payload = runCatching {
+        val payload = suspendRunCatching {
             json.decodeFromString(WatchSyncPayload.serializer(), bytes.decodeToString())
         }.getOrNull() ?: return
         if (payload.sentAtMs != 0L) {
@@ -138,7 +139,7 @@ object WearDataLayerSync {
         WearClimateChoices.applyComfort(payload.comfortCaps, payload.comfortModels)
         // A cold process has no cars in memory yet; what was stored last time is the "before", or a charge that completed while
         // the app was closed would raise nothing (a first sighting never alerts).
-        val before = _vehicles.value.ifEmpty { runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList()) }
+        val before = _vehicles.value.ifEmpty { suspendRunCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList()) }
         WearNotifier.onVehicles(app, before, payload.vehicles)
         // A push that carries the cars already held (the phone re-sends on every snapshot write) need not rewrite the store.
         val carsUnchanged = payload.vehicles == _vehicles.value
@@ -153,7 +154,7 @@ object WearDataLayerSync {
                 payload.watchUpdateApkUrl?.let { url -> UpdateAdvice(run, url, payload.watchUpdateNotes) }
             }
         // Mirror into the shared store so anything reading SnapshotStore sees the same data.
-        if (!carsUnchanged) runCatching { SnapshotStore(app).saveVehicles(payload.vehicles) }
+        if (!carsUnchanged) suspendRunCatching { SnapshotStore(app).saveVehicles(payload.vehicles) }
         // The tile and the complication read that store: have them redraw from it now rather than at their next poll.
         WearSurfaces.refresh(app)
     }

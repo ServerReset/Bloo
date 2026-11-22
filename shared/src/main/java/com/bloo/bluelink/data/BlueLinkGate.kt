@@ -2,6 +2,7 @@ package com.bloo.bluelink.data
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.suspendRunCatching
 
 /** Process-wide serialization for vehicle-status calls. */
 object BlueLinkGate {
@@ -16,4 +17,4 @@ object BlueLinkGate {
  * keep the stored snapshots fresh read this way; a failed read has nothing to contribute.
  */
 suspend fun VehicleRepository.lastKnownStatus(v: Vehicle): VehicleStatus? =
-    com.bloo.bluelink.suspendRunCatching { BlueLinkGate.statusMutex.withLock { status(v, refresh = false) } }.getOrNull()
+    suspendRunCatching { BlueLinkGate.statusMutex.withLock { status(v, refresh = false) } }.getOrNull()

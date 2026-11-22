@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import com.bloo.bluelink.data.ResponseFraming
 import com.bloo.bluelink.work.LiveChargePollWorker
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.suspendRunCatching
 
 // --- Per-car status loading and the live-charge bar (extracted from AppViewModel) --
 
@@ -196,7 +197,7 @@ internal suspend fun AppViewModel.refreshLiveChargeBar(vehicles: List<Vehicle>) 
     if (!liveChargeDismissalsResetThisSession) {
         liveChargeDismissalsResetThisSession = true
         vehicles.forEach { v ->
-            runCatching {
+            suspendRunCatching {
                 if (settingsStore.liveChargeDismissed(v.vin)) settingsStore.setLiveChargeDismissed(v.vin, false)
             }
         }
@@ -211,7 +212,7 @@ internal suspend fun AppViewModel.refreshLiveChargeBar(vehicles: List<Vehicle>) 
         val status = statuses[v.vin] ?: return@forEach
         val ev = status.evStatus
         if (ev?.batteryCharge == true) anyCharging = true
-        runCatching {
+        suspendRunCatching {
             LiveCharge.sync(context = getApplication(), settings = settingsStore, vin = v.vin, carName = v.name, ev = ev)
         }
     }

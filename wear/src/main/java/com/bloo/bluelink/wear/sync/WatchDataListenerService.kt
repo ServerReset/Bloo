@@ -10,6 +10,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Receives the phone's pushes on the watch, even when the watch app is not open, and mirrors
@@ -49,7 +50,7 @@ class WatchDataListenerService : WearableListenerService() {
      */
     @android.annotation.SuppressLint("WearRecents") // starting the installer from a Service
     private suspend fun installPushedApk(asset: com.google.android.gms.wearable.Asset) {
-        val bytes = runCatching {
+        val bytes = suspendRunCatching {
             com.google.android.gms.wearable.Wearable.getDataClient(applicationContext)
                 .getFdForAsset(asset).await().inputStream.use { it.readBytes() }
         }.getOrNull() ?: return

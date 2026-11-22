@@ -15,6 +15,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import com.bloo.bluelink.suspendRunCatching
 
 data class WorkflowRun(
     val runNumber: Int,
@@ -115,7 +116,7 @@ object UpdateApi {
      * branch-scoped at all. A caller passing a branch was reading a promise the code did not keep.
      */
     suspend fun fetchLatestSuccessfulRun(): WorkflowRun? = withContext(Dispatchers.IO) {
-        runCatching {
+        suspendRunCatching {
             val url = "https://api.github.com/repos/$OWNER/$REPO/releases"
                 .toHttpUrl()
                 .newBuilder()
@@ -193,7 +194,7 @@ object UpdateApi {
      */
     suspend fun downloadApk(url: String, destination: File, onProgress: (Float) -> Unit): Boolean =
         withContext(Dispatchers.IO) {
-            runCatching {
+            suspendRunCatching {
                 val request = Request.Builder().url(url).get().build()
                 downloadClient.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) return@use false

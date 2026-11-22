@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.tasks.await
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The watch end of "sign the watch in so it works on its own".
@@ -48,7 +49,7 @@ object WearCredentialSync {
     suspend fun onOffer(context: Context, phoneNodeId: String) {
         val publicKey = newTransferKey()
         _signInCode.value = WatchCredentialTransfer.confirmationCode(publicKey)
-        runCatching {
+        suspendRunCatching {
             Wearable.getMessageClient(context.applicationContext)
                 .sendMessage(phoneNodeId, WatchSyncProtocol.PATH_CRED_KEY, publicKey).await()
         }.onFailure { AppLog.log("WatchSync: couldn't send the transfer key (${it.javaClass.simpleName})") }
@@ -73,10 +74,10 @@ object WearCredentialSync {
             }
         }
         // One use: the key has done its job.
-        runCatching { KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(ALIAS) }
+        suspendRunCatching { KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(ALIAS) }
         _signInCode.value = null
         _signedIn.value = bundle.sessions.isNotEmpty()
-        runCatching {
+        suspendRunCatching {
             Wearable.getMessageClient(app).sendMessage(phoneNodeId, WatchSyncProtocol.PATH_CRED_ACK, ByteArray(0)).await()
         }
         refresh(app)
@@ -95,7 +96,7 @@ object WearCredentialSync {
     }
 
     /** Whether this watch holds a session of its own (and so can work without the phone). */
-    suspend fun hasSession(context: Context): Boolean =        runCatching { SessionStore(context.applicationContext).loggedInBrands().isNotEmpty() }
+    suspend fun hasSession(context: Context): Boolean =        suspendRunCatching { SessionStore(context.applicationContext).loggedInBrands().isNotEmpty() }
             .getOrDefault(false).also { _signedIn.value = it }
 
     /**
@@ -105,7 +106,7 @@ object WearCredentialSync {
     suspend fun runLocally(context: Context, vin: String, action: String, climate: ClimateRequest? = null): CarCommandResult? {
         val app = context.applicationContext
         if (!hasSession(app)) return null
-        val result = runCatching { CarCommandRunner.execute(app, CarCommand(vin, action).withClimate(climate)) }
+        val result = suspendRunCatching { CarCommandRunner.execute(app, CarCommand(vin, action).withClimate(climate)) }
             .getOrElse { CarCommandResult(vin, action, ok = false, message = it.message) }
         WearDataLayerSync.reloadFromStore(app, result)
         return result
@@ -115,7 +116,7 @@ object WearCredentialSync {
     suspend fun refresh(context: Context) {
         val app = context.applicationContext
         if (!hasSession(app)) return
-        runCatching { CarCommandRunner.refresh(app, vin = "", force = false) }
+        suspendRunCatching { CarCommandRunner.refresh(app, vin = "", force = false) }
         WearDataLayerSync.reloadFromStore(app, null)
     }
 

@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.CarCommandGate
 import com.bloo.bluelink.data.CarCommandRunner
 import kotlinx.coroutines.delay
+import com.bloo.bluelink.suspendRunCatching
 
 internal object WidgetKeys {
     /** The car this widget shows (unset: the first car). */
@@ -115,7 +116,7 @@ class CarActionCallback : ActionCallback {
         if (CarCommandGate.busy(CarCommandGate.keyFor(vin, action))) return
         val pendingKey = "$vin:$action"
         edit { it[WidgetKeys.PENDING] = pendingKey; it.remove(WidgetKeys.NOTE) }
-        val result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()
+        val result = suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()
         edit {
             // Only this command's own marker: a second tap while this ran replaced it, and clearing that one here
             // switched off the busy state of a command that is still running.

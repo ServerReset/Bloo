@@ -21,6 +21,7 @@ import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.Brand
 import com.bloo.bluelink.perf.PerfMonitor
 import com.bloo.uicommon.content
+import com.bloo.bluelink.suspendRunCatching
 
 // --- Garage loading, cached publish, and per-car config seeding (extracted from AppViewModel) --
 
@@ -71,7 +72,7 @@ private fun AppViewModel.isDeviceOnline(): Boolean {
  */
 private suspend fun AppViewModel.publishCachedGarage() {
     if (_state.value.screen != Screen.Loading) return
-    val cached = runCatching { snapshotStore.current() }.getOrNull() ?: return
+    val cached = suspendRunCatching { snapshotStore.current() }.getOrNull() ?: return
     if (cached.vehicles.isEmpty()) return
     val cachedVehicles = cached.vehicles.map { it.toVehicle() }
     val prefs = settingsStore.snapshot()
@@ -118,7 +119,7 @@ suspend fun AppViewModel.loadGarageInner() {
     val vehiclesFetchStartedAt = System.currentTimeMillis()
     val failedBrands = mutableListOf<Brand>()
     val answered = repos.entries.toList().flatMap { (brand, r) ->
-        runCatching {
+        suspendRunCatching {
             // Cold-start diagnostic: separates time waiting for statusMutex from r.vehicles()
             // itself.
             val lockWaitStartedAt = System.currentTimeMillis()

@@ -20,6 +20,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.suspendRunCatching
 
 /*
  * The hero's text colour follows the photo. The photo is sampled once where the text sits -- the title band at the top and the
@@ -141,7 +142,7 @@ internal suspend fun measureHeroToneCached(context: Context, model: Any, backdro
 private fun toneCacheKey(model: Any, backdrop: Float?): String = "$model|${backdrop?.let { (it * 20f).roundToInt() } ?: -1}"
 
 private suspend fun measureHeroTone(context: Context, model: Any, backdrop: Float?): HeroPhotoTone? = withContext(Dispatchers.Default) {
-    runCatching {
+    suspendRunCatching {
         val request = ImageRequest.Builder(context)
             .data(model)
             .size(SampleW, SampleH)
@@ -149,7 +150,7 @@ private suspend fun measureHeroTone(context: Context, model: Any, backdrop: Floa
             .precision(Precision.EXACT)
             .allowHardware(false)
             .build()
-        val bitmap = context.imageLoader.execute(request).drawable?.toBitmap(SampleW, SampleH) ?: return@runCatching null
+        val bitmap = context.imageLoader.execute(request).drawable?.toBitmap(SampleW, SampleH) ?: return@suspendRunCatching null
         val pixels = IntArray(SampleW * SampleH).also { bitmap.getPixels(it, 0, SampleW, 0, 0, SampleW, SampleH) }
         heroToneOf(pixels, SampleW, SampleH, backdrop)
     }.getOrNull()

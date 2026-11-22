@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import com.bloo.bluelink.suspendRunCatching
 
 /** Snapshot the UI/notification observe for one car's in-flight (or last) evaluation. */
 data class AutoLockEvalState(
@@ -190,7 +191,7 @@ object AutoLockController {
                 fail(context, vin, "Car no longer found.")
                 return@withLock
             }
-            val status = com.bloo.bluelink.suspendRunCatching { statusFor(context, v) }.getOrElse {
+            val status = suspendRunCatching { statusFor(context, v) }.getOrElse {
                 fail(context, vin, "Could not read vehicle status: ${it.message}")
                 return@withLock
             }
@@ -228,13 +229,13 @@ object AutoLockController {
         store.current().vehicles.firstOrNull { it.vin == vin }?.let { return it }
         val sessions = SessionStore(context)
         val credentials = CredentialStore(context)
-        for (brand in com.bloo.bluelink.suspendRunCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
+        for (brand in suspendRunCatching { sessions.loggedInBrands() }.getOrDefault(emptyList())) {
             // Inside the shared request lock like every other car request: BlueLink answers 502 to overlapping
             // ones, and an empty result here would read as "car not found" and skip the lock.
-            val fetched = com.bloo.bluelink.suspendRunCatching { BlueLinkGate.statusMutex.withLock { repositoryFor(brand, sessions, credentials).vehicles() } }
+            val fetched = suspendRunCatching { BlueLinkGate.statusMutex.withLock { repositoryFor(brand, sessions, credentials).vehicles() } }
                 .getOrDefault(emptyList())
             if (fetched.isEmpty()) continue
-            com.bloo.bluelink.suspendRunCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
+            suspendRunCatching { store.saveVehiclesKeepingStatus(fetched.map { it.toSnapshot() }) }
             fetched.firstOrNull { it.vin == vin }?.let { return it.toSnapshot() }
         }
         return null
@@ -248,7 +249,7 @@ object AutoLockController {
     private suspend fun performLock(context: Context, vin: String, carName: String, settings: AutoLockConfig) {
         // The outcome notification is the user's to silence (Settings -> Notifications); a failure
         // notification below is not.
-        val announce = runCatching { SettingsStore(context).notificationPrefs().autoLockAlerts }.getOrDefault(true)
+        val announce = suspendRunCatching { SettingsStore(context).notificationPrefs().autoLockAlerts }.getOrDefault(true)
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.LOCKING)) }
         if (settings.dryRun) {
             AppLog.log("AutoLock DRY RUN: would have locked $vin now. (No command sent.)")
@@ -270,12 +271,12 @@ object AutoLockController {
         // reports an error. Nothing else in this flow is retried, and this is bounded at one.
         // Up to three attempts in all, 2.5s and then 5s apart: a network blip, or a token that expired a minute ago, should not leave
         // the car open. Every failed attempt is logged, so the last one's reason is never the only trace.
-        var result = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+        var result = suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         var attempt = 1
         while (result?.ok != true && attempt < 3) {
             AppLog.log("AutoLock: lock attempt $attempt failed for $vin (${result?.message ?: "no response"}); trying again.")
             delay(if (attempt == 1) 2_500L else 5_000L)
-            result = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
+            result = suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
             attempt++
         }
         if (result?.ok == true) {
@@ -300,7 +301,7 @@ object AutoLockController {
      * the log and the in-app line, so an evaluation that could not lock looked like one that never ran.
      */
     private suspend fun carNameFor(context: Context, vin: String): String =
-        runCatching { SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.name }.getOrNull() ?: "Your car"
+        suspendRunCatching { SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin }?.name }.getOrNull() ?: "Your car"
 
     /** Tells the person AutoLock did not lock a car when it should have been able to, with the reason. */
     private fun notifyNotDetected(context: Context, vin: String, carName: String, text: String) {

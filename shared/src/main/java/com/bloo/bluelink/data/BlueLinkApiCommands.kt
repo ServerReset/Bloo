@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import okhttp3.RequestBody.Companion.toRequestBody
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The US Blue Link API's bigger commands, as extensions of [BlueLinkApi], kept out of the class so
@@ -124,7 +125,7 @@ suspend fun BlueLinkApi.svmLatest(token: String, username: String, pin: String, 
     val detail = root["svmDetails"]?.jsonArray?.firstOrNull()?.jsonObject?.get("svmDetail")?.jsonObject
         ?: return@execute null
     val image = detail["svmImage"]?.jsonPrimitive?.contentOrNull ?: return@execute null
-    val jpeg = runCatching { java.util.Base64.getMimeDecoder().decode(image) }.getOrNull() ?: return@execute null
+    val jpeg = suspendRunCatching { java.util.Base64.getMimeDecoder().decode(image) }.getOrNull() ?: return@execute null
     SurroundCapture(
         utcTime = detail["gpsDetail"]?.jsonObject?.get("time")?.jsonPrimitive?.contentOrNull,
         jpeg = jpeg,

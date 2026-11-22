@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The app's own performance instrumentation, so a log or a copied report says where the time went without a profiler.
@@ -239,10 +240,10 @@ object PerfMonitor {
         probeJob?.cancel()
         probeJob = null
         // Best effort: a listener the system no longer holds must not take the activity down with it.
-        thermalListener?.let { l -> runCatching { thermalPower?.removeThermalStatusListener(l) } }
+        thermalListener?.let { l -> suspendRunCatching { thermalPower?.removeThermalStatusListener(l) } }
         thermalListener = null
         thermalPower = null
-        powerReceiver?.let { r -> runCatching { device?.unregisterReceiver(r) } }
+        powerReceiver?.let { r -> suspendRunCatching { device?.unregisterReceiver(r) } }
         powerReceiver = null
         event("uninstall")
         thread?.quitSafely()

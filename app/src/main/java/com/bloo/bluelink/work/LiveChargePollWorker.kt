@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.repositoryFor
 import java.util.concurrent.TimeUnit
 import com.bloo.bluelink.data.DeviceStatus
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Keeps [LiveCharge]'s notification moving while a car keeps charging.
@@ -82,7 +83,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
             .groupBy { Brand.fromIndicator(it.toVehicle().brandIndicator) }
         val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {
-            val repo = runCatching { repositoryFor(brand, store, credentials) }
+            val repo = suspendRunCatching { repositoryFor(brand, store, credentials) }
                 .getOrNull() ?: continue
             val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() } ?: emptyList()
             for (v in vehicles) {
@@ -97,7 +98,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
                 // from the charge having stopped.
                 if (status == null) continue
                 fetched[v.vin] = status
-                com.bloo.bluelink.suspendRunCatching {
+                suspendRunCatching {
                     // charging local was `ev?.batteryCharge == true`, which the overload derives.
                     LiveCharge.sync(context = applicationContext, settings = settings, v = v, ev = ev)
                 }
@@ -106,7 +107,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
         // Before any of the return paths below, including the retry one: whatever this
         // tick did learn is worth keeping even if the pass as a whole is being retried.
         // No-ops on an empty map, which is exactly the !learnedSomething case.
-        com.bloo.bluelink.suspendRunCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+        suspendRunCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
         AppLog.log("LiveChargePollWorker: done in ${System.currentTimeMillis() - workerStartedAt}ms, ${fetched.size} status(es)")
 
         // Nothing came back at all. That's transient, so hand it to WorkManager's own

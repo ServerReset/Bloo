@@ -13,6 +13,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import com.bloo.uicommon.content
 import androidx.datastore.preferences.core.MutablePreferences
+import com.bloo.bluelink.suspendRunCatching
 
 // --- Settings backup export/import/merge (extracted from SettingsStore) --
 
@@ -91,7 +92,7 @@ suspend fun SettingsStore.pruneOrphanPhotos(): Int = withContext(Dispatchers.IO)
     var freed = 0
     dir.listFiles()?.forEach { f ->
         if (!f.isFile || f.absolutePath in referenced || f.lastModified() > cutoff) return@forEach
-        if (runCatching { f.delete() }.getOrDefault(false)) freed++
+        if (suspendRunCatching { f.delete() }.getOrDefault(false)) freed++
     }
     if (freed > 0) AppLog.log("Cleaned up $freed orphaned car photo(s)")
     freed

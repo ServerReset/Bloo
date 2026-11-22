@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The phone's way into a vehicle command. The phone's own names and climate targets (a saved preset, "smart", a temperature, "default") are
@@ -27,7 +28,7 @@ object VehicleCommandRunner {
         val action = actionFor(cmd) ?: return Result(true, "Done")
         val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
             ?: return Result(false, "Car not found")
-        val command = runCatching { commandFor(ctx, action, snap, climateTarget) }
+        val command = suspendRunCatching { commandFor(ctx, action, snap, climateTarget) }
             .getOrElse { return Result(false, it.message ?: "Command failed") }
         val outcome = CarCommandRunner.execute(ctx, command)
         if (!outcome.ok) return Result(false, outcome.message ?: "Command failed")

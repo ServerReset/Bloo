@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import com.bloo.bluelink.rethrowIfCancellation
+import com.bloo.bluelink.suspendRunCatching
 
 /** [VehicleRepository] for Hyundai/Genesis/Kia Canada. The shared account, control-token and session plumbing is in [ControlledAccountRepository]. */
 class CanadaRepository(
@@ -164,7 +165,7 @@ class CanadaRepository(
         val creds = credentialStore.load(brand)
             ?: throw BlueLinkException("Session expired - please sign in again", code = e.code)
         AppLog.log("${brand.label} session expired; re-authenticating silently")
-        val auth = runCatching {
+        val auth = suspendRunCatching {
             api.authUser(creds.email, creds.password, stored.deviceId ?: ApiHttp.newDeviceId(), stored.pin)
         }.onFailure { rethrowIfCancellation(it) }.getOrNull()
         if (auth !is CanadaAuth.LoggedIn) {

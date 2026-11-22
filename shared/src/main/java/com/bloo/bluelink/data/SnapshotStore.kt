@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * A small, on-disk projection of each vehicle's latest state. Background
@@ -219,7 +220,7 @@ class SnapshotStore(private val context: Context) {
      * so the cold-start garage publish via [current] skips that disk read.
      */
     suspend fun warmUp() {
-        runCatching { context.snapshotDataStore.data.first() }
+        suspendRunCatching { context.snapshotDataStore.data.first() }
     }
 
     /**

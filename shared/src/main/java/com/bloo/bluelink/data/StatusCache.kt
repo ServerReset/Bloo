@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.bloo.bluelink.suspendRunCatching
 
 // A corruption handler so a file damaged by an interrupted write/power loss
 // resets to empty prefs instead of rethrowing an uncaught exception out of
@@ -52,7 +53,7 @@ class StatusCache(private val context: Context) {
      * that work out of the frame budget rather than just off the critical path.
      */
     suspend fun warmUp() {
-        runCatching { context.statusCacheStore.data.first() }
+        suspendRunCatching { context.statusCacheStore.data.first() }
     }
 
     /**

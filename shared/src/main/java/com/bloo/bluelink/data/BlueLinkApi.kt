@@ -16,6 +16,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Thin client over the real Hyundai Blue Link US telematics API. Base URL, credentials, paths and
@@ -148,7 +149,7 @@ class BlueLinkApi(override val brand: Brand = Brand.HYUNDAI) : BrandEndpoints {
                 .build()
             val body = call(request)
             // Diagnostic (see ChargingPowerProbe): while the car reports it is charging, log its EV fields that look like power. Never fails the read.
-            runCatching {
+            suspendRunCatching {
                 val ev = json.parseToJsonElement(body).jsonObject["vehicleStatus"]?.jsonObject?.get("evStatus")
                 if ((ev as? JsonObject)?.get("batteryCharge")?.jsonPrimitive?.booleanOrNull == true) {
                     logChargingPowerFieldsOnce("Blue Link US", ev)

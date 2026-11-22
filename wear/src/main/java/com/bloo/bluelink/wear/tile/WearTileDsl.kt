@@ -17,6 +17,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.suspendRunCatching
 
 /*
  * The tile's building blocks. A tile cannot use Compose, and protolayout's builders are verbose enough that a layout written
@@ -143,7 +144,7 @@ internal fun tileModifiers(
 internal suspend fun loadTileSnapshot(context: Context): SnapshotStore.SnapshotData? {
     // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
     WearAccent.load(context)
-    return runCatching { SnapshotStore(context).current() }.getOrNull()
+    return suspendRunCatching { SnapshotStore(context).current() }.getOrNull()
 }
 
 internal fun Context.tileLaunch(actionKey: String? = null, slot: Int? = null): ActionBuilders.Action {

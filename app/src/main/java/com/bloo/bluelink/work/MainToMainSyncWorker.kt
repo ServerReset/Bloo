@@ -8,6 +8,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.performMainToMainSync
 import com.bloo.bluelink.data.syncUri
 import java.util.concurrent.TimeUnit
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Runs the Drive auto-sync periodically in the background, so a settings change
@@ -47,7 +48,7 @@ class MainToMainSyncWorker(ctx: Context, params: WorkerParameters) : BlooWorker(
         val ctx = applicationContext
         val store = SettingsStore(ctx)
         if (store.syncUri() == null) return Result.success()
-        val result = runCatching { store.performMainToMainSync() }
+        val result = suspendRunCatching { store.performMainToMainSync() }
         val outcome = result.getOrElse { t ->
             // An unexpected throwable (e.g. a DataStore IOException from the
             // trailing writes) must not be swallowed into a silent success --

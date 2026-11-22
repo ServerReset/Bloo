@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.repositoryFor
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Periodically refreshes each signed-in car's status in the background and posts
@@ -100,7 +101,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
         // Many status payloads carry no location, so `status.isDriving` alone reads 0 while the car
         // is genuinely moving, and the parked-car alerts (unlocked, door open, running too long)
         // then fire mid-drive. A missing/empty snapshot just falls back to the status itself.
-        val snapshots = runCatching { SnapshotStore(applicationContext).current().vehicles }.getOrDefault(emptyList())
+        val snapshots = suspendRunCatching { SnapshotStore(applicationContext).current().vehicles }.getOrDefault(emptyList())
         val snapshotDriving = snapshots.associate { it.vin to it.isDriving }
         // Vehicle IDENTITY comes from that snapshot too, as in LiveChargePollWorker: re-fetching the fleet list is a
         // network round trip per brand every tick for cars this worker already knows. A car added elsewhere is picked
@@ -109,12 +110,12 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
 
         val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {
-            val repo = runCatching { repositoryFor(brand, store, credentials) }.getOrNull() ?: continue
+            val repo = suspendRunCatching { repositoryFor(brand, store, credentials) }.getOrNull() ?: continue
             // Share the app-wide status gate so a foregrounded app and this worker
             // never issue overlapping requests (Blue Link 502s otherwise).
             val vehicles = snapshotsByBrand[brand]?.map { it.toVehicle() }.orEmpty().ifEmpty {
                 AppLog.log("AlertWorker: requesting statusMutex for ${brand.label} vehicles()")
-                com.bloo.bluelink.suspendRunCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }.getOrElse { emptyList() }
+                suspendRunCatching { BlueLinkGate.statusMutex.withLock { repo.vehicles() } }.getOrElse { emptyList() }
             }
             for (v in vehicles) {
                 AppLog.log("AlertWorker: requesting statusMutex for ${v.name}")
@@ -124,7 +125,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
                 // and this is the exact shape that once deleted the live charging bar
                 // when the network blipped.
                 if (status != null) fetched[v.vin] = status
-                com.bloo.bluelink.suspendRunCatching {
+                suspendRunCatching {
                     // `prefs` is already loaded above; pass it so evaluate() doesn't
                     // re-read the same DataStore value once per vehicle per tick.
                     //
@@ -159,14 +160,14 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
                     // sees charging start -- 30 minutes between ticks is far
                     // too coarse for a bar meant to look live.
                     if (ev?.batteryCharge == true) LiveChargePollWorker.kick(applicationContext)
-                    com.bloo.bluelink.suspendRunCatching {
+                    suspendRunCatching {
                         LiveCharge.sync(context = applicationContext, settings = settings, v = v, ev = ev)
                     }
                 }
             }
         }
         // One write for every car, every brand.
-        com.bloo.bluelink.suspendRunCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
+        suspendRunCatching { SnapshotStore(applicationContext).mergeStatuses(fetched) }
         AppLog.log("AlertWorker: done in ${System.currentTimeMillis() - workerStartedAt}ms, ${fetched.size} status(es)")
         return Result.success()
     }

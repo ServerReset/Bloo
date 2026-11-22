@@ -22,6 +22,7 @@ import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
 import com.bloo.bluelink.data.DeviceStatus
 import com.google.common.util.concurrent.ListenableFuture
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The watch's Tile: the car in the carousel, and -- the part that makes it a widget rather than a
@@ -54,7 +55,7 @@ class BlooTileService : TileService() {
                 val car = snapshot?.let { WearTileCar.pick(applicationContext, it.vehicles) ?: it.selected }
                 // Whatever goes wrong while drawing, the request is answered: an unset completer leaves the tile
                 // spinning for good, so a failure draws the plain "open Bloo" layout instead.
-                val layout = runCatching { layoutFor(car, side) }.getOrElse { layoutFor(null) }
+                val layout = suspendRunCatching { layoutFor(car, side) }.getOrElse { layoutFor(null) }
                 return tileOf(layout)
     }
 

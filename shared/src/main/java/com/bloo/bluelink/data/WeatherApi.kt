@@ -7,6 +7,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Current conditions for a single point, normalised from the Open-Meteo response. Temperatures are
@@ -186,7 +187,7 @@ object WeatherApi {
      * the async callback API).
      */
     suspend fun fetch(lat: Double, lon: Double): Weather? = withContext(Dispatchers.IO) {
-        runCatching {
+        suspendRunCatching {
             val url = "https://api.open-meteo.com/v1/forecast" +
                 "?latitude=$lat&longitude=$lon" +
                 "&current=temperature_2m,apparent_temperature,relative_humidity_2m," +

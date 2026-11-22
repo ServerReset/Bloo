@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The watch checks GitHub for its OWN updates, over its own internet connection.
@@ -49,7 +50,7 @@ object WearUpdateChecker {
         // flavors carrying the same PLAY_DISTRIBUTION the phone's do.
         if (BuildConfig.PLAY_DISTRIBUTION) return
         if (BuildConfig.BUILD_RUN_NUMBER <= 0) return
-        val run = runCatching {
+        val run = suspendRunCatching {
             UpdateApi.fetchLatestSuccessfulRun()
         }.getOrNull() ?: return
         _available.value = run.takeIf {

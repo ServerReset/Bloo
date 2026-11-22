@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlin.math.roundToInt
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * What smart climate WILL set for a car, so its row can say so before it is pressed: the weather where the car is parked, run
@@ -47,7 +48,7 @@ internal object WearSmartClimate {
         val now = System.currentTimeMillis()
         if (held != null && now - held.fetchedAt < TTL_MS) return
         if (now - (failedAt[car.vin] ?: 0L) < RETRY_MS) return
-        val weather = runCatching { WeatherApi.fetch(lat, lon) }.getOrNull()
+        val weather = suspendRunCatching { WeatherApi.fetch(lat, lon) }.getOrNull()
         if (weather == null) {
             // Offline or unavailable: do not ask again on every scroll past the row.
             failedAt[car.vin] = now

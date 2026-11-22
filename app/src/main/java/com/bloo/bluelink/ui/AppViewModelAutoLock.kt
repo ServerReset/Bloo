@@ -12,6 +12,7 @@ import com.bloo.bluelink.autolock.AutoLockTrigger
 import com.bloo.bluelink.autolock.BluetoothDevices
 import com.bloo.bluelink.autolock.PairedDevice
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.suspendRunCatching
 
 // --- AutoLock config, watcher and simulation (extracted from AppViewModel) --
 
@@ -62,7 +63,7 @@ suspend fun AppViewModel.refreshAutoLockAddresses() {
             config.deviceAddress?.takeIf { config.enabled }?.let { it to vin }
         }
         .toMap()
-    runCatching { com.bloo.bluelink.autolock.AutoLockAddresses.write(getApplication(), entries) }
+    suspendRunCatching { com.bloo.bluelink.autolock.AutoLockAddresses.write(getApplication(), entries) }
 }
 
 /** Re-attaches the low-power Bluetooth watcher when the app returns to the foreground. */

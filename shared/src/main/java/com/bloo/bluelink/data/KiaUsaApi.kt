@@ -19,6 +19,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Client for the Kia US "Kia Connect" telematics API (api.owners.kia.com), a
@@ -210,7 +211,7 @@ class KiaUsaApi {
         val ev = parsed.evStatus
         if (ev == null) parsed
         else {
-            val targets = runCatching { chargeTargets(session, vehicle) }.getOrNull()
+            val targets = suspendRunCatching { chargeTargets(session, vehicle) }.getOrNull()
             if (targets == null) parsed else parsed.copy(evStatus = ev.copy(reservChargeInfos = targets))
         }
     }

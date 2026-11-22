@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.async
+import com.bloo.bluelink.suspendRunCatching
 
 // --- Drive main-to-main sync engine (extracted from SettingsStore) --
 
@@ -68,7 +69,7 @@ suspend fun SettingsStore.syncFileChangedRemotely(): Boolean {
     // downloaded only if the provider gave no modified time and a peek is due.
     val remoteHash = suspend {
         kotlinx.coroutines.withContext(Dispatchers.IO) {
-            runCatching { readDriveText(parsed) }.onFailure { rethrowUnlessTimeout(it) }.getOrNull()
+            suspendRunCatching { readDriveText(parsed) }.onFailure { rethrowUnlessTimeout(it) }.getOrNull()
         }?.substringAfter('\n', "")?.takeIf { it.isNotBlank() }?.let { SyncMerge.parseMeta(it)?.hash }
     }
     val hash = if (due) remoteHash() else null
@@ -120,7 +121,7 @@ private fun registryChangedSince(
  */
 private suspend fun SettingsStore.readDriveFile(parsed: android.net.Uri): Pair<String?, String?> {
     var error: String? = null
-    val content = runCatching {
+    val content = suspendRunCatching {
         withDriveRetry { readDriveText(parsed) }
     }.onFailure {
         rethrowUnlessTimeout(it)
@@ -409,7 +410,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
     val uri = syncUri() ?: return SettingsStore.SyncTestResult(false, "Drive sync isn't set up yet.")
     val parsed = uri.toUri()
     // 1. Confirm we still hold a persisted read+write grant for this file.
-    val granted = runCatching {
+    val granted = suspendRunCatching {
         context.contentResolver.persistedUriPermissions.any {
             it.uri.toString() == uri && it.isReadPermission && it.isWritePermission
         }
@@ -419,7 +420,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
     // performMainToMainSync writing different content.
     return mainToMainSyncMutex.withLock {
         // 2. Read current bytes (an empty/new file reads as "" or null).
-        val current = runCatching {
+        val current = suspendRunCatching {
             withDriveRetry { readDriveText(parsed) }
         }.getOrElse { e ->
             rethrowUnlessTimeout(e)
@@ -430,7 +431,7 @@ suspend fun SettingsStore.testSyncRoundTrip(): SettingsStore.SyncTestResult {
         // a throwaway marker (overwritten by the next real sync's upload).
         val payload = current?.takeIf { it.isNotEmpty() } ?: "bloo-sync-test"
         // 3. Truncate-write + 4. verify, exactly as performMainToMainSync does.
-        val verified = runCatching {
+        val verified = suspendRunCatching {
             withDriveRetry {
                 kotlinx.coroutines.withTimeout(DRIVE_IO_TIMEOUT_MS) {
                     context.contentResolver.openOutputStream(parsed, "wt")?.use { it.write(payload.toByteArray()) }

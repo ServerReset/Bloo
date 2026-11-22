@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The privacy policy in its three places: the plain HTML page and the styled web page on the project site, and the plain copy the app
@@ -47,7 +48,7 @@ object PrivacyCopy {
      * reached or did not return the policy. A bad answer never replaces a good copy.
      */
     suspend fun pull(context: Context): String? = withContext(Dispatchers.IO) {
-        runCatching {
+        suspendRunCatching {
             val request = Request.Builder().url(PLAIN_URL).get().build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use null

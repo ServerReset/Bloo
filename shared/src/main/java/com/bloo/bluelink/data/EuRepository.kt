@@ -1,6 +1,7 @@
 package com.bloo.bluelink.data
 
 import com.bloo.bluelink.rethrowIfCancellation
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * [VehicleRepository] for Hyundai Bluelink Europe (CCAPI / CCS2), served by [EuApi]. The shared account, control-token and session plumbing is
@@ -93,7 +94,7 @@ class EuRepository(
     /** Refreshes the token, falling back to a full re-login, and saves the result in place of the expired session. */
     override suspend fun renewSession(stored: SessionStore.Session, e: BlueLinkException): EuSession {
         AppLog.log("${brand.label} session expired; refreshing")
-        val refreshed = runCatching { api.refresh(stored.toSession()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
+        val refreshed = suspendRunCatching { api.refresh(stored.toSession()) }.onFailure { rethrowIfCancellation(it) }.getOrNull()
         val session = refreshed ?: reLogin() ?: throw BlueLinkException(
             "Session expired - please sign out and sign in again", code = e.code,
         )
@@ -106,7 +107,7 @@ class EuRepository(
     private suspend fun reLogin(): EuSession? {
         val creds = credentialStore.load(brand) ?: return null
         val deviceId = store.load(brand)?.deviceId ?: EuApi.newDeviceId()
-        return runCatching {
+        return suspendRunCatching {
             api.login(creds.email, creds.password, deviceId, creds.pin)
         }.onFailure { rethrowIfCancellation(it) }.getOrNull()
     }

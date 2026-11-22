@@ -2,6 +2,7 @@ package com.bloo.bluelink.data
 
 import android.content.Context
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The car commands in flight, by car and by what they do. Phone, widget, watch and alert commands all claim the same keys, so one car
@@ -51,7 +52,7 @@ object CarCommandRunner {
         // it pulls fresh status, and takes the same lock itself, so it must run before this function's own.
         // It used to fall through to "Unknown action", so the widget's Refresh button always reported a failure.
         if (command.action == CarAction.REFRESH) {
-            val ok = runCatching { refresh(context, command.vin, force = false) }.getOrDefault(false)
+            val ok = suspendRunCatching { refresh(context, command.vin, force = false) }.getOrDefault(false)
             return CarCommandResult(command.vin, command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
         }
         // A request for something this car is already doing is refused, not queued: the first one is still going, and it is the one that
@@ -90,7 +91,7 @@ object CarCommandRunner {
                 seatRearLeft = SeatLevel.fromApi(command.seatRearLeft),
                 seatRearRight = SeatLevel.fromApi(command.seatRearRight),
             )
-            runCatching {
+            suspendRunCatching {
                 // The optimistic climate flag, but only for a brand whose status can later CONFIRM
                 // it (see Brand.reportsClimateState). Unknown is the honest answer.
                 fun climateFlag(on: Boolean): Boolean? =
@@ -218,7 +219,7 @@ object CarCommandRunner {
             val reposByBrand = mutableMapOf<Brand, VehicleRepository>()
             // Collected and written ONCE at the end rather than per car.
             targets.forEach { snap ->
-                runCatching {
+                suspendRunCatching {
                     val v = snap.toVehicle()
                     val brand = Brand.fromIndicator(v.brandIndicator)
                     val repo = reposByBrand.getOrPut(brand) {
@@ -227,7 +228,7 @@ object CarCommandRunner {
                     repo.status(v, refresh = force)?.let {
                         // Only when the status carried no GPS.
                         val fix = if (it.vehicleLocation == null) {
-                            runCatching { repo.location(v) }.getOrNull()
+                            suspendRunCatching { repo.location(v) }.getOrNull()
                         } else {
                             null
                         }

@@ -16,6 +16,7 @@ import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.doorLockLabel
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The car's charge (or fuel) on any watch face, in every shape a face offers: a ring-with-value, short text, a long line
@@ -32,7 +33,7 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
     }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
-        val snapshot = runCatching { SnapshotStore(applicationContext).current() }.getOrNull() ?: return NoDataComplicationData()
+        val snapshot = suspendRunCatching { SnapshotStore(applicationContext).current() }.getOrNull() ?: return NoDataComplicationData()
         val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
         // An old reading says so (aloud, and in the long line's title) instead of passing as current.
         val age = if (car.isStale()) car.updatedLabel() else null
@@ -85,7 +86,7 @@ abstract class BlooTextComplication(
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         val glyphOnly = request.complicationType == ComplicationType.MONOCHROMATIC_IMAGE
         if (request.complicationType != ComplicationType.SHORT_TEXT && !glyphOnly) return NoDataComplicationData()
-        val car = runCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
+        val car = suspendRunCatching { SnapshotStore(applicationContext).current().selected }.getOrNull() ?: return NoDataComplicationData()
         val reading = text(car)
         // The glyph alone needs only the car's state (a padlock shows with or without a word to go with it).
         if (glyphOnly) return glyphData(glyph(icon(car)), (reading?.second ?: car.name) + car.spokenAge(), tap())

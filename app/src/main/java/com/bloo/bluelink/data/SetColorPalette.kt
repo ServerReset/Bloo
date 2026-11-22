@@ -10,6 +10,7 @@ import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import com.bloo.uicommon.content
+import com.bloo.bluelink.suspendRunCatching
 
 suspend fun SettingsStore.setColorPalette(palette: ColorPalette) {
     editTracked { it[SettingsStore.Keys.PALETTE] = palette.name }
@@ -26,7 +27,7 @@ internal fun <T> SettingsStore.decodeJsonOr(json: Json, serializer: Deserializat
 /** Last-used climate settings for a car, restored when the pebble reopens. */
 suspend fun SettingsStore.savedClimate(vin: String): ClimateRequest? {
     val raw = context.settingsDataStore.data.first()[stringPreferencesKey("climate_$vin")] ?: return null
-    return runCatching { climateJson.decodeFromString(ClimateRequest.serializer(), raw) }.getOrNull()
+    return suspendRunCatching { climateJson.decodeFromString(ClimateRequest.serializer(), raw) }.getOrNull()
 }
 
 suspend fun SettingsStore.saveClimate(vin: String, req: ClimateRequest) {
@@ -136,13 +137,13 @@ suspend fun SettingsStore.setWeatherFromDeviceLocation(preloaded: android.locati
         ) {
             return false
         }
-        runCatching {
+        suspendRunCatching {
             val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
             listOf(
                 android.location.LocationManager.GPS_PROVIDER,
                 android.location.LocationManager.NETWORK_PROVIDER,
                 android.location.LocationManager.PASSIVE_PROVIDER,
-            ).firstNotNullOfOrNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+            ).firstNotNullOfOrNull { p -> suspendRunCatching { lm.getLastKnownLocation(p) }.getOrNull() }
         }.getOrNull() ?: return false
     }
     // @Suppress("DEPRECATION"): the sync Geocoder is Java-deprecated in favour of
@@ -150,7 +151,7 @@ suspend fun SettingsStore.setWeatherFromDeviceLocation(preloaded: android.locati
     // exists on every supported API level (minSdk 26) without a second,
     // listener-shaped implementation. The whole read is runCatching-wrapped.
     @Suppress("DEPRECATION")
-    val label = runCatching {
+    val label = suspendRunCatching {
         android.location.Geocoder(context, java.util.Locale.getDefault())
             .getFromLocation(loc.latitude, loc.longitude, 1)?.firstOrNull()?.let { a ->
                 listOfNotNull(a.locality ?: a.subAdminArea, a.adminArea).distinct()

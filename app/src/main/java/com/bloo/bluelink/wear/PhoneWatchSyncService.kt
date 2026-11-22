@@ -54,6 +54,7 @@ import com.bloo.bluelink.data.WatchComfortChoice
 import com.bloo.bluelink.ui.blooColorScheme
 import com.bloo.bluelink.ui.comfortCapsOf
 import kotlinx.serialization.json.Json
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Phone side of the watch sync. The watch is an AUXILIARY surface: it never talks to the
@@ -172,9 +173,9 @@ class PhoneWatchSyncService : WearableListenerService() {
     private suspend fun runCommand(request: WatchCommandRequest) {
         val result = if (request.command.action == CarAction.REFRESH) {
             // Not a car command: the watch is asking for fresh status. Fetch it, and the snapshot write pushes it back.
-            val ok = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
+            val ok = suspendRunCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
             CarCommandResult(request.command.vin, request.command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
-        } else com.bloo.bluelink.suspendRunCatching { CarCommandRunner.execute(applicationContext, request.command) }
+        } else suspendRunCatching { CarCommandRunner.execute(applicationContext, request.command) }
             .getOrElse {
                 CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
             }

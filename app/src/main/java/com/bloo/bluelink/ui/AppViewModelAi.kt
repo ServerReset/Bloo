@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.setAiEnabled
 import kotlinx.coroutines.flow.update
 import com.bloo.bluelink.data.DeviceStatus
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.suspendRunCatching
 
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
 
@@ -162,7 +163,7 @@ fun AppViewModel.askAi(query: String) {
 private suspend fun AppViewModel.readIntent(query: String): NaturalIntent? {
     if (!_state.value.aiActive || query.isBlank()) return null
     val now = LocalDateTime.now().let { String.format(java.util.Locale.US, "%02d:%02d", it.hour, it.minute) }
-    return runCatching { intents.intentFor(query, now, _state.value.vehicles.map { it.name }) }
+    return suspendRunCatching { intents.intentFor(query, now, _state.value.vehicles.map { it.name }) }
         .onFailure { AppLog.log("⚠ AI intent: ${it.message}") }
         .getOrNull()
 }
@@ -222,7 +223,7 @@ internal suspend fun AppViewModel.aiResolveSetting(
     candidates: List<com.bloo.bluelink.data.AiSettingResolver.Candidate>,
 ): com.bloo.bluelink.data.AiSettingResolver.Resolution? {
     if (!_state.value.aiActive || query.isBlank() || candidates.isEmpty()) return null
-    val raw = runCatching { ai.summarize(com.bloo.bluelink.data.AiSettingResolver.prompt(query, candidates)) }
+    val raw = suspendRunCatching { ai.summarize(com.bloo.bluelink.data.AiSettingResolver.prompt(query, candidates)) }
         .onFailure { AppLog.log("⚠ AI setting: ${it.message}") }
         .getOrNull() ?: return null
     return com.bloo.bluelink.data.AiSettingResolver.parse(raw, candidates)

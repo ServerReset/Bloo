@@ -11,6 +11,7 @@ import com.google.mlkit.genai.prompt.generateContentRequest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Gemini Nano, through the ML Kit Prompt API, used for one job: turning a free-form request into a [NaturalIntent]. It never runs a car
@@ -32,13 +33,13 @@ class IntentModel {
                 val reply = replyText(model, request) ?: return@withTimeout null
                 parseNaturalIntent(reply)
             } finally {
-                runCatching { model.close() }
+                suspendRunCatching { model.close() }
             }
         }
     }
 
     /** The reply's text, whatever wrapper the library returns it in: a future, a task, or the response itself. */
-    private suspend fun replyText(model: Any, request: Any): String? = com.bloo.bluelink.suspendRunCatching {
+    private suspend fun replyText(model: Any, request: Any): String? = suspendRunCatching {
         val raw = model.call("generateContent", request)
         val response = when (raw) {
             is ListenableFuture<*> -> raw.await()

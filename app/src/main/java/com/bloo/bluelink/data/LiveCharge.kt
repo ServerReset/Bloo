@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.wear.WatchPresence
 import com.bloo.bluelink.R
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Android 16's "Live Update" notification for an actively-charging car -- the ongoing progress bar
@@ -125,11 +126,11 @@ object LiveCharge {
             // tick, plus V more per persistSnapshots() -- which runs up to three times per
             // command and is also the debounced target for text-field edits, so typing a
             // license plate cost V durable writes.
-            com.bloo.bluelink.suspendRunCatching { if (settings.liveChargeDismissed(vin)) settings.setLiveChargeDismissed(vin, false) }
+            suspendRunCatching { if (settings.liveChargeDismissed(vin)) settings.setLiveChargeDismissed(vin, false) }
             update(context, vin, carName, charging = false)
             return
         }
-        if (com.bloo.bluelink.suspendRunCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
+        if (suspendRunCatching { settings.liveChargeDismissed(vin) }.getOrDefault(false)) return
         update(
             context = context,
             vin = vin,

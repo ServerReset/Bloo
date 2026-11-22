@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.first
 import com.bloo.uicommon.content
+import com.bloo.bluelink.suspendRunCatching
 
 // --- Sync identity, device registry, and shortcut selection (extracted from SettingsStore) --
 
@@ -272,7 +273,7 @@ suspend fun SettingsStore.removeSyncedDevice(id: String) {
 
 /** This device's own registry entry, freshly stamped. [appVersion] is best-effort. */
 internal suspend fun SettingsStore.selfSyncDevice(nowMs: Long): SyncMerge.SyncDevice {
-    val appVersion = runCatching {
+    val appVersion = suspendRunCatching {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: ""
     }.getOrDefault("")
     return SyncMerge.SyncDevice(

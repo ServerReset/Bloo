@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import com.bloo.bluelink.suspendRunCatching
 
 // The OLD plain-text session file: read once to move its contents into the encrypted vault, then
 // emptied. A corruption handler so a damaged file resets instead of crash-looping every reader.
@@ -72,14 +73,14 @@ class SessionStore(context: Context) {
     private suspend fun vault(): SecureVault = withContext(Dispatchers.IO) {
         val v = CredentialStore.vaultFor(context)
         if (v.getString(IMPORTED) == null) {
-            val old = runCatching { context.dataStore.data.first() }.getOrNull()
+            val old = suspendRunCatching { context.dataStore.data.first() }.getOrNull()
             v.edit {
                 old?.asMap()?.forEach { (k, value) ->
                     (value as? String)?.let { put("session/${k.name}", it) }
                 }
                 put(IMPORTED, "1")
             }
-            runCatching { context.dataStore.edit { it.clear() } }
+            suspendRunCatching { context.dataStore.edit { it.clear() } }
         }
         v
     }
@@ -153,7 +154,7 @@ class SessionStore(context: Context) {
     }
 
     suspend fun warmUp() {
-        runCatching { vault() }
+        suspendRunCatching { vault() }
     }
 
     suspend fun loggedInBrands(): List<Brand> =

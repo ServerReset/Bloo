@@ -13,6 +13,7 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * The watch's own log, kept only while advanced logging is on at the phone (see DiagSettings). Lines are gathered for a few seconds and
@@ -54,7 +55,7 @@ internal object WearLog {
         val context = app ?: return
         if (batch.isEmpty()) return
         val bytes = batch.joinToString("\n").encodeToByteArray()
-        runCatching {
+        suspendRunCatching {
             Wearable.getNodeClient(context).connectedNodes.await().forEach {
                 Wearable.getMessageClient(context).sendMessage(it.id, WatchSyncProtocol.PATH_WATCH_LOG, bytes).await()
             }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.suspendRunCatching
 
 /**
  * Keeps the widget in step with the app: whenever the car snapshot changes (a refresh, a command, an
@@ -34,10 +35,10 @@ object BlooWidgetUpdater {
     /** Redraws every placed widget, if there are any. */
     suspend fun updateNow(context: Context) {
         val app = context.applicationContext
-        runCatching {
+        suspendRunCatching {
             if (GlanceAppWidgetManager(app).getGlanceIds(BlooWidget::class.java).isNotEmpty()) BlooWidget().updateAll(app)
         }
-        runCatching {
+        suspendRunCatching {
             if (GlanceAppWidgetManager(app).getGlanceIds(BlooStripWidget::class.java).isNotEmpty()) BlooStripWidget().updateAll(app)
         }
     }

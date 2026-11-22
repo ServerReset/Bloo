@@ -8,6 +8,7 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.suspendRunCatching
 
 /** What a home-screen widget draws from: the saved cars, and whether the app is sealed after a restart (then there are none to show). */
 internal data class WidgetCars(val sealed: Boolean, val cars: List<VehicleSnapshot>)
@@ -15,7 +16,7 @@ internal data class WidgetCars(val sealed: Boolean, val cars: List<VehicleSnapsh
 /** Reads the widgets' cars. Both widgets load the same way, so the sealed check and the snapshot read live here once. */
 internal suspend fun loadWidgetCars(context: Context): WidgetCars {
     val sealed = BootGate.isLocked(context)
-    val cars = if (sealed) emptyList() else runCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
+    val cars = if (sealed) emptyList() else suspendRunCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
     return WidgetCars(sealed, cars)
 }
 
