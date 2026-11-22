@@ -8,7 +8,10 @@ data class Credentials(
     val password: String,
     val pin: String,
     val brand: Brand = Brand.HYUNDAI,
-)
+) {
+    /** Never the password, PIN or address: a logged object or an exception message must not carry them. */
+    override fun toString(): String = "Credentials(brand=$brand, email=<redacted>, password=<redacted>, pin=<redacted>)"
+}
 
 /**
  * Sign-in credentials and car service PINs, kept in the encrypted [SecureVault.secrets] vault

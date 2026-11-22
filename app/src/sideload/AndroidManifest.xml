@@ -18,6 +18,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <!-- Lets Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS show its "Allow" dialog directly
+         (LiveCharge.requestBackgroundUnrestricted) instead of only the settings page with the toggle. AutoLock,
+         the live charging bar and the alerts all run unattended in the background. Sideload only: Google Play
+         restricts this permission, so the Play build opens the battery settings page instead. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <application>
         <!-- Shizuku entry point, here and not in main: only this build has the library, the class and
              the runtime permission, and the Play build carries none of them.
