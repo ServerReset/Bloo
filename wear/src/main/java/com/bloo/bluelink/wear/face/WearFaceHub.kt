@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
 import androidx.compose.animation.core.Spring
 import androidx.compose.ui.platform.LocalDensity
+import com.bloo.bluelink.data.BlooColors
+import com.bloo.uicommon.AnimatedValue
 import androidx.compose.ui.text.TextStyle
 
 /**
@@ -56,7 +58,7 @@ fun WearFaceHub(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            com.bloo.uicommon.AnimatedValue(
+            AnimatedValue(
                 value = value,
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
@@ -127,6 +129,6 @@ private fun HubLine(text: String, color: Color, hubSize: Dp) {
 /** A moment's line in the hub, in place of the car's name: what just happened, or why to doubt the reading. */
 data class FaceStatus(val text: String, val error: Boolean = false)
 
-/** The ring's colour from the level: the shared [com.bloo.bluelink.data.BlooColors.levelColor] rule, as a Compose colour. */
+/** The ring's colour from the level: the shared [BlooColors.levelColor] rule, as a Compose colour. */
 fun faceTint(percent: Int?, charging: Boolean, fallback: Color): Color =
-    Color(com.bloo.bluelink.data.BlooColors.levelColor(percent, charging, fallback.toArgb()))
+    Color(BlooColors.levelColor(percent, charging, fallback.toArgb()))

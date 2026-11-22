@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.SyncPoll
+
 /**
  * Pure top-level timing/constant literals peeled out of AppViewModel.kt: the weather-freshness TTL,
  * auto-push debounce, orphaned-photo sweep delay, the update tile's undo/reminder windows, the
@@ -39,7 +41,7 @@ internal const val AUTO_PUSH_DEBOUNCE_MS = 1000L
 
 // While the app is on screen, how often to ask Drive whether another device changed the settings file
 // (a metadata query, not a download), so a change or a new car photo shows up within about this long.
-internal const val FOREGROUND_SYNC_POLL_MS = com.bloo.bluelink.data.SyncPoll.POLL_INTERVAL_MS
+internal const val FOREGROUND_SYNC_POLL_MS = SyncPoll.POLL_INTERVAL_MS
 
 // How long after launch the orphaned-car-photo sweep runs.
 internal const val PHOTO_SWEEP_DELAY_MS = 8000L

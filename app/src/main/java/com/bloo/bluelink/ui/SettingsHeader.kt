@@ -54,6 +54,7 @@ import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
+import com.bloo.bluelink.BuildConfig
 import com.bloo.uicommon.GapPage
 
 /**
@@ -201,7 +202,7 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.width(GapGroup))
-                SecondaryText(com.bloo.bluelink.BuildConfig.BUILD_BRANCH.takeIf { it.isNotBlank() } ?: "this build", modifier = Modifier.padding(bottom = GapRow))
+                SecondaryText(BuildConfig.BUILD_BRANCH.takeIf { it.isNotBlank() } ?: "this build", modifier = Modifier.padding(bottom = GapRow))
             }
             AnimatedVisibility(visible = expanded, enter = expandEnterSized(), exit = expandExitSized(fade = false)) {
                 Column {

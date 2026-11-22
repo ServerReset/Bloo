@@ -38,6 +38,8 @@ import dev.chrisbanes.haze.hazeSource
 import kotlin.math.max
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.GapRow
+import com.bloo.bluelink.BuildConfig
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.GapGroup
 
 // --- Settings -------------------------------------------------------------
@@ -58,7 +60,7 @@ internal fun SettingsScreen(
     /** Shared with GarageScreen's car pages so the floating search bar gets one blur source. */
     hazeState: HazeState = remember { HazeState() },
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("SettingsScreen")
+    TrackRecompositions("SettingsScreen")
     val appearance = LocalAppearance.current
     val notif by vm.notifications.collectAsStateWithLifecycle()
     // The app state is read inside each card's own item (see below), so a change recomposes the card that shows it, not this whole page.
@@ -204,7 +206,7 @@ internal fun SettingsScreen(
           // formatter.
           Spacer(Modifier.height(GapRow))
           RevealText(
-              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, com.bloo.bluelink.BuildConfig.BUILD_BRANCH),
+              "Bloo · " + com.bloo.bluelink.data.buildLabel(vm.currentBuildNumber, BuildConfig.BUILD_BRANCH),
               style = SecondaryTextStyle(),
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               textAlign = TextAlign.Center,

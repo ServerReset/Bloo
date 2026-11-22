@@ -9,12 +9,13 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.brand
+import com.bloo.bluelink.data.IntentExtras
 import com.bloo.bluelink.data.links
 
 /** App-icon long-press shortcuts: per-car quick actions and navigation. */
 object Shortcuts {
     const val ACTION = "com.bloo.bluelink.action.SHORTCUT"
-    const val EXTRA_VIN = com.bloo.bluelink.data.IntentExtras.VIN
+    const val EXTRA_VIN = IntentExtras.VIN
     const val EXTRA_CMD = "cmd"
 
     /** Selectable per-car shortcut actions (toggles + open), in priority order. */

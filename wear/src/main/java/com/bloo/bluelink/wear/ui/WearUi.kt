@@ -72,6 +72,8 @@ import com.bloo.uicommon.secondaryTextColor
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.bloo.uicommon.GapBlock
+import com.bloo.uicommon.GapRow
 import androidx.compose.ui.text.TextStyle
 
 /*
@@ -198,5 +200,5 @@ fun WearSubheading(text: String, modifier: Modifier = Modifier) {
  * between rows, a block gap between sections), so the watch breathes in the same units the phone does.
  */
 internal val ListInset = 18.dp
-internal val RowGap: Dp @Composable get() = com.bloo.uicommon.GapRow
-internal val SectionGap: Dp @Composable get() = com.bloo.uicommon.GapBlock
+internal val RowGap: Dp @Composable get() = GapRow
+internal val SectionGap: Dp @Composable get() = GapBlock

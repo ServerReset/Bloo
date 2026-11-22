@@ -33,6 +33,8 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.content
+import com.bloo.bluelink.data.AiSettingResolver
+import com.bloo.bluelink.data.SettingsStore
 import androidx.activity.result.contract.ActivityResultContracts
 
 // --- The AI-answer and command-action cards shown under search results ---
@@ -116,8 +118,8 @@ internal fun AiCommandProposal(
 internal fun AiSettingProposal(
     submittedQuery: String,
     state: UiState,
-    appearance: com.bloo.bluelink.data.SettingsStore.Appearance,
-    notif: com.bloo.bluelink.data.SettingsStore.NotificationPrefs,
+    appearance: SettingsStore.Appearance,
+    notif: SettingsStore.NotificationPrefs,
     vm: AppViewModel,
     hazeState: dev.chrisbanes.haze.HazeState?,
 ) {
@@ -126,7 +128,7 @@ internal fun AiSettingProposal(
         availableSettingActions(state, appearance)
     }
     val candidates = remember(actions, ctx) { actions.map { it.candidate(ctx) } }
-    var proposal by remember(submittedQuery) { mutableStateOf<com.bloo.bluelink.data.AiSettingResolver.Resolution?>(null) }
+    var proposal by remember(submittedQuery) { mutableStateOf<AiSettingResolver.Resolution?>(null) }
     var applied by remember(submittedQuery) { mutableStateOf(false) }
     LaunchedEffect(submittedQuery) { proposal = vm.aiResolveSetting(submittedQuery, candidates) }
     val p = proposal ?: return

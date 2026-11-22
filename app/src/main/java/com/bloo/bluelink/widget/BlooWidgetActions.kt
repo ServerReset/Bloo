@@ -13,6 +13,8 @@ import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.CarCommand
 import com.bloo.bluelink.data.PrefKeys
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.CarCommandGate
+import com.bloo.bluelink.data.CarCommandRunner
 import kotlinx.coroutines.delay
 
 internal object WidgetKeys {
@@ -110,10 +112,10 @@ class CarActionCallback : ActionCallback {
         }
 
         // Already on its way from the app, an alert or the watch: this tap sends nothing and shows nothing, and that command reports.
-        if (com.bloo.bluelink.data.CarCommandGate.busy(com.bloo.bluelink.data.CarCommandGate.keyFor(vin, action))) return
+        if (CarCommandGate.busy(CarCommandGate.keyFor(vin, action))) return
         val pendingKey = "$vin:$action"
         edit { it[WidgetKeys.PENDING] = pendingKey; it.remove(WidgetKeys.NOTE) }
-        val result = runCatching { com.bloo.bluelink.data.CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()
+        val result = runCatching { CarCommandRunner.execute(context, CarCommand(vin, action)) }.getOrNull()
         edit {
             // Only this command's own marker: a second tap while this ran replaced it, and clearing that one here
             // switched off the busy state of a command that is still running.

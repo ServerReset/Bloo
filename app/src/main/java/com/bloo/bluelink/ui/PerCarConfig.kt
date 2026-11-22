@@ -29,6 +29,7 @@ import com.bloo.bluelink.data.comfortModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.Shortcuts
 import kotlinx.coroutines.withContext
 
 /** The value [read] finds for each vehicle that has one, keyed by VIN. */
@@ -118,7 +119,7 @@ internal suspend fun AppViewModel.refreshLocalCarConfig() {
     // Quick-tile / shortcut changes must also re-push the launcher shortcuts, exactly as
     // loadGarageInner does, so an imported shortcut-set change is reflected in the app-icon
     // long-press menu and not just in-app.
-    com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
+    Shortcuts.refresh(getApplication(), vehicles, cfg.shortcutSet)
 }
 
 /**

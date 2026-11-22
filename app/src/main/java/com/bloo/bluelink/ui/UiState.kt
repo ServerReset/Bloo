@@ -23,6 +23,15 @@ import com.bloo.bluelink.data.engineLabel
 import com.bloo.bluelink.data.isGen5W
 import com.bloo.bluelink.data.platformOverridable
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.data.AiAvailability
+import com.bloo.bluelink.data.CarAlerts
+import com.bloo.bluelink.data.ClimateSync
+import com.bloo.bluelink.data.ComfortModel
+import com.bloo.bluelink.data.SurroundViewAccess
+import com.bloo.bluelink.data.SyncMerge
+import com.bloo.bluelink.data.resolvePowertrain
+import com.bloo.bluelink.data.surroundViewShown
+import com.bloo.bluelink.update.UpdateInfo
 import androidx.compose.runtime.Immutable
 
 /**
@@ -65,11 +74,11 @@ data class UiState(
      * Live climate draft by VIN, shared between simultaneous compositions of one car's climate
      * pebble.
      */
-    val climateSync: Map<String, com.bloo.bluelink.data.ClimateSync> = emptyMap(),
+    val climateSync: Map<String, ClimateSync> = emptyMap(),
     val seatConfigs: Map<String, SeatConfig> = emptyMap(),
     val powertrains: Map<String, Powertrain> = emptyMap(),
-    /** Per car: the surround-view choice. Absent means the default, [com.bloo.bluelink.data.SurroundViewAccess.AUTO]. */
-    val surroundViews: Map<String, com.bloo.bluelink.data.SurroundViewAccess> = emptyMap(),
+    /** Per car: the surround-view choice. Absent means the default, [SurroundViewAccess.AUTO]. */
+    val surroundViews: Map<String, SurroundViewAccess> = emptyMap(),
     /** Per car: Bluelink refused a surround-view request, so the car does not take the photos. */
     val surroundRefused: Map<String, Boolean> = emptyMap(),
     val sectionOrders: Map<String, List<String>> = emptyMap(),
@@ -79,7 +88,7 @@ data class UiState(
     /** Per car: what smart climate has learned from the person's feel answers (see ClimateModel). */
     val climateModels: Map<String, com.bloo.bluelink.data.ClimateModel> = emptyMap(),
     /** Per car: what smart comfort has learned from the person's own seat, wheel and defrost settings. */
-    val comfortModels: Map<String, com.bloo.bluelink.data.ComfortModel> = emptyMap(),
+    val comfortModels: Map<String, ComfortModel> = emptyMap(),
     val placeNames: Map<String, String> = emptyMap(),
     /**
      * Compact form of [placeNames] (street + ZIP) for space-constrained glance layouts. In-memory
@@ -122,7 +131,7 @@ data class UiState(
     val aiSupported: Boolean = false,
     val aiEnabled: Boolean = false,
     /** What the last Gemini Nano probe found (null until it has run); shown in the Debug card. */
-    val aiAvailability: com.bloo.bluelink.data.AiAvailability? = null,
+    val aiAvailability: AiAvailability? = null,
     /** The car (VIN) whose photo someone just asked to change; the root photo host consumes it. */
     val photoPickRequest: String? = null,
     /** A picture shared into the app from another app, waiting for the car it is for (see ShareIntake.kt). */
@@ -173,7 +182,7 @@ data class UiState(
     /** Controls the snackbar's colour, icon and dwell time. */
     val messageType: ToastKind = ToastKind.ERROR,
     /** A newer CI build than installed, if found. Drives the update tile; null means no tile. */
-    val updateAvailable: com.bloo.bluelink.update.UpdateInfo? = null,
+    val updateAvailable: UpdateInfo? = null,
     /** "Remind me" also sets this, plus a snooze and a 1-day reminder worker. */
     val updateTileDismissed: Boolean = false,
     /** Play reports a newer build for this copy (Play-installed copies only). Mirrored from PlayUpdates so the pebble list sees it. */
@@ -218,7 +227,7 @@ data class UiState(
      * Devices sharing this sync file (name/model/last-seen), for the Settings "your devices" list.
      * From the last sync's merged registry / cache.
      */
-    val syncDevices: List<com.bloo.bluelink.data.SyncMerge.SyncDevice> = emptyList(),
+    val syncDevices: List<SyncMerge.SyncDevice> = emptyList(),
     /** The device id designated primary (source of truth), or null if none. */
     val syncPrimaryId: String? = null,
     /** This device's own sync id, to mark "This device" and hide "Make primary" on self. */
@@ -269,7 +278,7 @@ data class UiState(
     fun seatConfigFor(v: Vehicle): SeatConfig = seatConfigs[v.vin] ?: SeatConfig()
 
     /** The learned comfort of the driver who is driving [vin] now. */
-    fun comfortModelOf(vin: String): com.bloo.bluelink.data.ComfortModel? =
+    fun comfortModelOf(vin: String): ComfortModel? =
         comfortModels[vin]
 
     fun sectionsFor(v: Vehicle): List<String> = sectionOrders[v.vin] ?: DEFAULT_SECTIONS
@@ -278,10 +287,10 @@ data class UiState(
      * Effective powertrain: user override, else EV/gas inferred from the API. Delegates to
      * [com.bloo.bluelink.data.resolvePowertrain], the one shared rule every powertrain-dependent
      * surface in the app (this, and the background alert path in
-     * [com.bloo.bluelink.data.CarAlerts]) resolves through -- see that function's own doc.
+     * [CarAlerts]) resolves through -- see that function's own doc.
      */
     fun powertrainOf(v: Vehicle): Powertrain =
-        com.bloo.bluelink.data.resolvePowertrain(v, powertrains[v.vin])
+        resolvePowertrain(v, powertrains[v.vin])
 
     /** Has a high-voltage battery you can charge (EV or plug-in hybrid). */
     fun hasBattery(v: Vehicle): Boolean = powertrainOf(v) == Powertrain.EV || powertrainOf(v) == Powertrain.PHEV
@@ -297,12 +306,12 @@ data class UiState(
         if (v.isGen5W) VehiclePlatform.GEN5W else VehiclePlatform.CCNC
 
     /** The person's surround-view choice for [v]. */
-    fun surroundAccessOf(v: Vehicle): com.bloo.bluelink.data.SurroundViewAccess =
-        surroundViews[v.vin] ?: com.bloo.bluelink.data.SurroundViewAccess.AUTO
+    fun surroundAccessOf(v: Vehicle): SurroundViewAccess =
+        surroundViews[v.vin] ?: SurroundViewAccess.AUTO
 
     /** Whether a surround-view feature shows for [v], given whether its brand has it ([hasFeature]). The 3D surroundings share the choice. */
     fun surroundOn(v: Vehicle, hasFeature: Boolean): Boolean =
-        com.bloo.bluelink.data.surroundViewShown(
+        surroundViewShown(
             hasFeature, platformOf(v), v.trim, surroundViews[v.vin], refused = surroundRefused[v.vin] == true,
         )
 

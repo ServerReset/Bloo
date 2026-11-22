@@ -17,6 +17,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.bloo.uicommon.content
+import com.bloo.bluelink.data.ActivityLogFile
+import com.bloo.bluelink.data.ApiHttp
+import com.bloo.bluelink.data.SessionStore
+import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.StatusCache
+import com.bloo.bluelink.wear.WatchPresence
+import com.bloo.bluelink.widget.BlooWidgetUpdater
+import com.bloo.bluelink.work.WorkManagerInit
 import kotlinx.coroutines.launch
 
 /**
@@ -25,7 +33,7 @@ import kotlinx.coroutines.launch
  *
  * Also implements [Configuration.Provider] for WorkManager on-demand initialization: the manifest
  * removes the default initializer, and WorkManager's own services call `WorkManager.getInstance`
- * directly (bypassing [com.bloo.bluelink.work.WorkManagerInit]), so a delegate is required.
+ * directly (bypassing [WorkManagerInit]), so a delegate is required.
  *
  * Also starts [DeviceStatus]'s single process-wide listeners (battery saver, thermal, lock state).
  */
@@ -82,13 +90,13 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         super.onCreate()
         installCrashHandler()
         // The activity log is kept in a file as well as in the panel's buffer, so a long session can be saved in full.
-        com.bloo.bluelink.data.ActivityLogFile.init(this)
-        com.bloo.bluelink.data.AppLog.sink = { com.bloo.bluelink.data.ActivityLogFile.append(it) }
+        ActivityLogFile.init(this)
+        AppLog.sink = { ActivityLogFile.append(it) }
         installStartupStrictMode()
         StartupTrace.mark(StartupLabels.APPLICATION_SUPER_ON_CREATE_DONE)
         DeviceStatus.ensureInitialized(this)
         // Keeps any homescreen widget in step with the car data.
-        com.bloo.bluelink.widget.BlooWidgetUpdater.start(this)
+        BlooWidgetUpdater.start(this)
         StartupTrace.mark(StartupLabels.DEVICE_STATUS_INITIALIZED)
         // Warm the biggest data classes off the main thread. SettingsStore() measured ~50ms on Main
         // on the first launch after install (1ms once warm) -- that is class-load/JIT of a very
@@ -97,14 +105,14 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
         // On the IO pool at normal priority, not a MIN_PRIORITY thread: the main thread can wait on this work (a class being
         // initialised here holds its init lock, and the first garage read waits for the same DataStore), and a thread at the
         // lowest priority can be starved for a long time while main waits behind it.
-        com.bloo.bluelink.ioScope().launch {
+        ioScope().launch {
             runCatching {
                 StartupTrace.trace(StartupLabels.CLASS_WARM_UP_STORES) {
                     val app = applicationContext
                     com.bloo.bluelink.data.SettingsStore(app)
-                    com.bloo.bluelink.data.SnapshotStore(app)
-                    com.bloo.bluelink.data.StatusCache(app)
-                    com.bloo.bluelink.data.SessionStore(app)
+                    SnapshotStore(app)
+                    StatusCache(app)
+                    SessionStore(app)
                 }
                 // Encrypted-prefs warm-up (MasterKey + EncryptedSharedPreferences + Tink). See
                 // CredentialStore.warmUp's own doc: this is the ~470ms the cold-start auto-login
@@ -116,7 +124,7 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // OkHttp's class graph is the heaviest class-load chain. Building the app's one shared client here loads it, and
                 // the first real request then finds the client ready instead of building it on the way.
                 StartupTrace.trace(StartupLabels.OKHTTP_CLASS_WARM_UP) {
-                    com.bloo.bluelink.data.ApiHttp.client
+                    ApiHttp.client
                 }
                 // Coil's singleton loader otherwise builds on main at the first map tile.
                 StartupTrace.trace(StartupLabels.COIL_IMAGE_LOADER_WARM_UP) {
@@ -138,19 +146,19 @@ class BlooApplication : Application(), Configuration.Provider, coil.ImageLoaderF
                 // 452ms measured on the API 34 emulator.
                 val dataStoreStarted = StartupTrace.begin()
                 com.bloo.bluelink.data.SettingsStore(applicationContext).warmUp()
-                com.bloo.bluelink.data.StatusCache(applicationContext).warmUp()
+                StatusCache(applicationContext).warmUp()
                 // Snapshot and session stores feed the first garage reads.
-                com.bloo.bluelink.data.SnapshotStore(applicationContext).warmUp()
-                com.bloo.bluelink.data.SessionStore(applicationContext).warmUp()
+                SnapshotStore(applicationContext).warmUp()
+                SessionStore(applicationContext).warmUp()
                 StartupTrace.end(StartupLabels.SETTINGS_DATASTORE_WARM_UP, dataStoreStarted)
-            }.onFailure { com.bloo.bluelink.rethrowIfCancellation(it) }
+            }.onFailure { rethrowIfCancellation(it) }
         }
         AppLog.log("▶ App starting: ${deviceSummary()}")
         // Watch presence + the live snapshot push (see app/.../wear/). Off the main thread, guarded
         // internally: a phone with no watch, or no Play Services at all, just reads as "no watch
         // paired" and the push is a no-op.
         Thread {
-            runCatching { com.bloo.bluelink.wear.WatchPresence.start(applicationContext) }
+            runCatching { WatchPresence.start(applicationContext) }
             // Housekeeping: drop any staged update APK from a previous session -- it is only ever
             // read in the same session that downloaded it, so it is dead weight (multi-MB) between
             // sessions. See UpdateCleanup's own doc.

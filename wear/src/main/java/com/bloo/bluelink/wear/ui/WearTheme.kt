@@ -14,6 +14,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.LocalReduceMotion
+import com.bloo.bluelink.data.BlooColors
+import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.uicommon.LocalIsDarkTheme
+import com.bloo.uicommon.LocalSurfaceProfile
+import com.bloo.uicommon.SurfaceProfile
+import com.bloo.uicommon.blooTypography
 import com.bloo.uicommon.reduceMotionCached
 
 /** The watch theme: a dark, high-contrast scheme for a small AMOLED watch face. */
@@ -24,9 +30,9 @@ internal fun WearTheme(content: @Composable () -> Unit) {
     remember(appContext) { WearAccent.load(appContext); WearGlass.load(appContext); WearType.load(appContext); WearClimateChoices.load(appContext) }
     val type by WearType.type.collectAsStateWithLifecycle()
     // The phone's typeface, with its classical headings: the same typography the phone sets its text with.
-    val typography = remember(type) { com.bloo.uicommon.blooTypography(type.font, type.classicHeadings) }
+    val typography = remember(type) { blooTypography(type.font, type.classicHeadings) }
     val accent by WearAccent.accent.collectAsStateWithLifecycle()
-    val primary = accent?.let { Color(it.primary) } ?: Color(com.bloo.bluelink.data.BlooColors.brandAccent)
+    val primary = accent?.let { Color(it.primary) } ?: Color(BlooColors.brandAccent)
     val onPrimary = accent?.let { Color(it.onPrimary) } ?: Color.White
     val scheme = remember(accent) {
         darkColorScheme(
@@ -46,16 +52,16 @@ internal fun WearTheme(content: @Composable () -> Unit) {
     // battery saver, exactly as on the phone -- and the watch is the device most likely to be in both.
     val context = LocalContext.current
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
-    val policy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsStateWithLifecycle()
+    val policy by DeviceStatus.policy.collectAsStateWithLifecycle()
     CompositionLocalProvider(
         // Reduced effects (the system setting, Battery Saver, a hot watch, or the wearer's own switch) turn the motion off.
         LocalReduceMotion provides (reduceMotion || policy.lean),
         // The watch theme is dark, and the shared tones need to know that.
-        com.bloo.uicommon.LocalIsDarkTheme provides true,
+        LocalIsDarkTheme provides true,
         // The phone's Classic headings decide the classical serif, for the hero text as for the headings.
         LocalHeroSerif provides type.classicHeadings,
         // The shared components lay themselves out for a round face: smaller switches, tighter rows, two lines of detail.
-        com.bloo.uicommon.LocalSurfaceProfile provides com.bloo.uicommon.SurfaceProfile.ROUND,
+        LocalSurfaceProfile provides SurfaceProfile.ROUND,
         LocalPowerPolicy provides policy,
         // RevealText draws with the PHONE Material3's Text, which resolves an unspecified colour from
         // ITS LocalContentColor -- black by default, and therefore invisible on this theme. Setting it

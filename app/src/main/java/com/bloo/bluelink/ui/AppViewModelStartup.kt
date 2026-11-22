@@ -13,6 +13,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.AiAvailability
+import com.bloo.bluelink.data.AiProbePolicy
 import kotlinx.coroutines.withContext
 
 /**
@@ -72,10 +74,10 @@ internal fun AppViewModel.coldStartAutoLogin() {
     // instead (see DebugSampleGarage). This is dead code in a release build: BuildConfig.DEBUG is
     // false there, so the flag reads false and R8 drops the object entirely. It sits above every
     // other check on purpose, because this function is the one place that decides Login vs Garage.
-    if (com.bloo.bluelink.ui.DebugSampleGarage.enabled(getApplication())) {
-        val sampleLocked = com.bloo.bluelink.ui.DebugSampleGarage.locked(getApplication())
+    if (DebugSampleGarage.enabled(getApplication())) {
+        val sampleLocked = DebugSampleGarage.locked(getApplication())
         logStartup("Cold start: DEBUG SAMPLE GARAGE (locked=$sampleLocked), not a real account")
-        _state.update { com.bloo.bluelink.ui.DebugSampleGarage.apply(it, sampleLocked) }
+        _state.update { DebugSampleGarage.apply(it, sampleLocked) }
         return
     }
     if (com.bloo.bluelink.data.BootGate.isLocked(getApplication())) {
@@ -168,7 +170,7 @@ internal fun AppViewModel.probeAi(restart: Boolean = false) {
             val enabled = if (result.usable) settingsStore.aiEnabled() else false
             val auto = if (result.usable) settingsStore.aiAutoSummarize() else false
             _state.update {
-                val keep = !result.usable && it.aiSupported && result is com.bloo.bluelink.data.AiAvailability.Error
+                val keep = !result.usable && it.aiSupported && result is AiAvailability.Error
                 it.copy(
                     aiAvailability = result,
                     aiSupported = if (keep) true else result.usable,
@@ -176,7 +178,7 @@ internal fun AppViewModel.probeAi(restart: Boolean = false) {
                     aiAutoSummarize = if (result.usable) auto else it.aiAutoSummarize,
                 )
             }
-            val wait = com.bloo.bluelink.data.AiProbePolicy.nextDelayMs(result, attempt) ?: break
+            val wait = AiProbePolicy.nextDelayMs(result, attempt) ?: break
             kotlinx.coroutines.delay(wait)
             attempt++
         }
@@ -186,7 +188,7 @@ internal fun AppViewModel.probeAi(restart: Boolean = false) {
 /** Probes again on returning to the app if Gemini Nano was not found, at most once a minute. */
 internal fun AppViewModel.recheckAiOnForeground() {
     val now = System.currentTimeMillis()
-    if (com.bloo.bluelink.data.AiProbePolicy.shouldRecheckOnForeground(_state.value.aiAvailability, lastAiProbeMs, now)) probeAi()
+    if (AiProbePolicy.shouldRecheckOnForeground(_state.value.aiAvailability, lastAiProbeMs, now)) probeAi()
 }
 
 /** The Debug card's "Check again": probe now, whatever the last result was. */

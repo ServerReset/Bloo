@@ -9,7 +9,7 @@ import com.bloo.uicommon.AnimatedValue
 import com.bloo.uicommon.LocalReduceMotion
 
 /**
- * The big-headline alias of [com.bloo.uicommon.AnimatedValue], the app's one rolling component:
+ * The big-headline alias of [AnimatedValue], the app's one rolling component:
  * compact values roll digit runs vertically, directionally (up when the number grew, down when it
  * shrank) between static text that crossfades; long or wrapping values fall back to a whole-string
  * slide.

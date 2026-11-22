@@ -1,5 +1,7 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.Vehicle
+
 import com.bloo.bluelink.data.brand
 
 internal enum class OnboardingStepKind {
@@ -88,10 +90,10 @@ internal fun setupIsBlocked(
  */
 internal fun buildOnboardingSteps(
     mode: OnboardingMode,
-    vehicles: List<com.bloo.bluelink.data.Vehicle>,
+    vehicles: List<Vehicle>,
     preConfiguredVins: Set<String> = emptySet(),
 ): List<OnboardingStep> = buildList {
-    fun carCards(v: com.bloo.bluelink.data.Vehicle) {
+    fun carCards(v: Vehicle) {
         add(OnboardingStep(OnboardingStepKind.CAR_POWERTRAIN, v.vin))
         // Only brands with surround view get the card; the limited-trim default needs no answer, so the card does not block.
         if (v.brand.capabilities.surroundView) add(OnboardingStep(OnboardingStepKind.CAR_SURROUND, v.vin))

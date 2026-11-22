@@ -24,6 +24,8 @@ import com.bloo.bluelink.data.setUltraGlass
 import com.bloo.bluelink.data.setVibrancy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.update.shizukuInstall
+import com.bloo.bluelink.wear.PhoneWatchSyncService
 import kotlinx.coroutines.launch
 
 // --- Appearance / UI preference setters (extracted from AppViewModel) ------
@@ -82,7 +84,7 @@ fun AppViewModel.setVibrancySoon(value: Float) =
     viewModelScope.launch { settingsStore.setVibrancy(value); pushPaletteToWatch() }
 
 /** The watch wears the phone's palette (see WatchAccent), so a change to it is sent along at once. */
-private fun AppViewModel.pushPaletteToWatch() = com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+private fun AppViewModel.pushPaletteToWatch() = PhoneWatchSyncService.pushNow(getApplication())
 
 // More of the same appearance-setter pattern described above the setThemeMode group: DataStore
 // write only, UI updates via the `appearance` StateFlow mirror. the animated background's colors
@@ -105,7 +107,7 @@ fun AppViewModel.setSearchBubblePosition(xFrac: Float, yFrac: Float) =
 fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
     persist { setSeamlessInstallShizuku(value) }
     if (value) {
-        val installer = com.bloo.bluelink.update.shizukuInstall()
+        val installer = shizukuInstall()
         if (installer.hasPermission()) return
         val queued = installer.requestPermissionOnEnable(SHIZUKU_INSTALL_REQUEST_CODE)
         if (!queued && !installer.isAvailable()) {
@@ -124,7 +126,7 @@ fun AppViewModel.setSeamlessInstallShizuku(value: Boolean) {
 fun AppViewModel.refreshShizukuAvailable() {
     StartupTrace.markIfStarting(StartupLabels.SHIZUKU_PROBE_BEGIN)
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        val avail = com.bloo.bluelink.update.shizukuInstall().isAvailable()
+        val avail = shizukuInstall().isAvailable()
         _state.update { it.copy(shizukuAvailable = avail) }
     }
 }

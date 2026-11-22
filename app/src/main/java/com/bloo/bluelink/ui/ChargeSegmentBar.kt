@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.layout
 import com.bloo.uicommon.LocalPowerPolicy
 import com.bloo.uicommon.lowPowerAwareSpring
 import androidx.lifecycle.Lifecycle
+import com.bloo.uicommon.ChargeRampEasing
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
@@ -215,7 +216,7 @@ private fun rememberSlowShimmer(periodMs: Long): State<Float> {
                 kotlinx.coroutines.delay(ShimmerStepNanos / 1_000_000L)
                 val now = System.nanoTime()
                 // The sheen's sweep follows the same ramp as the fill: it slows at each end of the band's travel.
-                state.floatValue = com.bloo.uicommon.ChargeRampEasing.transform(((now - start) % periodNanos).toFloat() / periodNanos.toFloat())
+                state.floatValue = ChargeRampEasing.transform(((now - start) % periodNanos).toFloat() / periodNanos.toFloat())
             }
         }
     }

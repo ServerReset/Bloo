@@ -11,6 +11,8 @@ import com.bloo.bluelink.data.toGeoLocation
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.ResponseFraming
+import com.bloo.bluelink.work.LiveChargePollWorker
 import kotlinx.coroutines.sync.withLock
 
 // --- Per-car status loading and the live-charge bar (extracted from AppViewModel) --
@@ -163,7 +165,7 @@ internal fun AppViewModel.loadStatus(
             logSuccess?.let { AppLog.log(it()) }
         } catch (e: Exception) {
             rethrowIfCancellation(e)
-            val msg = com.bloo.bluelink.data.ResponseFraming.userMessage(e)
+            val msg = ResponseFraming.userMessage(e)
                 ?: e.message
                 ?: errorMessage
             AppLog.log("⚠ ${v.name}: $msg")
@@ -213,5 +215,5 @@ internal suspend fun AppViewModel.refreshLiveChargeBar(vehicles: List<Vehicle>) 
             LiveCharge.sync(context = getApplication(), settings = settingsStore, vin = v.vin, carName = v.name, ev = ev)
         }
     }
-    if (anyCharging) com.bloo.bluelink.work.LiveChargePollWorker.kick(getApplication())
+    if (anyCharging) LiveChargePollWorker.kick(getApplication())
 }

@@ -40,6 +40,7 @@ import com.bloo.bluelink.data.setUnlockedMinutes
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapHairline
 import com.bloo.uicommon.GapGroup
+import com.bloo.bluelink.wear.WatchPresence
 import com.bloo.uicommon.MorphTextButton
 
 /**
@@ -110,7 +111,7 @@ internal fun NotificationsCardContent(
                 notif.tirePressure,
                 description = "When the car shows a tyre-pressure warning.",
             ) { vm.setNotifyTirePressure(it) }
-            val hasWatchApp by com.bloo.bluelink.wear.WatchPresence.hasApp.collectAsStateWithLifecycle()
+            val hasWatchApp by WatchPresence.hasApp.collectAsStateWithLifecycle()
             PopVisible(visible = hasWatchApp) {
                 ToggleRow(
                     "Low battery on watch",

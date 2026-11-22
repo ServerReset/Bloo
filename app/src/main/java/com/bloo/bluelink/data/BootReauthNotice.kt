@@ -1,6 +1,8 @@
 package com.bloo.bluelink.data
 
 import android.content.Context
+import com.bloo.bluelink.R
+import com.bloo.bluelink.Shortcuts
 import androidx.core.app.NotificationCompat
 
 /**
@@ -16,12 +18,12 @@ object BootReauthNotice {
         channelName = "Sign in after restart",
         channelDescription = "Asks you to sign in to Bloo after your phone restarts.",
         id = ID,
-        smallIcon = com.bloo.bluelink.R.drawable.ic_stat_bloo,
+        smallIcon = R.drawable.ic_stat_bloo,
         title = "Sign in to Bloo",
         text = "Your phone restarted. Open Bloo to sign in.",
         bigText = "Your phone restarted. Open Bloo to sign in.",
         category = NotificationCompat.CATEGORY_STATUS,
-        contentIntent = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context.applicationContext, vin = null),
+        contentIntent = Shortcuts.openCardPendingIntent(context.applicationContext, vin = null),
     )
 
     fun cancel(context: Context) = cancelNotice(context, ID)

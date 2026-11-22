@@ -25,6 +25,7 @@ import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.FieldShape
 import com.bloo.uicommon.content
+import com.bloo.bluelink.Shortcuts
 import com.bloo.uicommon.rememberRelativeTime
 
 /**
@@ -142,8 +143,8 @@ internal fun buildSettingsSearchEntries(
         add("AutoLock grace period · ${v.name}", "autolock grace period seconds wait delay countdown before locking ${v.name} how long before it locks") {
             AutoLockGraceSearchRow(v, vm)
         }
-        com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
-            val action = com.bloo.bluelink.Shortcuts.actionLabel(cmd)
+        Shortcuts.ACTIONS.forEach { cmd ->
+            val action = Shortcuts.actionLabel(cmd)
             add("Shortcut: $action · ${v.name}", "app shortcut launcher icon long press quick action $action ${v.name}") {
                 ToggleRow(action, state.isShortcutEnabled(v.vin, cmd)) { vm.setShortcutEnabled(v.vin, cmd, it) }
             }

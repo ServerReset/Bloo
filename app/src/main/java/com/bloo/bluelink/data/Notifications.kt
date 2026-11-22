@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bloo.bluelink.R
 import com.bloo.bluelink.ui.hasPermission
+import com.bloo.bluelink.Shortcuts
 import com.bloo.uicommon.content
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
@@ -185,7 +186,7 @@ object Notifications {
     ): Boolean {
         if (!hasPermission(context)) return false
         ensureChannel(context, channelId)
-        val pi = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin = null)
+        val pi = Shortcuts.openCardPendingIntent(context, vin = null)
         val builder = baseBuilder(context, channelId, title, text)
             .setLocalOnly(localOnly)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)

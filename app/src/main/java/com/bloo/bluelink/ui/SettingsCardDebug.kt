@@ -60,6 +60,14 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.bluelink.data.ActivityLogFile
+import com.bloo.bluelink.data.AiAvailability
+import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.DiagSettings
+import com.bloo.bluelink.data.LogLevel
+import com.bloo.bluelink.data.saveToDownloads
+import com.bloo.bluelink.perf.PerfFile
+import com.bloo.bluelink.perf.PerfMonitor
 import com.bloo.uicommon.MorphTextButton
 
 /**
@@ -71,7 +79,7 @@ internal fun DebugCardContent(
     vm: AppViewModel,
     clipboardScope: CoroutineScope,
     clipboard: Clipboard,
-    aiAvailability: com.bloo.bluelink.data.AiAvailability? = null,
+    aiAvailability: AiAvailability? = null,
 ) {
     // The log is read here, only while this card is composed: collecting it in the Settings root re-copied up to
     // 500 lines on every log line even with the card hidden.
@@ -88,14 +96,14 @@ internal fun DebugCardContent(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
         if (uri != null) saveScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            writeLogTo(context, uri, "performance") { com.bloo.bluelink.perf.PerfMonitor.saveableReport() }
+            writeLogTo(context, uri, "performance") { PerfMonitor.saveableReport() }
         }
     }
     val saveActivity = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
         if (uri != null) saveScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            writeLogTo(context, uri, "activity") { com.bloo.bluelink.data.ActivityLogFile.readAll() }
+            writeLogTo(context, uri, "activity") { ActivityLogFile.readAll() }
         }
     }
     SettingsCard("Debug", Icons.Filled.BugReport, vm, status = "${logs.size} log lines") {
@@ -109,12 +117,12 @@ internal fun DebugCardContent(
             }
             SettingsGroup("Logging") {
                 // Off logs nothing (the default). Simple keeps the activity log. Advanced adds detailed timing and the watch's log, and slows the app.
-                var level by remember { mutableStateOf(com.bloo.bluelink.data.DiagSettings.level) }
+                var level by remember { mutableStateOf(DiagSettings.level) }
                 BodySmallText("Off logs nothing. Simple keeps the activity log. Advanced also keeps detailed timing and the watch's log, and slows the app while it runs.")
                 EnumSegmented(
-                    entries = com.bloo.bluelink.data.LogLevel.entries,
+                    entries = LogLevel.entries,
                     selected = level,
-                    label = { when (it) { com.bloo.bluelink.data.LogLevel.OFF -> "Off"; com.bloo.bluelink.data.LogLevel.SIMPLE -> "Simple"; com.bloo.bluelink.data.LogLevel.ADVANCED -> "Advanced" } },
+                    label = { when (it) { LogLevel.OFF -> "Off"; LogLevel.SIMPLE -> "Simple"; LogLevel.ADVANCED -> "Advanced" } },
                     onSelect = { choice -> vm.setLogLevel(choice); level = choice },
                 )
             }
@@ -125,18 +133,18 @@ internal fun DebugCardContent(
                         "Save to Downloads",
                         onClick = {
                             saveScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.bloo.bluelink.data.saveToDownloads(context, "bloo-performance-${fileStamp()}.txt", com.bloo.bluelink.perf.PerfMonitor.saveableReport())
+                                saveToDownloads(context, "bloo-performance-${fileStamp()}.txt", PerfMonitor.saveableReport())
                             }
                         },
                         emphasis = ButtonEmphasis.Confirm,
                     )
                     MorphTextButton("Save file", onClick = { savePerformance.launch("bloo-performance-${fileStamp()}.txt") })
-                    MorphTextButton("Copy report", onClick = { copy("bloo performance", com.bloo.bluelink.perf.PerfMonitor.report()) })
-                    MorphTextButton("Record 10 s trace", onClick = { com.bloo.bluelink.perf.PerfMonitor.recordTrace(context) })
+                    MorphTextButton("Copy report", onClick = { copy("bloo performance", PerfMonitor.report()) })
+                    MorphTextButton("Record 10 s trace", onClick = { PerfMonitor.recordTrace(context) })
                     MorphTextButton("Share log file", onClick = {
-                        com.bloo.bluelink.perf.PerfFile.shareIntent(context)?.let { context.startActivity(android.content.Intent.createChooser(it, "Send the performance log")) }
+                        PerfFile.shareIntent(context)?.let { context.startActivity(android.content.Intent.createChooser(it, "Send the performance log")) }
                     })
-                    MorphTextButton("Reset", onClick = { com.bloo.bluelink.perf.PerfMonitor.reset() }, emphasis = ButtonEmphasis.Deny)
+                    MorphTextButton("Reset", onClick = { PerfMonitor.reset() }, emphasis = ButtonEmphasis.Deny)
                 }
             }
             SettingsGroup("Activity log") {
@@ -146,7 +154,7 @@ internal fun DebugCardContent(
                         "Save to Downloads",
                         onClick = {
                             saveScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.bloo.bluelink.data.saveToDownloads(context, "bloo-activity-${fileStamp()}.txt", com.bloo.bluelink.data.ActivityLogFile.readAll())
+                                saveToDownloads(context, "bloo-activity-${fileStamp()}.txt", ActivityLogFile.readAll())
                             }
                         },
                         emphasis = ButtonEmphasis.Confirm,
@@ -310,5 +318,5 @@ private fun writeLogTo(context: android.content.Context, uri: android.net.Uri, w
         val body = text()
         context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(body) } ?: error("no output stream")
     }.isSuccess
-    com.bloo.bluelink.data.AppLog.log(if (saved) "Saved the $what log to the file you chose" else "Could not save the $what log")
+    AppLog.log(if (saved) "Saved the $what log to the file you chose" else "Could not save the $what log")
 }

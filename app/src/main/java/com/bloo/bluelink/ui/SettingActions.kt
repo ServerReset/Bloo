@@ -12,6 +12,7 @@ import com.bloo.bluelink.data.setFontChoice
 import com.bloo.bluelink.data.setRunningMinutes
 import com.bloo.bluelink.data.setTempUnit
 import com.bloo.bluelink.data.setUnitSystem
+import com.bloo.bluelink.data.DEFAULT_SECTIONS
 import com.bloo.bluelink.data.setUnlockedMinutes
 
 /** Everything a setting's current value is read from: the same three sources search draws its controls from. */
@@ -236,7 +237,7 @@ private fun dynamicSettingActions(state: UiState, appearance: SettingsStore.Appe
     state.vehicles.forEachIndexed { i, v ->
         add(
             action("a_order$i", "Reset pebble order · ${v.name}", "pebbles order reset default ${v.name}") {
-                it.setSectionOrder(v, com.bloo.bluelink.data.DEFAULT_SECTIONS)
+                it.setSectionOrder(v, DEFAULT_SECTIONS)
             },
         )
         val sections = state.sectionsFor(v).filter { it != "summary" && state.isSectionAvailable(v, it) }

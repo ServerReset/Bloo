@@ -73,6 +73,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.LocalPowerPolicy
 
 /** How many frames the first map in a process waits before it composes, so it lands after the cards and photos the garage draws first. */
@@ -143,7 +144,7 @@ private fun CarMapBody(
     selectedVin: String? = null,
     onCarTap: (String) -> Unit = {},
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("CarMapBody")
+    TrackRecompositions("CarMapBody")
     val context = LocalContext.current
     val weight by rememberUpdatedState(panWeight)
     // Cold-start diagnostic; see HeroVisual's matching mark.

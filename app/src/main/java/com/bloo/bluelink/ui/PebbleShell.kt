@@ -52,6 +52,8 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.lowPowerAwareSpring
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.content
 
 /**
@@ -174,11 +176,11 @@ internal fun PebbleShell(
     contentGap: Dp = GapRow,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("PebbleShell")
+    TrackRecompositions("PebbleShell")
     // Frames while a pebble opens or closes are filed under it ("Garage/pebble-Trips"), not under the screen alone; not the first composition.
     var seenOnce by remember { mutableStateOf(false) }
     LaunchedEffect(expanded) {
-        if (seenOnce) com.bloo.bluelink.perf.PerfMonitor.scope("pebble-$title", 900)
+        if (seenOnce) PerfMonitor.scope("pebble-$title", 900)
         seenOnce = true
     }
     // Collapsed = pill-soft corners; expanded = tighter rounded square. Direction picks the same

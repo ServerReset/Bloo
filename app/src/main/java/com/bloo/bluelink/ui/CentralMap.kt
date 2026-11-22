@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import com.bloo.bluelink.data.GeoLocation
+import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.MapTiles
 
 /*
@@ -135,7 +136,7 @@ internal class CentralMap {
      */
     fun open(vin: String) {
         if (this.vin != null) return
-        com.bloo.bluelink.data.AppLog.log("Map: expand tapped for $vin")
+        AppLog.log("Map: expand tapped for $vin")
         this.vin = vin
         anchorVin = vin
         barShown = true

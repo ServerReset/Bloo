@@ -30,6 +30,7 @@ import com.bloo.bluelink.data.CarAction
 import com.bloo.bluelink.data.ClimatePreset
 import com.bloo.bluelink.data.CarLabels
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.uicommon.LocalReduceMotion
 import com.bloo.uicommon.AppIcons
 
 /**
@@ -88,7 +89,7 @@ internal fun WearClimatePebble(
                 inactiveColor = scheme.onSurface.copy(alpha = 0.2f),
                 dotOnActive = scheme.onPrimary,
                 dotOnInactive = scheme.onSurfaceVariant,
-                reduceMotion = com.bloo.uicommon.LocalReduceMotion.current,
+                reduceMotion = LocalReduceMotion.current,
                 onStepTick = {},
                 onSettle = {},
                 enabled = !busy(CarAction.CLIMATE_ON),

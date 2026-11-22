@@ -67,6 +67,9 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.denyTone
 import com.bloo.uicommon.MorphActionButton
 import com.bloo.uicommon.container
+import com.bloo.bluelink.data.ClimatePreset
+import com.bloo.bluelink.data.Powertrain
+import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
 
 // --- Climate --------------------------------------------------------------
@@ -87,7 +90,7 @@ internal fun ClimatePebble(
     val pending = state.isPending(v.vin, "climate")
     val fahrenheit = LocalAppearance.current.useFahrenheit
     // Seats show only where the car has them, and not on a Gen 5 EV that never reports them. Shared by the controls and the preset editor.
-    val showSeatControls = seats.any && !(state.isGen5WEffective(v) && state.powertrainOf(v) == com.bloo.bluelink.data.Powertrain.EV)
+    val showSeatControls = seats.any && !(state.isGen5WEffective(v) && state.powertrainOf(v) == Powertrain.EV)
     val form = rememberClimateForm(v.vin)
     var settingsLoaded by remember(v.vin) { mutableStateOf(false) }
 
@@ -228,7 +231,7 @@ internal fun ClimatePebble(
     }
 
     // Starting a saved preset, or stopping the one running.
-    val startPreset: (com.bloo.bluelink.data.ClimatePreset) -> Unit = start@{ preset ->
+    val startPreset: (ClimatePreset) -> Unit = start@{ preset ->
         // A request is still in flight: pressing again would send a second one (and a second notice).
         if (pending) return@start
         if (activePresetId == preset.id && climateOn) {
@@ -427,7 +430,7 @@ private fun SmartClimateSection(
         val step = influence.roundToInt().coerceIn(-1, 1)
         val target = plan.targetF + step * FEEL_STEP_F
         val scheme = MaterialTheme.colorScheme
-        val haptics = com.bloo.uicommon.LocalHaptics.current
+        val haptics = LocalHaptics.current
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             RevealMutedText("Colder")
             RevealMutedText("Hotter")
@@ -441,7 +444,7 @@ private fun SmartClimateSection(
             inactiveColor = scheme.surfaceContainerHighest,
             dotOnActive = scheme.onPrimary.copy(alpha = 0.7f),
             dotOnInactive = scheme.onSurfaceVariant.copy(alpha = 0.5f),
-            reduceMotion = com.bloo.uicommon.LocalReduceMotion.current,
+            reduceMotion = LocalReduceMotion.current,
             onStepTick = { haptics?.tick() },
             onSettle = { haptics?.click() },
             enabled = enabled,

@@ -77,7 +77,7 @@ fun BlooSlider(
                 RollingGlyph(Icons.Filled.Remove, trigger = minusRoll, direction = -1)
             }
             val track = Modifier.weight(1f).padding(horizontal = GapRow)
-            com.bloo.uicommon.AnimatedSlider(
+            AnimatedSlider(
                 value = draft,
                 onValueChange = { draft = it; onValueChange?.invoke(it) },
                 valueRange = valueRange,

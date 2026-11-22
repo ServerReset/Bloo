@@ -8,6 +8,8 @@ import com.bloo.bluelink.data.allAutoLockConfigs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import com.bloo.bluelink.data.BootReauthNotice
+import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.launch
 
 /** Relaunches [MainActivity] once an in-place app update finishes installing. */
@@ -18,7 +20,7 @@ class AutoLockBootReceiver : BroadcastReceiver() {
             // After a restart the app is sealed until the user signs in (see BootGate): the only thing
             // that happens is a notification asking them to. AutoLock starts once they have.
             if (com.bloo.bluelink.data.BootGate.isLocked(ctx)) {
-                com.bloo.bluelink.data.BootReauthNotice.post(ctx)
+                BootReauthNotice.post(ctx)
                 return
             }
             startWatchIfEnabled(ctx)
@@ -37,7 +39,7 @@ class AutoLockBootReceiver : BroadcastReceiver() {
         /** Starts the background Bluetooth watcher when AutoLock is on for any car. */
         fun startWatchIfEnabled(ctx: Context) {
             CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-                val entry = com.bloo.bluelink.data.SettingsStore(ctx).allAutoLockConfigs()
+                val entry = SettingsStore(ctx).allAutoLockConfigs()
                     .entries.firstOrNull { it.value.enabled }
                 if (entry != null) {
                     // Through the funnel: it refuses when the app is sealed, which is the case this

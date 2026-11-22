@@ -25,6 +25,8 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.MotionMedium
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -78,7 +80,7 @@ internal fun CollapsedGaragePager(
         // than one car's column, however many share the screen with it, and SettingsScreen's own
         // LazyColumn is a single column at any width to begin with.
         val total = slots + 1
-        com.bloo.bluelink.perf.TrackRecompositions("CollapsedGaragePager")
+        TrackRecompositions("CollapsedGaragePager")
         // Every car's photo is decoded (and its text tone measured) before its page is swiped to, so a page never shows a
         // placeholder where its photo is about to be.
         PrefetchHeroPhotos(remember(state) { androidx.compose.runtime.derivedStateOf { state.value.imageUrls } })
@@ -93,7 +95,7 @@ internal fun CollapsedGaragePager(
         // as well let the pager settle on its own pages mid-drag, and those settles changed the car again: one flick moved two or three.
         // Frames while a page is being swiped are their own line in the performance report.
         LaunchedEffect(pager) {
-            snapshotFlow { pager.isScrollInProgress }.collect { if (it) com.bloo.bluelink.perf.PerfMonitor.scope("garage-swipe", 1_200) }
+            snapshotFlow { pager.isScrollInProgress }.collect { if (it) PerfMonitor.scope("garage-swipe", 1_200) }
         }
         // The aurora leans with the page as it turns, and springs once each time a page settles.
         val aurora = LocalAuroraReactions.current

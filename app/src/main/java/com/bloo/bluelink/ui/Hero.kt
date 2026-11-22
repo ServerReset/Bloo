@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.lerp
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.uicommon.calmSpring
+import com.bloo.bluelink.data.HERO_PHOTO_SECTION
 import com.bloo.uicommon.AppIcons
 
 /**
@@ -157,7 +158,7 @@ internal fun HeroHeader(
             // A collapsed card always has its edge. The setting and a cut-out only take the edge off the open card.
             edge = !floating,
             glass = !floating,
-            onToggle = { vm.togglePebble(v, com.bloo.bluelink.data.HERO_PHOTO_SECTION) },
+            onToggle = { vm.togglePebble(v, HERO_PHOTO_SECTION) },
             icon = AppIcons.DirectionsCar,
             title = v.name,
             modifier = modifier,

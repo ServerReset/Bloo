@@ -10,6 +10,7 @@ import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
+import com.bloo.bluelink.data.WorkflowRun
 import kotlinx.coroutines.launch
 
 /**
@@ -99,10 +100,10 @@ object WatchPresence {
     /**
      * Advertise a newer WATCH build to any paired watch. A no-op when no watch is paired, so
      * the update check never pays for a push nobody will read. [run] is the phone's newest
-     * [com.bloo.bluelink.data.WorkflowRun]; its watch asset URL is what the watch offers to
+     * [WorkflowRun]; its watch asset URL is what the watch offers to
      * download.
      */
-    fun pushWatchUpdateAdvice(context: Context, run: com.bloo.bluelink.data.WorkflowRun) {
+    fun pushWatchUpdateAdvice(context: Context, run: WorkflowRun) {
         if (!_hasWatch.value) return
         val watchUrl = run.watchApkUrl ?: return
         PhoneWatchSyncService.pushNow(

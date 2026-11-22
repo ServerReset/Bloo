@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withTimeoutOrNull
+import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.launch
 
 /**
@@ -55,12 +56,12 @@ class WearSnapshotRepository(private val context: Context) {
     val refreshing: StateFlow<Boolean> = _refreshing
 
     /** Send any of the app's command names for [vin]; the face's controls all go through here. */
-    fun command(vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null) {
+    fun command(vin: String, action: String, climate: ClimateRequest? = null) {
         // Refresh is not a car command (the runner has no such action): it pulls fresh status, like the pull-down.
         if (action == CarAction.REFRESH) refresh() else run(vin, action, climate)
     }
 
-    private fun run(vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null) {
+    private fun run(vin: String, action: String, climate: ClimateRequest? = null) {
         scope.launch { WearCommands.track(vin, action) { runWatchCommand(context, vin, action, climate) } }
     }
 
@@ -80,7 +81,7 @@ internal suspend fun runWatchCommand(
     context: Context,
     vin: String,
     action: String,
-    climate: com.bloo.bluelink.data.ClimateRequest? = null,
+    climate: ClimateRequest? = null,
 ): Boolean = runWatchCommandChecked(context, vin, action, climate) != null
 
 /** [runWatchCommand] that also says how it went: true/false when the watch ran it itself, null when it went to the phone. */
@@ -88,7 +89,7 @@ internal suspend fun runWatchCommandChecked(
     context: Context,
     vin: String,
     action: String,
-    climate: com.bloo.bluelink.data.ClimateRequest? = null,
+    climate: ClimateRequest? = null,
 ): Boolean? {
     WearCredentialSync.runLocally(context, vin, action, climate)?.let { return it.ok }
     WearDataLayerSync.sendCommand(context, vin, action, climate)

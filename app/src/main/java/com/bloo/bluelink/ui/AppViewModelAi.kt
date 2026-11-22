@@ -12,6 +12,7 @@ import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiAutoSummarize
 import com.bloo.bluelink.data.setAiEnabled
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.data.DeviceStatus
 import kotlinx.coroutines.launch
 
 // --- On-device AI (Gemini Nano): summaries, free-form questions, command resolution (extracted from AppViewModel) --
@@ -57,7 +58,7 @@ internal fun AppViewModel.autoSummarize(v: Vehicle) {
     // Only when asked for: on-device AI on, AND the automatic option on (off by default).
     if (!s.aiActive || !s.aiAutoSummarize) return
     // Lean (Battery Saver / a throttling phone): the model is still there on a tap, just not run unasked.
-    if (!com.bloo.bluelink.data.DeviceStatus.policy(getApplication()).autoSummarize) return
+    if (!DeviceStatus.policy(getApplication()).autoSummarize) return
     // Android only lets the on-device model run while the app is on screen (GenAiException code 30,
     // "background use blocked"); a summary asked for in the background would just fail. It is written
     // when the app next comes to the foreground (see summarizeMissingOnForeground).

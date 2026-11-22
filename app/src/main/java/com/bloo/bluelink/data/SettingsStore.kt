@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.builtins.ListSerializer
+import com.bloo.bluelink.ui.GlassStops
 import kotlinx.serialization.builtins.serializer
 
 /**
@@ -109,7 +110,7 @@ class SettingsStore(internal val context: Context) {
         val vibrancy: Float = 1f,
         /**
          * How transparent the backing of floating glass is: 0 = solid, 1 = none (one of
-         * [com.bloo.bluelink.ui.GlassStops]). Defaults to "Clear" (0.90) -- the second clearest
+         * [GlassStops]). Defaults to "Clear" (0.90) -- the second clearest
          * stop, so the glass reads as glass out of the box.
          */
         val glassClarity: Float = 0.8f,
@@ -229,7 +230,7 @@ class SettingsStore(internal val context: Context) {
         val unlocked: Boolean = true,
         val unlockedMinutes: Int = 10,
         /**
-         * The Live Update charging notification -- see [com.bloo.bluelink.data.LiveCharge]'s class
+         * The Live Update charging notification -- see [LiveCharge]'s class
          * doc for what that means precisely and how to verify it's actually working.
          */
         val charging: Boolean = true,

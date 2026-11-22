@@ -16,6 +16,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.autolock.AutoLockBootReceiver
+import com.bloo.bluelink.data.BootReauthNotice
+import com.bloo.bluelink.widget.BlooWidgetUpdater
 import kotlinx.coroutines.withContext
 
 // --- Lock timing and the biometric lock (extracted from AppViewModel) --
@@ -207,8 +210,8 @@ private fun AppViewModel.finishBootReauth(username: String, password: String, pi
 private fun AppViewModel.openBootAndStart() {
     val app = getApplication<android.app.Application>()
     com.bloo.bluelink.data.BootGate.markOpen(app)
-    com.bloo.bluelink.data.BootReauthNotice.cancel(app)
-    com.bloo.bluelink.widget.BlooWidgetUpdater.requestUpdate(app)
-    com.bloo.bluelink.autolock.AutoLockBootReceiver.startWatchIfEnabled(app)
+    BootReauthNotice.cancel(app)
+    BlooWidgetUpdater.requestUpdate(app)
+    AutoLockBootReceiver.startWatchIfEnabled(app)
     coldStartAutoLogin()
 }

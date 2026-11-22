@@ -54,6 +54,8 @@ import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.LocalHaptics
 
 /** Which shape the search control is in: a bubble, a pill, or the full bar. */
@@ -94,7 +96,7 @@ internal fun SearchLayer(
      */
     hazeState: HazeState? = null,
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("SearchLayer")
+    TrackRecompositions("SearchLayer")
     var query by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf("") }
     var focused by rememberSaveable { mutableStateOf(false) }
@@ -122,7 +124,7 @@ internal fun SearchLayer(
     LaunchedEffect(open) {
         if (hapticArmed) {
             if (open) haptics?.click() else haptics?.tick()
-            com.bloo.bluelink.perf.PerfMonitor.scope(if (open) "search-open" else "search-close", 1_200)
+            PerfMonitor.scope(if (open) "search-open" else "search-close", 1_200)
         }
         hapticArmed = true
     }

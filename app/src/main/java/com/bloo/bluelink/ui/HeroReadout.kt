@@ -50,6 +50,7 @@ import kotlin.math.roundToInt
 import com.bloo.uicommon.MotionMedium
 import com.bloo.uicommon.GapRow
 import androidx.compose.runtime.Immutable
+import com.bloo.uicommon.ColdStartWindow
 import androidx.compose.ui.unit.Constraints
 
 /** What a screen reader says for the readout: the charge, the range and the state, in one sentence instead of three loose numbers. */
@@ -162,7 +163,7 @@ internal fun animatedChargeFrac(target: Float): State<Float> {
     val spec = lowPowerBounce<Float>()
     // Starts empty only in the app's first moments; a bar composed later (the next car in a swipe) starts at its charge, so
     // it does not spring up from nothing while the page slides in.
-    val fill = remember { Animatable(if (com.bloo.uicommon.ColdStartWindow.isOpen()) 0f else target) }
+    val fill = remember { Animatable(if (ColdStartWindow.isOpen()) 0f else target) }
     LaunchedEffect(target) { fill.animateTo(target, spec) }
     // The State itself, not its value: the bar reads it when it DRAWS, so a charge change redraws the bar (it needed that) and
     // does not recompose the whole readout around it on every frame of the spring.

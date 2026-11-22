@@ -37,7 +37,7 @@ internal suspend fun SettingsStore.editTracked(mutate: (androidx.datastore.prefe
         // every alert/tile tick fires a redundant full Drive round-trip (the hash is unchanged,
         // so no data corrupts, but it's needless background I/O the prefix design meant to
         // stop).
-        touched.removeAll { com.bloo.bluelink.data.SyncMerge.isDeviceLocal(it) }
+        touched.removeAll { SyncMerge.isDeviceLocal(it) }
         if (touched.isNotEmpty()) {
             val dirtyKey = stringPreferencesKey(PrefKeys.SYNC_DIRTY_KEYS)
             val existing = prefs.dirtyKeySet()

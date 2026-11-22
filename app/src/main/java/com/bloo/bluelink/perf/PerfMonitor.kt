@@ -527,10 +527,10 @@ object PerfMonitor {
         val dir = context.getExternalFilesDir(null) ?: context.filesDir
         val base = java.io.File(dir, "bloo-trace-${System.currentTimeMillis()}").path
         android.os.Debug.startMethodTracing(base, 64 * 1024 * 1024)
-        com.bloo.bluelink.data.AppLog.log("Trace: recording $seconds s to $base.trace")
+        AppLog.log("Trace: recording $seconds s to $base.trace")
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             android.os.Debug.stopMethodTracing()
-            com.bloo.bluelink.data.AppLog.log("Trace: saved $base.trace")
+            AppLog.log("Trace: saved $base.trace")
         }, seconds * 1000L)
     }
 

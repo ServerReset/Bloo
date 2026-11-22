@@ -8,6 +8,8 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.bloo.bluelink.Shortcuts
+import com.bloo.bluelink.wear.WatchPresence
 import com.bloo.bluelink.R
 
 /**
@@ -201,7 +203,7 @@ object LiveCharge {
             pluggedInLabel?.takeIf { it.isNotBlank() && !it.startsWith("Not ") },
         ).joinToString(" · ")
 
-        val contentPi = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin, requestCode = id)
+        val contentPi = Shortcuts.openCardPendingIntent(context, vin, requestCode = id)
         val stopIntent = Intent(context, AlertActionReceiver::class.java).apply {
             action = AlertActionReceiver.ACTION_RUN
             data = "bloo://live_charge/$vin".toUri()
@@ -231,7 +233,7 @@ object LiveCharge {
 
         val builder = NotificationCompat.Builder(context, CHANNEL)
             // The watch shows its own charging card, so the phone's isn't copied onto it.
-            .setLocalOnly(com.bloo.bluelink.wear.WatchPresence.appInstalled(context))
+            .setLocalOnly(WatchPresence.appInstalled(context))
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setColor(ACCENT)
             .setContentTitle("$carName is charging")

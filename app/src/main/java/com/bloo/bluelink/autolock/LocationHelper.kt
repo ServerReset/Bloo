@@ -11,6 +11,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import com.bloo.bluelink.data.DeviceStatus
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
@@ -71,7 +72,7 @@ object LocationHelper {
         // fix within a few tens of metres, which Wi-Fi and cell give, at a fraction of the battery.
         priority: Int? = null,
     ): Flow<android.location.Location> = callbackFlow {
-        val policy = com.bloo.bluelink.data.DeviceStatus.policy(context)
+        val policy = DeviceStatus.policy(context)
         // Lean (see PowerPolicy): low-power fixes, a third as often.
         val effectivePriority = priority ?: if (policy.highAccuracyLocation) Priority.PRIORITY_BALANCED_POWER_ACCURACY else Priority.PRIORITY_LOW_POWER
         if (!hasPermission(context)) {

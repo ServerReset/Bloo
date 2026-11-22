@@ -6,21 +6,26 @@ import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.allAutoLockConfigs
 import com.bloo.bluelink.data.autoLockConfig
 import com.bloo.bluelink.data.setAutoLockConfig
+import com.bloo.bluelink.autolock.AutoLockConfig
+import com.bloo.bluelink.autolock.AutoLockController
+import com.bloo.bluelink.autolock.AutoLockTrigger
+import com.bloo.bluelink.autolock.BluetoothDevices
+import com.bloo.bluelink.autolock.PairedDevice
 import kotlinx.coroutines.launch
 
 // --- AutoLock config, watcher and simulation (extracted from AppViewModel) --
 
-suspend fun AppViewModel.autoLockConfig(vin: String): com.bloo.bluelink.autolock.AutoLockConfig =
+suspend fun AppViewModel.autoLockConfig(vin: String): AutoLockConfig =
     settingsStore.autoLockConfig(vin)
 
-fun AppViewModel.setAutoLockConfig(vin: String, config: com.bloo.bluelink.autolock.AutoLockConfig) {
+fun AppViewModel.setAutoLockConfig(vin: String, config: AutoLockConfig) {
     viewModelScope.launch {
         settingsStore.setAutoLockConfig(vin, config)
         refreshAutoLockAddresses()
         // Turning AutoLock OFF must also CANCEL an evaluation already in flight for this car. The
         // config read at the START of an evaluation only guards NEW ones.
         if (!config.enabled) {
-            runCatching { com.bloo.bluelink.autolock.AutoLockController.cancel(vin) }
+            runCatching { AutoLockController.cancel(vin) }
         }
         val anyEnabled = settingsStore.allAutoLockConfigs().values.any { it.enabled }
         val action = if (anyEnabled) {
@@ -81,8 +86,8 @@ fun AppViewModel.ensureAutoLockWatcher() {
  * Bonded (paired) Bluetooth devices, for the "which one is your car" picker. Empty without
  * BLUETOOTH_CONNECT granted -- the Settings section prompts for it first.
  */
-fun AppViewModel.pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.PairedDevice> =
-    com.bloo.bluelink.autolock.BluetoothDevices.bondedDevices(getApplication())
+fun AppViewModel.pairedBluetoothDevices(): List<PairedDevice> =
+    BluetoothDevices.bondedDevices(getApplication())
 
 /**
  * "Simulate leaving" test button: runs the exact same evaluation a real Bluetooth disconnect would,
@@ -91,7 +96,7 @@ fun AppViewModel.pairedBluetoothDevices(): List<com.bloo.bluelink.autolock.Paire
 fun AppViewModel.simulateAutoLockLeaving(v: Vehicle) {
     viewModelScope.launch {
         val config = settingsStore.autoLockConfig(v.vin)
-        com.bloo.bluelink.autolock.AutoLockTrigger.onCarDisconnected(getApplication(), v.vin, log = false)
+        AutoLockTrigger.onCarDisconnected(getApplication(), v.vin, log = false)
         AppLog.log("AutoLock: simulated leaving ${v.name}.")
     }
 }

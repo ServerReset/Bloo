@@ -20,6 +20,7 @@ import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.bluelink.ioScope
+import com.bloo.bluelink.data.DeviceStatus
 import com.google.common.util.concurrent.ListenableFuture
 
 /**
@@ -59,7 +60,7 @@ class BlooTileService : TileService() {
 
     private fun tileOf(layout: LayoutElement): TileBuilders.Tile {
         val freshness = runCatching {
-            60_000L * com.bloo.bluelink.data.DeviceStatus.policy(applicationContext).pollIntervalMultiplier
+            60_000L * DeviceStatus.policy(applicationContext).pollIntervalMultiplier
         }.getOrDefault(60_000L)
         return TileBuilders.Tile.Builder()
             .setResourcesVersion(RESOURCES_VERSION)
@@ -229,7 +230,7 @@ class BlooTileService : TileService() {
     }
 
     private fun tint(car: VehicleSnapshot): Int =
-        com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, INK)
+        BlooColors.levelColor(car.percent, car.charging == true, INK)
 
     /**
      * The car's charge as the face draws it: a thin track round the display's edge, the charge in the car's colour from the top, and a short

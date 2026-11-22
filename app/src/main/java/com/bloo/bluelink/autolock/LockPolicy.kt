@@ -1,5 +1,7 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.ui.AppViewModel
+
 import com.bloo.bluelink.data.VehicleStatus
 
 /** Outcome of evaluating a status snapshot against the auto-lock policy. */
@@ -11,7 +13,7 @@ sealed interface LockDecision {
 /**
  * Pure policy: should AutoLock attempt to lock, given this status? Ported from
  * i5-AutoLock's `LockPolicy`, onto Bloo's own [VehicleStatus] shape (`doorLock == true`
- * means locked here, matching [com.bloo.bluelink.ui.AppViewModel.lock]'s own convention).
+ * means locked here, matching [AppViewModel.lock]'s own convention).
  */
 object LockPolicy {
     /** An open door or window does not stop the lock: a car locked around an open window is still better than one left unlocked. */

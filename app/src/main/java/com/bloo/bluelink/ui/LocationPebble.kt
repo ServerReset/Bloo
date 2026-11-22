@@ -46,6 +46,7 @@ import com.bloo.uicommon.GapGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.background
 import androidx.compose.ui.semantics.Role
+import com.bloo.bluelink.perf.TrackRecompositions
 import androidx.compose.foundation.clickable
 
 /**
@@ -124,7 +125,7 @@ internal fun rememberLocateAction(vm: AppViewModel, v: Vehicle): () -> Unit {
 
 @Composable
 internal fun LocationPebble(v: Vehicle, state: UiState, vm: AppViewModel, modifier: Modifier) {
-    com.bloo.bluelink.perf.TrackRecompositions("LocationPebble")
+    TrackRecompositions("LocationPebble")
     val context = LocalContext.current
     val appearance = LocalAppearance.current
     val fahrenheit = appearance.useFahrenheit

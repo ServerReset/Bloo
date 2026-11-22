@@ -11,6 +11,7 @@ import com.bloo.bluelink.data.savedClimate
 import com.bloo.bluelink.data.setClimatePresets
 import com.bloo.bluelink.data.toClimateSync
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.wear.PhoneWatchSyncService
 import kotlinx.coroutines.launch
 
 // --- Saved climate draft, presets, and the cross-composition climate mirror (extracted from AppViewModel) --
@@ -47,7 +48,7 @@ fun AppViewModel.saveClimatePreset(v: Vehicle, name: String, req: ClimateRequest
     viewModelScope.launch {
         settingsStore.saveClimatePreset(v.vin, preset)
         // The watch offers the same presets.
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+        PhoneWatchSyncService.pushNow(getApplication())
     }
 }
 
@@ -60,7 +61,7 @@ fun AppViewModel.updateClimatePreset(v: Vehicle, id: String, name: String, req: 
     }
     viewModelScope.launch {
         settingsStore.saveClimatePreset(v.vin, updated)
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+        PhoneWatchSyncService.pushNow(getApplication())
     }
 }
 
@@ -72,7 +73,7 @@ fun AppViewModel.deleteClimatePreset(v: Vehicle, id: String) {
     }
     viewModelScope.launch {
         settingsStore.deleteClimatePreset(v.vin, id)
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+        PhoneWatchSyncService.pushNow(getApplication())
     }
 }
 
@@ -81,7 +82,7 @@ fun AppViewModel.reorderClimatePresets(v: Vehicle, ordered: List<ClimatePreset>)
     _state.update { it.copy(climatePresets = it.climatePresets.withCar(v.vin, ordered)) }
     viewModelScope.launch {
         settingsStore.setClimatePresets(v.vin, ordered)
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+        PhoneWatchSyncService.pushNow(getApplication())
     }
 }
 

@@ -94,6 +94,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.LocalPowerPolicy
+import com.bloo.bluelink.data.Vehicle
 import com.bloo.uicommon.LocalReduceMotion
 
 /**
@@ -258,7 +259,7 @@ internal fun Modifier.pullToRefreshOrDismiss(
  * readout shows (see [chargeReadoutOf]), worked out without the readout's theme colours, so it is a plain function: the map host derives
  * every car's bar from it outside composition, and so recomposes only when the text really changes.
  */
-internal fun mapChargeStats(state: UiState, v: com.bloo.bluelink.data.Vehicle, metric: Boolean): Pair<String?, String?> {
+internal fun mapChargeStats(state: UiState, v: Vehicle, metric: Boolean): Pair<String?, String?> {
     val status = state.statusFor(v)
     val hasBattery = state.hasBattery(v)
     val pctText = status?.percentFor(hasBattery)?.let { "$it%" } ?: "--"

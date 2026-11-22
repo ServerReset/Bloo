@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.bloo.bluelink.data.FontChoice
+import com.bloo.bluelink.MainActivity
+import com.bloo.uicommon.BlooColors
 import kotlinx.serialization.Serializable
 
 /** User-selectable appearance. */
@@ -192,7 +194,7 @@ val ExpressiveShapes = Shapes(
  * the shared :uicommon helper.
  */
 @Composable
-fun buttonContainer(): Color = com.bloo.uicommon.BlooColors.buttonContainer(
+fun buttonContainer(): Color = BlooColors.buttonContainer(
     MaterialTheme.colorScheme.surfaceContainerHighest,
     MaterialTheme.colorScheme.onSurface,
 )
@@ -281,5 +283,5 @@ fun blooColorScheme(
 
 /**
  * The app's root theme wrapper, applied once around the whole Compose tree (see
- * [com.bloo.bluelink.MainActivity]).
+ * [MainActivity]).
  */

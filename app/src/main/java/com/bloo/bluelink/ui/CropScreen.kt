@@ -53,6 +53,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.GroupWeightProportional
 import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.MorphTextButton
+import com.bloo.bluelink.data.PhotoDecoder
 import com.bloo.uicommon.StandardButtonPadding
 
 // --- Photo crop editor ---
@@ -76,7 +77,7 @@ internal fun CropScreen(vin: String, uriString: String, onCancel: () -> Unit, on
             runCatching {
                 val uri = uriString.toUri()
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
-                val raw = com.bloo.bluelink.data.PhotoDecoder.decode(bytes, 2200) ?: return@runCatching null
+                val raw = PhotoDecoder.decode(bytes, 2200) ?: return@runCatching null
                 // Apply the photo's EXIF orientation.
                 val orientation = context.contentResolver.openInputStream(uri)?.use {
                     androidx.exifinterface.media.ExifInterface(it).getAttributeInt(

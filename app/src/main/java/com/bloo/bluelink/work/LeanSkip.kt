@@ -3,11 +3,12 @@ package com.bloo.bluelink.work
 import android.content.Context
 import androidx.core.content.edit
 import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.bluelink.data.PowerPolicy
 import com.bloo.bluelink.data.privatePrefs
 
 /**
  * The periodic workers are scheduled once at a fixed interval, so the device's lean mode (see
- * [com.bloo.bluelink.data.PowerPolicy.pollIntervalMultiplier]) is applied here: when lean, a run that
+ * [PowerPolicy.pollIntervalMultiplier]) is applied here: when lean, a run that
  * comes sooner than [baseIntervalMs] times the multiplier after the last real one does nothing. Returns
  * true to skip this run.
  */

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.core.net.toUri
+import com.bloo.bluelink.BuildConfig
 import com.bloo.bluelink.ui.tryStart
 
 /**
@@ -66,7 +67,7 @@ fun LiveCharge.isBackgroundUnrestricted(context: Context): Boolean {
 // sends it, and AutoLock cannot work from a Doze-suspended process: its whole job is reacting to leaving the car.
 @android.annotation.SuppressLint("BatteryLife")
 fun LiveCharge.requestBackgroundUnrestricted(context: Context) {
-    if (!com.bloo.bluelink.BuildConfig.PLAY_DISTRIBUTION) {
+    if (!BuildConfig.PLAY_DISTRIBUTION) {
         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
             .setData("package:${context.packageName}".toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

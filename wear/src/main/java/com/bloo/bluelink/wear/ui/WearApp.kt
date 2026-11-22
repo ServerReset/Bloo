@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.material3.AppScaffold
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.uicommon.RevealText
 
 /**
@@ -71,7 +72,7 @@ private fun SignInCode(code: String) {
 @Composable
 private fun Cars(
     repo: WearSnapshotRepository,
-    vehicles: List<com.bloo.bluelink.data.VehicleSnapshot>,
+    vehicles: List<VehicleSnapshot>,
     actions: CarPageActions,
 ) {
     val (send, tileRequest, onTileRequestHandled) = actions

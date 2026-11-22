@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.bloo.bluelink.data.DeviceStatus
 import kotlinx.coroutines.launch
 
 /**
@@ -38,9 +39,9 @@ class WearMainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WearLog.attach(this)
         // The watch's own power state (Battery Saver, thermal): see PowerPolicy.
-        com.bloo.bluelink.data.DeviceStatus.ensureInitialized(this)
+        DeviceStatus.ensureInitialized(this)
         // The wearer's own reduce-effects switch joins Battery Saver in the policy before anything draws.
-        com.bloo.bluelink.data.DeviceStatus.setManualLean(WearLook.reduceEffects(this))
+        DeviceStatus.setManualLean(WearLook.reduceEffects(this))
         WearPresets.ensureLoaded(this)
         val repo = WearSnapshotRepository(this)
         // The watch's own device lock holds it until the first unlock after a restart, so its work starts here.
@@ -89,7 +90,7 @@ class WearMainActivity : ComponentActivity() {
         if (!WearNotifier.canPost(this)) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 0)
         // The watch checks for its OWN updates over its own internet, independent of the phone.
         // Lean: not unasked; the watch has its own power budget.
-        if (com.bloo.bluelink.data.DeviceStatus.policy(this).pollIntervalMultiplier == 1) lifecycleScope.launch { WearUpdateChecker.check() }
+        if (DeviceStatus.policy(this).pollIntervalMultiplier == 1) lifecycleScope.launch { WearUpdateChecker.check() }
         // A watch the phone has signed in fetches its own car status.
         lifecycleScope.launch { WearCredentialSync.refresh(this@WearMainActivity) }
         // The watch's own AutoLock (beta): re-arm its one-shot trigger sensor for this run.

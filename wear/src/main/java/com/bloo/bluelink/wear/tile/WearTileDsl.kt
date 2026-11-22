@@ -15,6 +15,7 @@ import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.tiles.TileBuilders
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
+import com.bloo.bluelink.data.SnapshotStore
 import kotlinx.coroutines.launch
 
 /*
@@ -137,10 +138,10 @@ internal fun tileModifiers(
  * exactly what a press on the face would. With neither, it just opens the app.
  */
 /** Reads the phone's accent and the tile's snapshot, in that order. Both tiles start here. */
-internal suspend fun loadTileSnapshot(context: Context): com.bloo.bluelink.data.SnapshotStore.SnapshotData? {
+internal suspend fun loadTileSnapshot(context: Context): SnapshotStore.SnapshotData? {
     // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
     WearAccent.load(context)
-    return runCatching { com.bloo.bluelink.data.SnapshotStore(context).current() }.getOrNull()
+    return runCatching { SnapshotStore(context).current() }.getOrNull()
 }
 
 internal fun Context.tileLaunch(actionKey: String? = null, slot: Int? = null): ActionBuilders.Action {

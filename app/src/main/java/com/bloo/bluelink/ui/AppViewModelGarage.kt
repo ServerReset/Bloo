@@ -17,13 +17,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.Shortcuts
+import com.bloo.bluelink.data.Brand
+import com.bloo.bluelink.perf.PerfMonitor
 import com.bloo.uicommon.content
 
 // --- Garage loading, cached publish, and per-car config seeding (extracted from AppViewModel) --
 
 /**
  * Result of [perCarConfig]: a UiState transform folding in the config fields, plus the shortcut set
- * the caller needs for [com.bloo.bluelink.Shortcuts.refresh].
+ * the caller needs for [Shortcuts.refresh].
  */
 internal class PerCarConfig(val apply: (UiState) -> UiState, val shortcutSet: Set<String>?)
 
@@ -43,7 +46,7 @@ internal suspend fun AppViewModel.loadGarageInternal() {
     if (loadingGarage) return
     loadingGarage = true
     try {
-        com.bloo.bluelink.perf.PerfMonitor.span("garage.load", thresholdMs = 16) { loadGarageInner() }
+        PerfMonitor.span("garage.load", thresholdMs = 16) { loadGarageInner() }
     } finally {
         loadingGarage = false
     }
@@ -113,7 +116,7 @@ suspend fun AppViewModel.loadGarageInner() {
     // .toList() first: the loop suspends, and logout()/repoFor() may mutate `repos` meanwhile
     // (ConcurrentModificationException). A snapshot also keeps a mid-load sign-out's vehicles out.
     val vehiclesFetchStartedAt = System.currentTimeMillis()
-    val failedBrands = mutableListOf<com.bloo.bluelink.data.Brand>()
+    val failedBrands = mutableListOf<Brand>()
     val answered = repos.entries.toList().flatMap { (brand, r) ->
         runCatching {
             // Cold-start diagnostic: separates time waiting for statusMutex from r.vehicles()
@@ -222,7 +225,7 @@ suspend fun AppViewModel.loadGarageInner() {
     // Keep app-icon shortcuts in sync, off the main thread: ShortcutManagerCompat does a
     // synchronous binder round trip per call.
     viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-        runCatching { com.bloo.bluelink.Shortcuts.refresh(getApplication(), vehicles, shortcutSet) }
+        runCatching { Shortcuts.refresh(getApplication(), vehicles, shortcutSet) }
     }
     tryRunPendingShortcut()
     // Defer status fetching while the app is (or will be) locked, so it does not jank the lock-away

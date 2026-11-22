@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.bloo.bluelink.R
 import com.bloo.bluelink.data.Notifications
 import com.bloo.bluelink.data.ensureNotificationChannel
+import com.bloo.bluelink.Shortcuts
 import com.bloo.bluelink.data.postBuilt
 
 /**
@@ -81,9 +82,9 @@ object AutoLockEventNotifier {
             "AutoLock sent the lock command after you walked away."
         }
 
-        val contentIntent = com.bloo.bluelink.Shortcuts.openCardPendingIntent(context, vin, requestCode = notificationId(vin))
+        val contentIntent = Shortcuts.openCardPendingIntent(context, vin, requestCode = notificationId(vin))
 
-        val builder = com.bloo.bluelink.data.Notifications.baseBuilder(context, CHANNEL_ID, title, text)
+        val builder = Notifications.baseBuilder(context, CHANNEL_ID, title, text)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             // Said outright: shown on a paired watch as well as the phone (Wear OS bridges every notification that is not

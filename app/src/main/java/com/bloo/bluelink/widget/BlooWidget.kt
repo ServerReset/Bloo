@@ -58,6 +58,8 @@ import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.stateLineOrParked
 import com.bloo.bluelink.data.updatedLabel
 import com.bloo.uicommon.container
+import com.bloo.bluelink.Shortcuts
+import com.bloo.bluelink.data.BlooColors
 import com.bloo.uicommon.content
 
 /**
@@ -495,7 +497,7 @@ internal fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
 /** The value's and the bar's colour by level (red low, amber, green, blue charging), shared with the watch. */
 internal fun levelTint(car: VehicleSnapshot): androidx.glance.unit.ColorProvider =
     androidx.glance.unit.ColorProvider(
-        androidx.compose.ui.graphics.Color(com.bloo.bluelink.data.BlooColors.levelColor(car.percent, car.charging == true, 0xFF888888.toInt())),
+        androidx.compose.ui.graphics.Color(BlooColors.levelColor(car.percent, car.charging == true, 0xFF888888.toInt())),
     )
 
 /**
@@ -507,8 +509,8 @@ internal fun openCarIntent(context: Context, vin: String?): Intent {
     val intent = Intent(context, MainActivity::class.java)
     if (vin == null) return intent
     return intent
-        .setAction(com.bloo.bluelink.Shortcuts.ACTION)
+        .setAction(Shortcuts.ACTION)
         .setData(android.net.Uri.parse("bloo://car/${android.net.Uri.encode(vin)}"))
-        .putExtra(com.bloo.bluelink.Shortcuts.EXTRA_VIN, vin)
-        .putExtra(com.bloo.bluelink.Shortcuts.EXTRA_CMD, "open")
+        .putExtra(Shortcuts.EXTRA_VIN, vin)
+        .putExtra(Shortcuts.EXTRA_CMD, "open")
 }

@@ -86,6 +86,7 @@ import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.SegmentOption
+import com.bloo.bluelink.perf.TrackRecompositions
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -118,7 +119,7 @@ internal fun LoginScreen(
      */
     updateAvailableUrl: String? = null,
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("LoginScreen")
+    TrackRecompositions("LoginScreen")
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }

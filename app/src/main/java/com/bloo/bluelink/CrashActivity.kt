@@ -59,6 +59,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.bloo.uicommon.GapSection
+import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.ui.MutedText
+import com.bloo.bluelink.ui.PlayStoreLinks
+import com.bloo.bluelink.update.UpdateCleanup
+import com.bloo.bluelink.update.UpdateMessages
 import com.bloo.uicommon.MorphTextButton
 
 /**
@@ -88,7 +93,7 @@ class CrashActivity : ComponentActivity() {
     companion object {
         /** Carries the FULL report now, not just a bare stack trace -- see
          *  [BlooApplication.onCreate]'s own `report` local for what's actually in it
-         *  (device/build info, the stack trace, and the [com.bloo.bluelink.data.AppLog]
+         *  (device/build info, the stack trace, and the [AppLog]
          *  history leading up to the crash). Kept this name rather than renaming it: it's
          *  a public Intent-extra key, and BlooApplication (the only writer) and this
          *  Activity (the only reader) are the only two things that ever need to agree on
@@ -112,7 +117,7 @@ class CrashActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(GapSection),
                     ) {
                         Header()
-                        UpdateRecoveryPanel(apkFile = com.bloo.bluelink.update.UpdateCleanup.stagedApkFile(this@CrashActivity))
+                        UpdateRecoveryPanel(apkFile = UpdateCleanup.stagedApkFile(this@CrashActivity))
                         CrashLog(report)
                     }
                 }
@@ -155,8 +160,8 @@ class CrashActivity : ComponentActivity() {
         // and can this artifact install anything itself (see UpdateRuntime).
         if (!UpdateRuntime.usesGitHub(context)) {
             SettingsGroup("Update") {
-                com.bloo.bluelink.ui.MutedText("Google Play keeps this copy up to date.")
-                com.bloo.bluelink.ui.PlayStoreLinks()
+                MutedText("Google Play keeps this copy up to date.")
+                PlayStoreLinks()
             }
             return
         }
@@ -177,7 +182,7 @@ class CrashActivity : ComponentActivity() {
         var statusMessage by remember { mutableStateOf<String?>(null) }
 
         SettingsGroup("Update") {
-            com.bloo.bluelink.ui.MutedText("Grab a fresh build without leaving this screen.")
+            MutedText("Grab a fresh build without leaving this screen.")
 
             MorphTextButton(
                 text = if (checking) "Checking…" else "Check for updates",
@@ -218,7 +223,7 @@ class CrashActivity : ComponentActivity() {
                             withContext(Dispatchers.Main) {
                                 installing = false
                                 if (ok) {
-                                    statusMessage = com.bloo.bluelink.update.UpdateMessages.INSTALLED_REOPEN
+                                    statusMessage = UpdateMessages.INSTALLED_REOPEN
                                 } else if (!installDownloadedApk(context, apkFile)) {
                                     statusMessage = "Couldn't open the installer. Find Bloo.apk in your downloads."
                                 } else {
@@ -250,7 +255,7 @@ class CrashActivity : ComponentActivity() {
                             val ok = UpdateApi.downloadApk(url, apkFile) { downloadProgress = it }
                             downloading = false
                             apkReady = ok
-                            statusMessage = if (ok) null else com.bloo.bluelink.update.UpdateMessages.DOWNLOAD_FAILED
+                            statusMessage = if (ok) null else UpdateMessages.DOWNLOAD_FAILED
                         }
                     },
                 )
@@ -277,7 +282,7 @@ class CrashActivity : ComponentActivity() {
         val clipboard = LocalClipboard.current
         val clipboardScope = rememberCoroutineScope()
         SettingsGroup("Crash report") {
-            com.bloo.bluelink.ui.MutedText("Copy this and send it back.")
+            MutedText("Copy this and send it back.")
             MorphTextButton(
                 "Copy",
                 icon = Icons.Filled.ContentCopy,

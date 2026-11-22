@@ -4,6 +4,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.bloo.bluelink.autolock.AutoLockConfig
+import com.bloo.bluelink.autolock.AutoLockBluetoothReceiver
+import com.bloo.bluelink.autolock.AutoLockController
+import com.bloo.bluelink.ui.AppViewModel
 import kotlinx.coroutines.flow.first
 
 // --- AutoLock: per-car config, the "cars with AutoLock" registry, and sign-out cleanup ---
@@ -84,7 +87,7 @@ suspend fun SettingsStore.setAutoLockConfig(vin: String, config: AutoLockConfig)
 }
 
 /** Every VIN that has ever had AutoLock enabled -- see [setAutoLockConfig]'s registry
- *  note. Used by [com.bloo.bluelink.autolock.AutoLockBluetoothReceiver] to find which
+ *  note. Used by [AutoLockBluetoothReceiver] to find which
  *  car(s), if any, a disconnected Bluetooth device belongs to. */
 suspend fun SettingsStore.autoLockConfiguredVins(): List<String> =
 
@@ -95,11 +98,11 @@ fun SettingsStore.autoLockConfiguredVins(p: Preferences): List<String> =
     (p[stringPreferencesKey(PrefKeys.AUTOLOCK_VINS)] ?: "").split(',').filter { it.isNotBlank() }
 
 /** Forgets AutoLock entirely for every currently-registered car -- called on a full
- *  sign-out (see [com.bloo.bluelink.ui.AppViewModel.logout]) alongside the other
+ *  sign-out (see [AppViewModel.logout]) alongside the other
  *  account-derived stores it already wipes there (statusCache, snapshotStore). Without
  *  this, a signed-out car's VIN stayed in the registry forever: every Bluetooth
  *  connect/disconnect this phone ever saw kept checking it, futilely, against a vehicle
- *  [com.bloo.bluelink.autolock.AutoLockController] can never find again. */
+ *  [AutoLockController] can never find again. */
 suspend fun SettingsStore.clearAllAutoLockConfigs() {
     val vins = autoLockConfiguredVins()
     if (vins.isEmpty()) return

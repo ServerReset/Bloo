@@ -41,6 +41,9 @@ import com.bloo.bluelink.work.MainToMainSyncWorker
 import com.bloo.bluelink.work.UpdateCheckWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.DiagSettings
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.update.PlayUpdates
 import com.bloo.bluelink.update.shizukuInstall
 
 /**
@@ -109,8 +112,8 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
         // Per-frame cost, main-thread stalls and the rest of the app's own performance numbers, for the activity log and the Debug card's report.
         // The logging switches first: everything after this logs, and the monitor starts only if advanced logging was left on.
-        com.bloo.bluelink.data.DiagSettings.load(this)
-        com.bloo.bluelink.perf.PerfMonitor.install(this)
+        DiagSettings.load(this)
+        PerfMonitor.install(this)
         // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual starting state --
         // onMultiWindowModeChanged (below) only fires on a TRANSITION, so a cold start directly
         // INTO split-screen/freeform would otherwise never set this at all and StatusBarScrim would
@@ -188,7 +191,7 @@ class MainActivity : FragmentActivity() {
      */
     override fun onStop() {
         super.onStop()
-        com.bloo.bluelink.perf.PerfMonitor.foreground(false)
+        PerfMonitor.foreground(false)
         backgroundedAt = System.currentTimeMillis()
         viewModel.appForeground.value = false
     }
@@ -196,7 +199,7 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         StartupTrace.mark(StartupLabels.MAIN_ACTIVITY_ON_START)
         super.onStart()
-        com.bloo.bluelink.perf.PerfMonitor.foreground(true)
+        PerfMonitor.foreground(true)
         viewModel.appForeground.value = true
         viewModel.recheckAiOnForeground()
         viewModel.summarizeMissingOnForeground()
@@ -227,7 +230,7 @@ class MainActivity : FragmentActivity() {
      * signatures match, and that copy must stop updating itself the moment it does.
      */
     private fun refreshUpdates() {
-        if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(this)) com.bloo.bluelink.update.PlayUpdates.onForeground(this)
+        if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(this)) PlayUpdates.onForeground(this)
     }
 
     override fun onResume() {
@@ -239,7 +242,7 @@ class MainActivity : FragmentActivity() {
     /** Remove the Shizuku listener so it doesn't leak past this Activity instance. */
     override fun onDestroy() {
         if (current === this) current = null
-        com.bloo.bluelink.perf.PerfMonitor.uninstall()
+        PerfMonitor.uninstall()
         runCatching { unregisterReceiver(screenOffReceiver) }
         runCatching { shizukuInstall().unregisterPermissionResultListener() }
         super.onDestroy()

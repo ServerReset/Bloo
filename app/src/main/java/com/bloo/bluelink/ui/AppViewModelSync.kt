@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.bloo.uicommon.content
+import com.bloo.bluelink.wear.PhoneWatchSyncService
+import com.bloo.bluelink.wear.WatchPresence
 import androidx.core.content.FileProvider
 
 // --- Settings export/import and Drive auto-sync (extracted from AppViewModel) --
@@ -244,7 +246,7 @@ fun AppViewModel.testSync() {
  * immediately instead of waiting for the passive refresh collector.
  */
 internal suspend fun AppViewModel.runDriveSyncNow() {
-    val watch = com.bloo.bluelink.wear.WatchPresence.watch.value
+    val watch = WatchPresence.watch.value
     val outcome = withContext(Dispatchers.IO) {
         settingsStore.performMainToMainSync(connectedWatchId = watch?.id, connectedWatchName = watch?.name)
     }
@@ -256,7 +258,7 @@ internal suspend fun AppViewModel.runDriveSyncNow() {
             // Another device may have flipped the AI switches.
             refreshAiSettings()
             // ...or changed what the watch shows (its face controls, effects, climate presets): hand it over now.
-            com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+            PhoneWatchSyncService.pushNow(getApplication())
         }
         _state.update {
             it.copy(

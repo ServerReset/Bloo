@@ -14,6 +14,7 @@ import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.setBiometricLock
 import com.bloo.bluelink.data.setLockTiming
 import com.bloo.uicommon.AppIcons
+import com.bloo.bluelink.data.BootGate
 import com.bloo.uicommon.GapGroup
 
 /** The "Security" card: the app lock, which the phone's own lock unlocks. */
@@ -42,14 +43,14 @@ internal fun SecurityCardContent(
                 }
             }
             SettingsGroup {
-                var requireAuth by remember { mutableStateOf(com.bloo.bluelink.data.BootGate.enabled(context)) }
+                var requireAuth by remember { mutableStateOf(BootGate.enabled(context)) }
                 ToggleRow(
                     "Sign in after a restart",
                     requireAuth,
                     description = "After a restart, Bloo waits for sign-in. Alerts and AutoLock pause until then.",
                 ) {
                     requireAuth = it
-                    com.bloo.bluelink.data.BootGate.setEnabled(context, it)
+                    BootGate.setEnabled(context, it)
                 }
             }
         }

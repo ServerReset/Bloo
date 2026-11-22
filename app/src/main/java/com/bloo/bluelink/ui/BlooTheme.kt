@@ -22,6 +22,7 @@ import com.bloo.uicommon.LocalSpaceScale
 import com.bloo.uicommon.spaceScaleFor
 import com.bloo.uicommon.MaxFontScale
 import com.bloo.uicommon.LocalIsDarkTheme
+import com.bloo.uicommon.blooTypography
 import com.bloo.uicommon.content
 
 @Composable
@@ -104,7 +105,7 @@ fun BlooTheme(
     // applied on every screen -- so the answer is cached for the process instead.
     val reduceMotion = remember(context.contentResolver) { reduceMotionCached(context) }
     // Memoize typography and motion to avoid recomputing on every recomposition.
-    val typography = remember(fontChoice, classicHeadings) { com.bloo.uicommon.blooTypography(fontChoice, classicHeadings) }
+    val typography = remember(fontChoice, classicHeadings) { blooTypography(fontChoice, classicHeadings) }
     val motionScheme = remember { MotionScheme.expressive() }
     MaterialExpressiveTheme(
         colorScheme = scheme,

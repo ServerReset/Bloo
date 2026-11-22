@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.LocalReduceMotion
 
 /** How long a changed canvas text takes to cross-fade, the same as the Compose text's change fade. */
@@ -12,7 +13,7 @@ private const val TextFadeMs = 240
 
 /**
  * Text drawn on a canvas, which the Compose text does not reach. When its string changes, the old text fades out while the new one fades
- * in, the same as [com.bloo.uicommon.RevealText] does for Compose text. Drawn in the draw phase, so the fade is a draw change, not a
+ * in, the same as [RevealText] does for Compose text. Drawn in the draw phase, so the fade is a draw change, not a
  * recomposition.
  */
 internal class CanvasTextFade {

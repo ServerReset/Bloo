@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.WbCloudy
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.WeatherCode
 
 /** The icon for a weather [condition] at day or night, so icon choices are consistent across the phone UI. */
@@ -28,7 +29,7 @@ fun weatherIcon(condition: WeatherCode, isDay: Boolean): ImageVector = when (con
 
 /** The tint for a weather [condition]: a colour per kind of weather, and [neutralColor] where there is nothing to say. */
 fun weatherTint(condition: WeatherCode, isDay: Boolean, neutralColor: Color): Color = when (condition) {
-    WeatherCode.CLEAR -> if (isDay) Color(com.bloo.bluelink.data.BlooColors.warn) else Color(0xFFB0BEC5)
+    WeatherCode.CLEAR -> if (isDay) Color(BlooColors.warn) else Color(0xFFB0BEC5)
     WeatherCode.PARTLY_CLOUDY -> Color(0xFF90A4AE)
     WeatherCode.CLOUDY, WeatherCode.FOG, WeatherCode.UNKNOWN -> neutralColor
     WeatherCode.DRIZZLE, WeatherCode.RAIN, WeatherCode.SHOWERS -> Color(0xFF4FC3F7)

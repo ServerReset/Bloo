@@ -11,6 +11,7 @@ import com.bloo.uicommon.content
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.async
 
 // --- Drive main-to-main sync engine (extracted from SettingsStore) --
@@ -466,7 +467,7 @@ private suspend fun SettingsStore.readDriveText(parsed: android.net.Uri): String
 }
 
 /** Where [readDriveText]'s reads run, apart from their callers, so a hung read never holds one up. */
-private val driveReads = com.bloo.bluelink.ioScope()
+private val driveReads = ioScope()
 
 /** In a catch-all around a Drive read: our own timeout is a failure to report, but the caller being cancelled is not. */
 private fun rethrowUnlessTimeout(e: Throwable) {

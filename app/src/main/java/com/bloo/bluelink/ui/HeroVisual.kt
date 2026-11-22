@@ -45,6 +45,7 @@ import coil.request.ImageRequest
 import com.bloo.bluelink.data.Vehicle
 import com.bloo.bluelink.data.VehicleStatus
 import kotlinx.coroutines.delay
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.MotionLong
 
 /**
@@ -228,7 +229,7 @@ internal fun HeroVisual(
     /** The photo sits inside the card (not floating), so even a cut-out is clipped to the card's corners. */
     contained: Boolean = false,
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("HeroVisual")
+    TrackRecompositions("HeroVisual")
     StartupTrace.once("hero-visual-${v.vin}", "HeroVisual composing for ${v.name}")
     val density = LocalDensity.current
     val sizeModifier = when {

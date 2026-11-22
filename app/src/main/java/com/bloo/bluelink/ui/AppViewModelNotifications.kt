@@ -8,6 +8,8 @@ import com.bloo.bluelink.data.setNotifyWatchLowBattery
 import com.bloo.bluelink.data.setNotifyLow12V
 import com.bloo.bluelink.data.setNotifyTirePressure
 import kotlinx.coroutines.flow.map
+import com.bloo.bluelink.wear.PhoneWatchSyncService
+import com.bloo.bluelink.work.LiveChargePollWorker
 import kotlinx.coroutines.launch
 
 // --- Notification preference setters (extracted from AppViewModel) --
@@ -27,17 +29,17 @@ import kotlinx.coroutines.launch
  */
 fun AppViewModel.setNotifyCharging(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyCharging(v)
-    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    PhoneWatchSyncService.pushNow(getApplication())
     if (!v) {
         LiveCharge.cancelAll(getApplication(), _state.value.vehicles.map { it.vin })
-        com.bloo.bluelink.work.LiveChargePollWorker.cancel(getApplication())
+        LiveChargePollWorker.cancel(getApplication())
     }
 }
 
 
 fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyChargeComplete(v)
-    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    PhoneWatchSyncService.pushNow(getApplication())
 }
 
 /** Whether AutoLock posts its "Locked" / "Would have locked" notification. */
@@ -45,7 +47,7 @@ fun AppViewModel.setNotifyChargeComplete(v: Boolean) = viewModelScope.launch {
 /** The watch's own low-battery notification; pushed to the watch with the next sync. */
 fun AppViewModel.setNotifyWatchLowBattery(v: Boolean) = viewModelScope.launch {
     settingsStore.setNotifyWatchLowBattery(v)
-    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+    PhoneWatchSyncService.pushNow(getApplication())
 }
 
 fun AppViewModel.setNotifyLow12V(v: Boolean) = viewModelScope.launch { settingsStore.setNotifyLow12V(v) }

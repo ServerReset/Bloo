@@ -18,12 +18,13 @@ import com.bloo.bluelink.data.VehicleStatus
 import com.bloo.bluelink.data.notificationPrefs
 import com.bloo.bluelink.data.repositoryFor
 import java.util.concurrent.TimeUnit
+import com.bloo.bluelink.data.DeviceStatus
 import kotlinx.coroutines.sync.withLock
 
 /**
  * Keeps [LiveCharge]'s notification moving while a car keeps charging.
  *
- * [com.bloo.bluelink.work.AlertWorker] already polls every 30 minutes, which
+ * [AlertWorker] already polls every 30 minutes, which
  * is far too coarse for something meant to look "live" -- a progress bar
  * that visibly jumps once every half hour reads as broken, not live. This
  * worker fills the gap with a short interval, but ONLY while at least one
@@ -160,7 +161,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
          *  is the chain rescheduling itself, not a competing start. */
         private fun scheduleNext(context: Context) {
             val request = OneTimeWorkRequestBuilder<LiveChargePollWorker>()
-                .setInitialDelay(INTERVAL_MINUTES * com.bloo.bluelink.data.DeviceStatus.policy(context).pollIntervalMultiplier, TimeUnit.MINUTES)
+                .setInitialDelay(INTERVAL_MINUTES * DeviceStatus.policy(context).pollIntervalMultiplier, TimeUnit.MINUTES)
                 .setConstraints(constraints())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()

@@ -5,6 +5,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.bloo.bluelink.BlooApplication
 import java.util.concurrent.TimeUnit
 
 /**
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit
  *
  * The manifest (see `AndroidManifest.xml`) removes that automatic initializer via
  * `tools:node="remove"` on its `WorkManagerInitializer` meta-data. The replacement is
- * [com.bloo.bluelink.BlooApplication] implementing `Configuration.Provider` -- WorkManager's
+ * [BlooApplication] implementing `Configuration.Provider` -- WorkManager's
  * officially supported *on-demand initialization* hook, which lazily self-initializes the first
  * time ANY call site (this object's own callers, but just as importantly WorkManager's own
  * internal `SystemJobService`/`SystemAlarmService`, which is what actually runs a scheduled

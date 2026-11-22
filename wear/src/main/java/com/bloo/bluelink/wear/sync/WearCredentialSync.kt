@@ -21,6 +21,7 @@ import java.security.KeyStore
 import java.security.PrivateKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -101,7 +102,7 @@ object WearCredentialSync {
      * Run a command on the watch itself. Returns null when the watch has no session, which is the
      * caller's cue to hand the command to the phone instead.
      */
-    suspend fun runLocally(context: Context, vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null): CarCommandResult? {
+    suspend fun runLocally(context: Context, vin: String, action: String, climate: ClimateRequest? = null): CarCommandResult? {
         val app = context.applicationContext
         if (!hasSession(app)) return null
         val result = runCatching { CarCommandRunner.execute(app, CarCommand(vin, action).withClimate(climate)) }

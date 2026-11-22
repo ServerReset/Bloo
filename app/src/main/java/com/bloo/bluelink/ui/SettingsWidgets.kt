@@ -66,14 +66,15 @@ import com.bloo.uicommon.MorphButton
 import com.bloo.uicommon.TitleSubtitle
 import com.bloo.uicommon.MorphSegmented
 import com.bloo.uicommon.SegmentOption
+import com.bloo.bluelink.data.SurroundViewAccess
 import com.bloo.uicommon.content
 
 /** One option in a [MorphSegmented] control; re-exported from :uicommon. */
-typealias SegmentOption = com.bloo.uicommon.SegmentOption
+typealias SegmentOption = SegmentOption
 
 /**
  * A full-width segmented selector: a tonal track whose active segment fills with the primary
- * accent. Thin wrapper over [com.bloo.uicommon.MorphSegmented] supplying M3 colours, label
+ * accent. Thin wrapper over [MorphSegmented] supplying M3 colours, label
  * typography and haptics.
  */
 @Composable
@@ -87,7 +88,7 @@ fun MorphSegmented(
 ) {
     val haptics = LocalHaptics.current
     val scheme = MaterialTheme.colorScheme
-    com.bloo.uicommon.MorphSegmented(
+    MorphSegmented(
         options = options,
         selectedKey = selectedKey,
         onSelect = onSelect,
@@ -134,12 +135,12 @@ internal fun PowertrainPicker(current: Powertrain, onSelect: (Powertrain) -> Uni
 
 /** Which cars show the surround-view features: limited ccNC trims (the default), every car the brand has them on, or none. */
 @Composable
-internal fun SurroundViewPicker(current: com.bloo.bluelink.data.SurroundViewAccess, onSelect: (com.bloo.bluelink.data.SurroundViewAccess) -> Unit) = EnumSegmented(
-    com.bloo.bluelink.data.SurroundViewAccess.entries, current, onSelect = onSelect,
+internal fun SurroundViewPicker(current: SurroundViewAccess, onSelect: (SurroundViewAccess) -> Unit) = EnumSegmented(
+    SurroundViewAccess.entries, current, onSelect = onSelect,
     label = { when (it) {
-        com.bloo.bluelink.data.SurroundViewAccess.AUTO -> "Limited trims"
-        com.bloo.bluelink.data.SurroundViewAccess.ON -> "Always"
-        com.bloo.bluelink.data.SurroundViewAccess.OFF -> "Off"
+        SurroundViewAccess.AUTO -> "Limited trims"
+        SurroundViewAccess.ON -> "Always"
+        SurroundViewAccess.OFF -> "Off"
     } },
 )
 

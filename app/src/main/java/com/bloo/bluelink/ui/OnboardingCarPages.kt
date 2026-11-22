@@ -15,7 +15,7 @@ import com.bloo.uicommon.GapSection
  * Picking an option applies it straight away; there is no separate confirm step.
  */
 @Composable
-internal fun OnboardingPowertrainPage(vehicle: com.bloo.bluelink.data.Vehicle, state: UiState, vm: AppViewModel) {
+internal fun OnboardingPowertrainPage(vehicle: Vehicle, state: UiState, vm: AppViewModel) {
     // No intro line on any of the three car cards: the card's own summary carries the question
     // ("Gas, hybrid, plug-in or electric?"), and the body used to open by restating it at length.
     // One card, one line, then the control.
@@ -29,7 +29,7 @@ internal fun OnboardingPowertrainPage(vehicle: com.bloo.bluelink.data.Vehicle, s
  * The car's surround-view choice: limited trims, every car the brand has it on, or none. The default needs no answer.
  */
 @Composable
-internal fun OnboardingSurroundPage(vehicle: com.bloo.bluelink.data.Vehicle, state: UiState, vm: AppViewModel) {
+internal fun OnboardingSurroundPage(vehicle: Vehicle, state: UiState, vm: AppViewModel) {
     SurroundViewPicker(current = state.surroundAccessOf(vehicle)) { a ->
         vm.setSurroundView(vehicle, a)
     }
@@ -40,8 +40,8 @@ internal fun OnboardingSurroundPage(vehicle: com.bloo.bluelink.data.Vehicle, sta
  * match.
  */
 @Composable
-internal fun OnboardingClimatePage(vehicle: com.bloo.bluelink.data.Vehicle, state: UiState, vm: AppViewModel) {
-    val sc = state.seatConfigs[vehicle.vin] ?: com.bloo.bluelink.data.SeatConfig()
+internal fun OnboardingClimatePage(vehicle: Vehicle, state: UiState, vm: AppViewModel) {
+    val sc = state.seatConfigs[vehicle.vin] ?: SeatConfig()
     // innerGlassPanel(GapSection) and a 0.5 divider, matching the alerts list and SettingsGroup: this
     // panel was the last outlinedPanel(12.dp) in the deck, and its divider was the only 0.35 in the app.
     Column(Modifier.fillMaxWidth().innerGlassPanel(GapSection)) {

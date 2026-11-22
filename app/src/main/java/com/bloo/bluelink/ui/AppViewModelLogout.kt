@@ -13,6 +13,9 @@ import com.bloo.bluelink.data.syncDeviceName
 import com.bloo.bluelink.data.syncUri
 import com.bloo.bluelink.data.syncWifiOnly
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.autolock.AutoLockAddresses
+import com.bloo.bluelink.autolock.AutoLockController
+import com.bloo.bluelink.data.forgetRepository
 import kotlinx.coroutines.launch
 
 // --- Sign-out (extracted from AppViewModel) --
@@ -27,7 +30,7 @@ fun AppViewModel.logout(brand: Brand) {
         runCatching { repoFor(brand).logout() }
         credentialStore.clear(brand)
         repos.remove(brand)
-        com.bloo.bluelink.data.forgetRepository(brand)
+        forgetRepository(brand)
         AppLog.log("Signed out of ${brand.label}")
         val remaining = credentialStore.loadAll()
         if (remaining.isEmpty()) {
@@ -41,11 +44,11 @@ fun AppViewModel.logout(brand: Brand) {
             // car that can never be found.
             runCatching {
                 val autoLockVins = settingsStore.autoLockConfiguredVins()
-                com.bloo.bluelink.autolock.AutoLockController.forgetAll(autoLockVins)
+                AutoLockController.forgetAll(autoLockVins)
                 settingsStore.clearAllAutoLockConfigs()
                 // The receiver's synchronous mirror has to go with it, or a signed-out app would still
                 // match a car's Bluetooth disconnect and start an evaluation for a car that is gone.
-                runCatching { com.bloo.bluelink.autolock.AutoLockAddresses.write(getApplication(), emptyMap()) }
+                runCatching { AutoLockAddresses.write(getApplication(), emptyMap()) }
             }
             // `sessionFetched` is add-only and lives for the ViewModel's life, and [ensureStatus]
             // returns immediately for any VIN in it. Belongs exactly here, beside the other two

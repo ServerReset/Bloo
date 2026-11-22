@@ -4,18 +4,22 @@ import androidx.lifecycle.viewModelScope
 import com.bloo.bluelink.data.GeoLocation
 import com.bloo.bluelink.data.Vehicle
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.autolock.LocationHelper
+import com.bloo.bluelink.data.GeocodedPlace
+import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.wear.PhoneWatchSyncService
 import kotlinx.coroutines.launch
 
 // --- Device location, reverse geocoding, and weather place (extracted from AppViewModel) --
 
 /**
  * Refreshes [UiState.deviceLocation], the PHONE's own last-known position, via
- * [com.bloo.bluelink.autolock.LocationHelper]. Fails soft (keeps the existing value) without
+ * [LocationHelper]. Fails soft (keeps the existing value) without
  * permission or a fix.
  */
 internal fun AppViewModel.refreshDeviceLocation() {
     viewModelScope.launch {
-        val loc = com.bloo.bluelink.autolock.LocationHelper.currentLocation(getApplication()) ?: return@launch
+        val loc = LocationHelper.currentLocation(getApplication()) ?: return@launch
         _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
         // Reverse-geocode the phone's fix so the Location pebble can label the "your
         // location" block with a place name, not just coordinates. Best-effort: a failure leaves
@@ -37,7 +41,7 @@ internal fun AppViewModel.refreshDeviceLocation() {
  * fails routinely and is not an error. Delegates to the shared
  * [com.bloo.bluelink.data.reverseGeocode].
  */
-internal suspend fun AppViewModel.reverseGeocode(loc: GeoLocation): com.bloo.bluelink.data.GeocodedPlace? =
+internal suspend fun AppViewModel.reverseGeocode(loc: GeoLocation): GeocodedPlace? =
     com.bloo.bluelink.data.reverseGeocode(getApplication(), loc.latitude, loc.longitude)
 
 /**
@@ -53,9 +57,9 @@ internal suspend fun AppViewModel.applyPlace(v: Vehicle, loc: GeoLocation): Bool
     }
     // The watch shows the same short name, so the car's snapshot keeps it and the watch is sent the change.
     val app = getApplication<android.app.Application>()
-    val store = com.bloo.bluelink.data.SnapshotStore(app)
+    val store = SnapshotStore(app)
     store.current().vehicles.firstOrNull { it.vin == v.vin }?.let { store.updateVehicle(it.copy(place = place.compact)) }
-    com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(app)
+    PhoneWatchSyncService.pushNow(app)
     return true
 }
 

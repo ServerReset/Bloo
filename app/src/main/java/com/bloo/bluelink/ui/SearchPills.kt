@@ -46,6 +46,7 @@ import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.canBlurBackdrops
+import com.bloo.uicommon.LocalReduceMotion
 import dev.chrisbanes.haze.HazeState
 
 /*
@@ -228,7 +229,7 @@ internal fun LiftedPiece(
     hazeState: HazeState?,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val reduce = com.bloo.uicommon.LocalReduceMotion.current
+    val reduce = LocalReduceMotion.current
     val lift = remember(key) { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
     LaunchedEffect(key) {
         if (!reduce) lift.animateTo(1f, bounceSpring(stiffness = Spring.StiffnessLow))

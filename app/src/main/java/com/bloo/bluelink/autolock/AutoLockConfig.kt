@@ -1,7 +1,9 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.SettingsStore
+
 /**
- * Per-car AutoLock configuration, persisted in [com.bloo.bluelink.data.SettingsStore]
+ * Per-car AutoLock configuration, persisted in [SettingsStore]
  * (`autoLockConfig`/`setAutoLockConfig`). Defaults are the safe/inert ones: disabled, and
  * [dryRun] true so turning AutoLock on for the first time never sends a real lock command
  * until the user has watched it "would have locked" a few times and trusts it -- the same

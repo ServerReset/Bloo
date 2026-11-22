@@ -28,7 +28,7 @@ object PrivacyCopy {
 
     private val client by lazy {
         // The shared HTTP stack's pool and threads, with this page's own short timeouts.
-        com.bloo.bluelink.data.ApiHttp.client.newBuilder()
+        ApiHttp.client.newBuilder()
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(8, TimeUnit.SECONDS)
             .callTimeout(12, TimeUnit.SECONDS)

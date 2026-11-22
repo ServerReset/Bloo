@@ -3,6 +3,7 @@ package com.bloo.bluelink.svm3d
 import okhttp3.Request
 import java.io.File
 import java.io.IOException
+import com.bloo.bluelink.data.ApiHttp
 import java.util.concurrent.TimeUnit
 
 /**
@@ -46,7 +47,7 @@ class ModelStore(private val dir: File) {
     fun download(progress: (Float) -> Unit) {
         dir.mkdirs()
         // The shared HTTP stack's pool and threads, with only the read timeout a large download needs (redirects are followed by default).
-        val client = com.bloo.bluelink.data.ApiHttp.client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()
+        val client = ApiHttp.client.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()
         val todo = missingBytes.coerceAtLeast(1)
         var done = 0L
         for (m in ALL) {

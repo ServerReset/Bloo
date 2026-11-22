@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalWindowInfo
 import com.bloo.bluelink.data.CarCommandIds
+import com.bloo.bluelink.data.AppLog
 import dev.chrisbanes.haze.HazeState
 
 /*
@@ -76,7 +77,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     // A map that has nothing to draw from is nothing on screen: say so in the log, rather than leave it silent.
     LaunchedEffect(hostVin, hostVehicle == null, hostLocation == null) {
         if (openVin != null && (hostVehicle == null || hostLocation == null)) {
-            com.bloo.bluelink.data.AppLog.log("Map: $openVin not drawn (car found: ${hostVehicle != null}, location: ${hostLocation != null})")
+            AppLog.log("Map: $openVin not drawn (car found: ${hostVehicle != null}, location: ${hostLocation != null})")
         }
     }
     if (hostVehicle == null || hostLocation == null) return
@@ -166,7 +167,7 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             centralMap.closingTo = target
             // Captured now, so the collapse aims at where the card is when it starts, not where it drifts to while the map shrinks.
             centralMap.closeRect = target?.let { centralMap.cardBounds(it) }
-            com.bloo.bluelink.data.AppLog.log("Map: closing onto ${centralMap.closingTo} at ${centralMap.closingTo?.let { centralMap.cardBounds(it) }} (bar shows ${centralMap.currentVin}, opened for ${centralMap.vin})")
+            AppLog.log("Map: closing onto ${centralMap.closingTo} at ${centralMap.closingTo?.let { centralMap.cardBounds(it) }} (bar shows ${centralMap.currentVin}, opened for ${centralMap.vin})")
         },
         onDismiss = {
             // The closed map rests in the card it closed onto: the garage's current car.

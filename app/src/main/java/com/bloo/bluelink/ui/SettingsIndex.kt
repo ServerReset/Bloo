@@ -24,6 +24,7 @@ import com.bloo.bluelink.data.setNotifyService
 import com.bloo.bluelink.data.setNotifyUnlocked
 import com.bloo.bluelink.data.setSeamlessInstallShizuku
 import com.bloo.bluelink.data.setSeatFlag
+import com.bloo.bluelink.data.VehicleCommandRunner
 import com.bloo.uicommon.content
 
 internal class SearchEntry(val title: String, val haystack: String, val content: @Composable () -> Unit) {
@@ -283,7 +284,7 @@ internal fun searchScore(tokens: List<String>, e: SearchEntry, fuzzy: Boolean): 
 
 /**
  * A vehicle command recognised in a free-form search query. [cmd]/[climateTarget] use
- * [com.bloo.bluelink.data.VehicleCommandRunner]'s command vocabulary.
+ * [VehicleCommandRunner]'s command vocabulary.
  */
 /**
  * A command the search read from a phrase. [atMinute], when the phrase names a time, makes it a scheduled command for that minute of

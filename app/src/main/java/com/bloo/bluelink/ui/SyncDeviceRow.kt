@@ -31,6 +31,7 @@ import com.bloo.uicommon.ButtonIconSize
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.GapSection
+import com.bloo.bluelink.data.relativeLabel
 import com.bloo.uicommon.SecondaryTextStyle
 
 private const val ACTIVE_DEVICE_MS = 10L * 60 * 1000
@@ -122,7 +123,7 @@ internal fun SyncDeviceRow(
                 Spacer(Modifier.width(GapRow))
                 val seen = when {
                     isSelf || health == DeviceHealth.ACTIVE -> "Active now"
-                    else -> com.bloo.bluelink.data.relativeLabel(device.lastSeenMs).ifBlank { "Never synced" }
+                    else -> relativeLabel(device.lastSeenMs).ifBlank { "Never synced" }
                 }
                 // Two short lines, each allowed to wrap: what it is, then when it was last seen and its version.
                 val model = device.model.takeIf { it.isNotBlank() && !it.equals(device.name, ignoreCase = true) }

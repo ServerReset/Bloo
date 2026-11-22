@@ -33,6 +33,17 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.BuildConfig
+import com.bloo.bluelink.autolock.AutoLockController
+import com.bloo.bluelink.autolock.AutoLockEvalState
+import com.bloo.bluelink.data.Ai
+import com.bloo.bluelink.data.BlueLinkGate
+import com.bloo.bluelink.data.IntentModel
+import com.bloo.bluelink.data.LearnedSettings
+import com.bloo.bluelink.data.LogLevel
+import com.bloo.bluelink.data.repositoryFor
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.wear.PhoneWatchSyncService
 import kotlinx.coroutines.sync.Mutex
 
 /**
@@ -97,9 +108,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     internal val statusCache = StartupTrace.trace(StartupLabels.STATUS_CACHE_CONSTRUCTED) { StatusCache(app) }
 
-    internal val ai = StartupTrace.trace(StartupLabels.AI_CONSTRUCTED) { com.bloo.bluelink.data.Ai(app) }
+    internal val ai = StartupTrace.trace(StartupLabels.AI_CONSTRUCTED) { Ai(app) }
     /** Gemini Nano (Prompt API) for reading a free-form request into an intent; created here so it lives as long as the app. */
-    internal val intents = com.bloo.bluelink.data.IntentModel()
+    internal val intents = IntentModel()
 
     // One repository per signed-in brand (any mix of brands can be active).
     internal val repos = mutableMapOf<Brand, VehicleRepository>()
@@ -108,7 +119,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     internal val busyCount = java.util.concurrent.atomic.AtomicInteger(0)
 
     internal fun repoFor(brand: Brand): VehicleRepository =
-        repos.getOrPut(brand) { com.bloo.bluelink.data.repositoryFor(brand, store, credentialStore) }
+        repos.getOrPut(brand) { repositoryFor(brand, store, credentialStore) }
 
     internal fun kiaRepo(): KiaRepository = repoFor(Brand.KIA) as KiaRepository
 
@@ -153,10 +164,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Serializes ALL vehicleStatus calls account-wide (shared with the background worker via
-     * [com.bloo.bluelink.data.BlueLinkGate]). Blue Link rejects overlapping requests with `502 ...
+     * [BlueLinkGate]). Blue Link rejects overlapping requests with `502 ...
      * a previous request is pending`.
      */
-    internal val statusMutex = com.bloo.bluelink.data.BlueLinkGate.statusMutex
+    internal val statusMutex = BlueLinkGate.statusMutex
 
     /**
      * Which car the pager is on -- its OWN flow, deliberately not a field of [UiState], and this is
@@ -222,10 +233,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val cacheWrite = Mutex()
 
     /** The logging choice: Off, Simple (the activity log) or Advanced (plus the performance and watch detail). */
-    fun setLogLevel(level: com.bloo.bluelink.data.LogLevel) {
+    fun setLogLevel(level: LogLevel) {
         com.bloo.bluelink.data.DiagSettings.setLevel(getApplication(), level)
-        com.bloo.bluelink.perf.PerfMonitor.setAdvanced(com.bloo.bluelink.data.DiagSettings.advanced)
-        com.bloo.bluelink.wear.PhoneWatchSyncService.pushNow(getApplication())
+        PerfMonitor.setAdvanced(com.bloo.bluelink.data.DiagSettings.advanced)
+        PhoneWatchSyncService.pushNow(getApplication())
     }
 
     /**
@@ -249,7 +260,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The advanced logging switch is read by the monitor itself (see DiagSettings); nothing here watches the UI state for it.
         mirrorPlayUpdates()
         // Something learned on the watch changed the stored settings: the screen reads them again.
-        viewModelScope.launch { com.bloo.bluelink.data.LearnedSettings.changed.collect { refreshLocalCarConfig() } }
+        viewModelScope.launch { LearnedSettings.changed.collect { refreshLocalCarConfig() } }
         bootstrapColdStart()
         startChargingPoll()
     }
@@ -284,7 +295,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val snapshots = vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) }
         // The write is file I/O: off the main thread, so a swipe is not held up by a save (it used to take up to 68 ms there).
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            com.bloo.bluelink.perf.PerfMonitor.span("snapshot.save", thresholdMs = 8) {
+            PerfMonitor.span("snapshot.save", thresholdMs = 8) {
                 snapshotStore.saveVehicles(snapshots)
             }
         }
@@ -306,8 +317,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * to show "watching…" / "locking in 12s" / "locked" while a test or a real trigger is in
      * flight.
      */
-    val autoLockState: StateFlow<Map<String, com.bloo.bluelink.autolock.AutoLockEvalState>>
-        get() = com.bloo.bluelink.autolock.AutoLockController.state
+    val autoLockState: StateFlow<Map<String, AutoLockEvalState>>
+        get() = AutoLockController.state
 
     /** Collapse keys ("<vin>:<section>") on their own small flow. */
     val collapsedSections: StateFlow<Set<String>> = state
@@ -316,7 +327,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- App self-update (GitHub Actions builds; Bloo isn't on the Play Store) ---
 
-    val currentBuildNumber: Int get() = com.bloo.bluelink.BuildConfig.BUILD_RUN_NUMBER
+    val currentBuildNumber: Int get() = BuildConfig.BUILD_RUN_NUMBER
 
     /** Keyboard shortcuts for the screen that owns them (help, search, settings, back); see [onShortcut]. */
     internal val shortcutEvents = kotlinx.coroutines.flow.MutableSharedFlow<Shortcut>(extraBufferCapacity = 8)

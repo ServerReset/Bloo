@@ -77,6 +77,9 @@ import kotlinx.coroutines.launch
 import com.bloo.uicommon.AppIcons
 import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.LocalHaptics
+import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.lowPowerAwareSpring
 
 /**
@@ -161,7 +164,7 @@ internal fun ExpandableMapLayer(
     /** Opens the map from its floating place (closed). */
     onOpen: () -> Unit = {},
 ) {
-    com.bloo.bluelink.perf.TrackRecompositions("ExpandableMapLayer")
+    TrackRecompositions("ExpandableMapLayer")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -214,13 +217,13 @@ internal fun ExpandableMapLayer(
         // with the opening (see MapInputs.panWeight), so the map opens off-centre and just gets bigger. Closing ramps it back out, which is
         // what carries the pin to the middle of the collapsed map.
         val root = rootPos ?: return@LaunchedEffect
-        com.bloo.bluelink.data.AppLog.log("Map: placed at ${root.x.toInt()},${root.y.toInt()}, opening")
+        AppLog.log("Map: placed at ${root.x.toInt()},${root.y.toInt()}, opening")
         val o = originBounds().translate(-root.x, -root.y)
         val w = windowSize.width.toFloat()
         val h = windowSize.height.toFloat()
         val k = mapState.scale.coerceAtLeast(0.5f)
         mapState.panTo((o.center.x - w / 2f) / k, (o.center.y - (h - h * 0.85f / 2f)) / k)
-        com.bloo.bluelink.perf.PerfMonitor.scope("map-open", 1_000)
+        PerfMonitor.scope("map-open", 1_000)
         // The sheet grows and the bar flies in together: the bar comes down from above the screen, under the status bar, and
         // overshoots its place a little before it settles.
         launch { expandFraction.animateTo(1f, animationSpec = openSpec) }
@@ -275,7 +278,7 @@ internal fun ExpandableMapLayer(
         if (isExpanded && chromeShown) {
             kotlinx.coroutines.delay(500)
             chromeInsets?.let {
-                com.bloo.bluelink.data.AppLog.log(
+                AppLog.log(
                     "Map chrome: mapTop=${it.mapTop} mapBottom=${it.mapBottom} barBottom=${it.barBottom} rowTop=${it.rowTop} topPx=${it.topPx()}",
                 )
             }
@@ -290,7 +293,7 @@ internal fun ExpandableMapLayer(
         closing = true
         barDetailsOpen = false
         onDismissDrag(1f)
-        com.bloo.bluelink.perf.PerfMonitor.scope("map-close", 1_000)
+        PerfMonitor.scope("map-close", 1_000)
         scope.launch {
             beforeClose?.invoke()
             // One motion: the bar retreats up while the sheet shrinks, and the bar's width follows the sheet from the first frame.

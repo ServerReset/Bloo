@@ -7,6 +7,7 @@ import android.os.Build
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.bloo.bluelink.data.SurroundCapture
 import java.util.TimeZone
 
 /** One surround-view set, as the 3D scene reads it: when it was taken, its layout, and its image bytes. */
@@ -67,6 +68,6 @@ class SvmShot(val utcTime: String?, val imageSize: List<Int>, private val read: 
     }.getOrNull()
 
     companion object {
-        fun of(c: com.bloo.bluelink.data.SurroundCapture) = SvmShot(c.utcTime, c.imageSize) { c.jpeg }
+        fun of(c: SurroundCapture) = SvmShot(c.utcTime, c.imageSize) { c.jpeg }
     }
 }

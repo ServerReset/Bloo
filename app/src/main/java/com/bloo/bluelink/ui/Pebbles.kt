@@ -43,6 +43,8 @@ import com.bloo.uicommon.calmSpring
 import com.bloo.uicommon.ReorderableRows
 import com.bloo.uicommon.mergeShownOrder
 import com.bloo.uicommon.rememberDisplayedItems
+import com.bloo.bluelink.data.AppLog
+import com.bloo.bluelink.data.HERO_PHOTO_SECTION
 import com.bloo.uicommon.LocalHaptics
 
 /**
@@ -270,7 +272,7 @@ internal fun stateSlice(state: State<UiState>, contextKey: Any?, keys: (UiState)
                 val a = (before as? List<*>)
                 val b = (key as? List<*>)
                 val changed = if (a != null && b != null) a.indices.filter { a[it] != b.getOrNull(it) }.joinToString(",") else "key"
-                com.bloo.bluelink.data.AppLog.log("slice[$contextKey] changed: $changed")
+                AppLog.log("slice[$contextKey] changed: $changed")
             }
             KeyedSlice(s, key)
         }
@@ -290,7 +292,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
             val heroState = stateSlice(state, v) { s ->
                 listOf(
                     s.statuses[v.vin], s.imageUrls[v.vin], s.hasBattery(v), s.hasFuel(v),
-                    s.locations[v.vin], s.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION), s.textClearPhotos[v.vin],
+                    s.locations[v.vin], s.isPebbleExpanded(v.vin, HERO_PHOTO_SECTION), s.textClearPhotos[v.vin],
                 )
             }
             HeroHeader(
@@ -298,7 +300,7 @@ internal fun SinglePebble(section: String, v: Vehicle, state: State<UiState>, vm
                 modifier = modifier,
                 drivingLabel = heroState.drivingLabel(v), metric = metric,
                 textClear = heroState.textClearPhotos[v.vin],
-                photoExpanded = heroState.isPebbleExpanded(v.vin, com.bloo.bluelink.data.HERO_PHOTO_SECTION),
+                photoExpanded = heroState.isPebbleExpanded(v.vin, HERO_PHOTO_SECTION),
             )
         }
         "update" -> {

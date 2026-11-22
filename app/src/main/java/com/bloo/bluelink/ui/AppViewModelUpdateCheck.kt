@@ -2,6 +2,8 @@ package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.update.UpdateCheckResult
+import com.bloo.bluelink.wear.WatchPresence
 import kotlinx.coroutines.launch
 
 // --- Update checks (extracted from AppViewModel) --
@@ -46,7 +48,7 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
         try {
             val result = com.bloo.bluelink.update.UpdateChecker.checkPhone(getApplication(), force = force)
             when (result) {
-                is com.bloo.bluelink.update.UpdateCheckResult.Available -> {
+                is UpdateCheckResult.Available -> {
                     _state.update {
                         val sameBuild = it.updateAvailable?.run?.runNumber == result.info.run.runNumber
                         it.copy(
@@ -62,22 +64,22 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                     // watch APK) so it can offer its own update -- the watch has no network of its
                     // own. Advertised only when a watch is actually paired, so an unwatched phone
                     // never does the extra Data Layer work.
-                    com.bloo.bluelink.wear.WatchPresence.pushWatchUpdateAdvice(getApplication(), result.info.run)
+                    WatchPresence.pushWatchUpdateAdvice(getApplication(), result.info.run)
                     // A manual check also confirms via snackbar, since the update tile isn't
                     // visible from Settings.
                     if (surfaceResult) _state.update {
                         it.copy(message = "Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = ToastKind.INFO)
                     }
                 }
-                is com.bloo.bluelink.update.UpdateCheckResult.Failed ->
+                is UpdateCheckResult.Failed ->
                     if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = ToastKind.ERROR) }
                 // else: silent -- next refresh tries again
-                is com.bloo.bluelink.update.UpdateCheckResult.Skipped -> {
+                is UpdateCheckResult.Skipped -> {
                     // No network call happened (debounce or snooze), so this says nothing about
                     // updates and must not touch updateAvailable. surfaceResult stays silent for
                     // the same reason.
                 }
-                is com.bloo.bluelink.update.UpdateCheckResult.UpToDate -> {
+                is UpdateCheckResult.UpToDate -> {
                     _state.update {
                         // Never yank the tile out from under work already in flight. A
                         // ready-to-install APK is kept for the same reason: the user still has an

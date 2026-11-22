@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.bloo.uicommon.RevealText
+import com.bloo.bluelink.data.ServicePin
 import com.bloo.uicommon.FieldShape
 
 /**
@@ -62,7 +63,7 @@ internal fun PinField(
     placeholder: String? = null,
     label: String? = null,
     digitsOnly: Boolean = true,
-    maxDigits: Int = com.bloo.bluelink.data.ServicePin.MAX_DIGITS,
+    maxDigits: Int = ServicePin.MAX_DIGITS,
     revealed: Boolean = false,
     trailingIcon: @Composable (() -> Unit)? = null,
     isError: Boolean = false,

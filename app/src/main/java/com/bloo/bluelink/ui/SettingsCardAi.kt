@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import com.bloo.bluelink.data.aiEnabled
 import com.bloo.bluelink.data.setAiEnabled
 import com.bloo.uicommon.AppIcons
+import com.bloo.bluelink.Shortcuts
 import com.bloo.uicommon.GapGroup
 
 /** The "AI" card: one switch, and what it does. */
@@ -40,9 +41,9 @@ internal fun AppShortcutsCardContent(state: UiState, vm: AppViewModel) {
             BodySmallText("Quick actions on the launcher icon. Pick what each car offers.")
             state.vehicles.forEach { v ->
                 SettingsGroup(v.name) {
-                    com.bloo.bluelink.Shortcuts.ACTIONS.forEach { cmd ->
+                    Shortcuts.ACTIONS.forEach { cmd ->
                         ToggleRow(
-                            com.bloo.bluelink.Shortcuts.actionLabel(cmd),
+                            Shortcuts.actionLabel(cmd),
                             state.isShortcutEnabled(v.vin, cmd),
                         ) { vm.setShortcutEnabled(v.vin, cmd, it) }
                     }

@@ -41,6 +41,18 @@ import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.bloo.bluelink.data.ApiHttp
+import com.bloo.bluelink.data.BootGate
+import com.bloo.bluelink.data.CarAction
+import com.bloo.bluelink.data.CarCommandResult
+import com.bloo.bluelink.data.DiagSettings
+import com.bloo.bluelink.data.LearnedSettings
+import com.bloo.bluelink.data.LiveCharge
+import com.bloo.bluelink.data.SmartClimateMode
+import com.bloo.bluelink.data.WatchClimateFeedback
+import com.bloo.bluelink.data.WatchComfortChoice
+import com.bloo.bluelink.ui.blooColorScheme
+import com.bloo.bluelink.ui.comfortCapsOf
 import kotlinx.serialization.json.Json
 
 /**
@@ -72,7 +84,7 @@ class PhoneWatchSyncService : WearableListenerService() {
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         // Sealed after a restart: nothing runs until the user signs in, and that includes a command from the watch
         // (the credential messages below already stop here; the command path did not).
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return
+        if (BootGate.isLocked(applicationContext)) return
         for (event in dataEvents) {
             if (event.type != DataEvent.TYPE_CHANGED) continue
             val path = event.dataItem.uri.path ?: continue
@@ -100,38 +112,38 @@ class PhoneWatchSyncService : WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: com.google.android.gms.wearable.MessageEvent) {
         super.onMessageReceived(messageEvent)
-        if (com.bloo.bluelink.data.BootGate.isLocked(applicationContext)) return
+        if (BootGate.isLocked(applicationContext)) return
         when (messageEvent.path) {
             WatchSyncProtocol.PATH_CRED_KEY -> WatchSignIn.onKey(messageEvent.sourceNodeId, messageEvent.data)
             WatchSyncProtocol.PATH_CRED_ACK -> WatchSignIn.onAck()
             // A feel answer from the watch's smart climate: kept with the phone's, and the plan is sent back so both agree.
             WatchSyncProtocol.PATH_CLIMATE_FEEDBACK -> runCatching {
-                json.decodeFromString(com.bloo.bluelink.data.WatchClimateFeedback.serializer(), messageEvent.data.decodeToString())
+                json.decodeFromString(WatchClimateFeedback.serializer(), messageEvent.data.decodeToString())
             }.getOrNull()?.let { f ->
                 ClimateChoices.recordFeedback(applicationContext, f.vin, f.ambientF, f.deltaF)
                 // The learned model takes the answer too, then the plan goes back with the learned numbers, so both devices agree.
                 scope.launch {
                     SettingsStore(applicationContext).learnClimate(f.vin, f.ambientF, f.deltaF)
-                    com.bloo.bluelink.data.LearnedSettings.changed.tryEmit(Unit)
+                    LearnedSettings.changed.tryEmit(Unit)
                     pushNow(applicationContext)
                 }
             }
             // A comfort choice made on the watch: the learned model takes it, then the plan goes back with the learned numbers.
             WatchSyncProtocol.PATH_COMFORT_CHOICE -> runCatching {
-                json.decodeFromString(com.bloo.bluelink.data.WatchComfortChoice.serializer(), messageEvent.data.decodeToString())
+                json.decodeFromString(WatchComfortChoice.serializer(), messageEvent.data.decodeToString())
             }.getOrNull()?.let { c ->
                 scope.launch {
-                    val mode = runCatching { com.bloo.bluelink.data.SmartClimateMode.valueOf(c.mode) }.getOrNull() ?: return@launch
+                    val mode = runCatching { SmartClimateMode.valueOf(c.mode) }.getOrNull() ?: return@launch
                     SettingsStore(applicationContext).learnComfort(c.vin, mode, c.levels.toIntArray())
-                    com.bloo.bluelink.data.LearnedSettings.changed.tryEmit(Unit)
+                    LearnedSettings.changed.tryEmit(Unit)
                     pushNow(applicationContext)
                 }
             }
             // The watch's own log lines (advanced logging only), kept in the phone's activity log, marked as the watch's.
             WatchSyncProtocol.PATH_WATCH_LOG -> {
                 val lines = messageEvent.data.decodeToString().lines().filter { it.isNotBlank() }
-                if (lines.isNotEmpty()) com.bloo.bluelink.data.AppLog.log("watch: ${lines.size} line(s)")
-                lines.forEach { com.bloo.bluelink.data.AppLog.log("  watch ${it.take(400)}") }
+                if (lines.isNotEmpty()) AppLog.log("watch: ${lines.size} line(s)")
+                lines.forEach { AppLog.log("  watch ${it.take(400)}") }
             }
             WatchSyncProtocol.PATH_LOOK_PREFS -> scope.launch {
                 runCatching { json.decodeFromString(WatchLookPrefs.serializer(), messageEvent.data.decodeToString()) }
@@ -149,7 +161,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                         store.setNotifyWatchLowBattery(p.lowBattery)
                         store.setNotifyAutoLock(p.autoLock)
                         if (!p.charging) {
-                            com.bloo.bluelink.data.LiveCharge.cancelAll(applicationContext, SnapshotStore(applicationContext).current().vehicles.map { it.vin })
+                            LiveCharge.cancelAll(applicationContext, SnapshotStore(applicationContext).current().vehicles.map { it.vin })
                         }
                         pushNow(applicationContext)
                     }
@@ -158,13 +170,13 @@ class PhoneWatchSyncService : WearableListenerService() {
     }
 
     private suspend fun runCommand(request: WatchCommandRequest) {
-        val result = if (request.command.action == com.bloo.bluelink.data.CarAction.REFRESH) {
+        val result = if (request.command.action == CarAction.REFRESH) {
             // Not a car command: the watch is asking for fresh status. Fetch it, and the snapshot write pushes it back.
             val ok = com.bloo.bluelink.suspendRunCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
-            com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
-        } else com.bloo.bluelink.suspendRunCatching { com.bloo.bluelink.data.CarCommandRunner.execute(applicationContext, request.command) }
+            CarCommandResult(request.command.vin, request.command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
+        } else com.bloo.bluelink.suspendRunCatching { CarCommandRunner.execute(applicationContext, request.command) }
             .getOrElse {
-                com.bloo.bluelink.data.CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
+                CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
             }
         val out = WatchCommandResult(
             requestId = request.requestId, vin = result.vin, action = result.action, ok = result.ok,
@@ -206,7 +218,7 @@ class PhoneWatchSyncService : WearableListenerService() {
             val app = context.applicationContext
             ioScope().launch {
                 runCatching {
-                    val bytes = com.bloo.bluelink.data.ApiHttp.client.newCall(
+                    val bytes = ApiHttp.client.newCall(
                         okhttp3.Request.Builder().url(url).get().build(),
                     ).execute().use { resp ->
                         if (!resp.isSuccessful) error("HTTP ${resp.code}")
@@ -248,7 +260,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     vehicles = snapshot.vehicles,
                     selectedVin = snapshot.selectedVin,
                     sentAtMs = System.currentTimeMillis(),
-                    advancedLogging = com.bloo.bluelink.data.DiagSettings.advanced,
+                    advancedLogging = DiagSettings.advanced,
                     watchUpdateRunNumber = advice?.first,
                     watchUpdateApkUrl = advice?.second,
                     watchUpdateNotes = advice?.third,
@@ -262,7 +274,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     type = WatchType(appearance.fontChoice, appearance.classicHeadings),
                     climateFeedback = snapshot.vehicles.associate { it.vin to ClimateChoices.feedback(app, it.vin) }
                         .filterValues { it.isNotEmpty() },
-                    comfortCaps = snapshot.vehicles.associate { it.vin to com.bloo.bluelink.ui.comfortCapsOf(SettingsStore(app).seatConfig(it.vin)).encode() },
+                    comfortCaps = snapshot.vehicles.associate { it.vin to comfortCapsOf(SettingsStore(app).seatConfig(it.vin)).encode() },
                     comfortModels = snapshot.vehicles.mapNotNull { v ->
                         SettingsStore(app).comfortModelNow(v.vin)?.let { v.vin to it.encode() }
                     }.toMap(),
@@ -290,7 +302,7 @@ class PhoneWatchSyncService : WearableListenerService() {
  */
 private fun watchAccentOf(context: Context, appearance: SettingsStore.Appearance): WatchAccent? = runCatching {
     val custom = if (!appearance.dynamicColor) appearance.customPalettes.find { it.id == appearance.activeCustomPaletteId } else null
-    val scheme = com.bloo.bluelink.ui.blooColorScheme(
+    val scheme = blooColorScheme(
         context = context,
         dark = true,
         dynamicColor = appearance.dynamicColor,

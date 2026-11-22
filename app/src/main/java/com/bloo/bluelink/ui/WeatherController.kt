@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.data.withinWindow
 import kotlinx.coroutines.withContext
 
 internal class WeatherController(
@@ -95,7 +96,7 @@ internal class WeatherController(
 
     /** True when a reading fetched at [fetchedAt] is still within the weather TTL and nobody asked for a [force]d refresh. */
     private fun isFresh(fetchedAt: Long?, force: Boolean): Boolean =
-        !force && fetchedAt != null && com.bloo.bluelink.data.withinWindow(System.currentTimeMillis(), fetchedAt, WEATHER_TTL_MS)
+        !force && fetchedAt != null && withinWindow(System.currentTimeMillis(), fetchedAt, WEATHER_TTL_MS)
 
     /** Fetch weather at a car's last-known location, if any. */
     fun loadCarWeather(v: Vehicle, force: Boolean = false) = scope.launch {

@@ -29,6 +29,7 @@ import com.bloo.uicommon.confirmTone
 import com.bloo.uicommon.container
 import com.bloo.uicommon.content
 import dev.chrisbanes.haze.HazeState
+import com.bloo.bluelink.data.buildLabel
 import kotlin.math.roundToInt
 
 @Composable
@@ -59,7 +60,7 @@ internal fun UpdateAvailableTile(
                 title = "Update available",
                 summary = if (info != null) {
                     info.run.displayTitle?.takeIf { it.isNotBlank() }
-                        ?: com.bloo.bluelink.data.buildLabel(info.run.runNumber)
+                        ?: buildLabel(info.run.runNumber)
                 } else {
                     "Google Play"
                 },

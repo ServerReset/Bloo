@@ -1,6 +1,8 @@
 package com.bloo.uicommon
 
 import androidx.compose.runtime.compositionLocalOf
+import com.bloo.bluelink.data.DeviceState
+import com.bloo.bluelink.data.PowerPolicy
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
@@ -18,13 +20,13 @@ val LocalReduceMotion = staticCompositionLocalOf { false }
 
 /**
  * The device-resource policy (battery saver, thermal throttling), collected ONCE at the app root and
- * read here. [com.bloo.bluelink.data.PowerPolicy] is the single place that says what changes when the
+ * read here. [PowerPolicy] is the single place that says what changes when the
  * device is short on power: every visual or animated "lean" decision reads it, never the system
  * directly. Collected once because every call site used to collect the flow itself: about ten per
  * pebble, hundreds of live collectors across the pages in the pager, all created mid-swipe.
  */
 val LocalPowerPolicy = compositionLocalOf {
-    com.bloo.bluelink.data.PowerPolicy.of(com.bloo.bluelink.data.DeviceState())
+    PowerPolicy.of(DeviceState())
 }
 
 /**

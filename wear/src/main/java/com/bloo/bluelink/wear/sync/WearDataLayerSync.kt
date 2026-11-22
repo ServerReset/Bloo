@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
+import com.bloo.bluelink.data.CarCommand
+import com.bloo.bluelink.data.CarCommandResult
+import com.bloo.bluelink.data.ClimateRequest
+import com.bloo.bluelink.data.WatchCommandResult
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -55,8 +59,8 @@ object WearDataLayerSync {
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected
 
-    private val _lastCommandResult = MutableStateFlow<com.bloo.bluelink.data.WatchCommandResult?>(null)
-    val lastCommandResult: StateFlow<com.bloo.bluelink.data.WatchCommandResult?> = _lastCommandResult
+    private val _lastCommandResult = MutableStateFlow<WatchCommandResult?>(null)
+    val lastCommandResult: StateFlow<WatchCommandResult?> = _lastCommandResult
 
     /** A newer WATCH build the phone is advertising, or null. */
     private val _updateAdvice = MutableStateFlow<UpdateAdvice?>(null)
@@ -144,7 +148,7 @@ object WearDataLayerSync {
         // Never on a Play copy: Play updates it, and a GitHub APK is signed with a different key, so installing
         // one over it fails (the checker's own check() stops at the same flag).
         _updateAdvice.value = payload.watchUpdateRunNumber
-            ?.takeIf { !com.bloo.bluelink.wear.BuildConfig.PLAY_DISTRIBUTION && it > com.bloo.bluelink.wear.BuildConfig.BUILD_RUN_NUMBER }
+            ?.takeIf { !BuildConfig.PLAY_DISTRIBUTION && it > BuildConfig.BUILD_RUN_NUMBER }
             ?.let { run ->
                 payload.watchUpdateApkUrl?.let { url -> UpdateAdvice(run, url, payload.watchUpdateNotes) }
             }
@@ -158,7 +162,7 @@ object WearDataLayerSync {
      * Re-read the on-watch store after a command or refresh the watch ran ITSELF, so the UI shows
      * what it just did, and report the command's outcome the same way the phone's reply would.
      */
-    suspend fun reloadFromStore(context: Context, result: com.bloo.bluelink.data.CarCommandResult?) {
+    suspend fun reloadFromStore(context: Context, result: CarCommandResult?) {
         val snapshot = SnapshotStore(context.applicationContext).current()
         if (snapshot.vehicles.isNotEmpty()) {
             WearNotifier.onVehicles(context, _vehicles.value, snapshot.vehicles)
@@ -166,7 +170,7 @@ object WearDataLayerSync {
             WearSurfaces.refresh(context)
         }
         result?.let {
-            _lastCommandResult.value = com.bloo.bluelink.data.WatchCommandResult(
+            _lastCommandResult.value = WatchCommandResult(
                 requestId = "local-${System.nanoTime()}", vin = it.vin, action = it.action, ok = it.ok, message = it.message,
             )
         }
@@ -175,7 +179,7 @@ object WearDataLayerSync {
     fun applyCommandResult(context: Context, bytes: ByteArray?) {
         if (bytes == null) return
         val result = runCatching {
-            json.decodeFromString(com.bloo.bluelink.data.WatchCommandResult.serializer(), bytes.decodeToString())
+            json.decodeFromString(WatchCommandResult.serializer(), bytes.decodeToString())
         }.getOrNull() ?: return
         _lastCommandResult.value = result
     }
@@ -198,11 +202,11 @@ object WearDataLayerSync {
      * Send a command to the phone to run; its outcome arrives in [lastCommandResult]. Used when
      * the watch has no session of its own (see [WearCredentialSync.runLocally]).
      */
-    fun sendCommand(context: Context, vin: String, action: String, climate: com.bloo.bluelink.data.ClimateRequest? = null) {
+    fun sendCommand(context: Context, vin: String, action: String, climate: ClimateRequest? = null) {
         val app = context.applicationContext
         val request = WatchCommandRequest(
             requestId = UUID.randomUUID().toString(),
-            command = com.bloo.bluelink.data.CarCommand(vin, action).withClimate(climate),
+            command = CarCommand(vin, action).withClimate(climate),
         )
         scope.launch {
             val req = PutDataMapRequest.create(WatchSyncProtocol.commandPath(request.requestId)).apply {

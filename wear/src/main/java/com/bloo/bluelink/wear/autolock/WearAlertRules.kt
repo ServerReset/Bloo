@@ -1,5 +1,7 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.WatchNotifyPrefs
+
 import com.bloo.bluelink.data.VehicleSnapshot
 
 /** What the watch should do about one car after its state changed. */
@@ -25,7 +27,7 @@ internal const val WEAR_FULL_PERCENT = 95
 internal fun planWearAlerts(
     before: VehicleSnapshot?,
     now: VehicleSnapshot,
-    prefs: com.bloo.bluelink.data.WatchNotifyPrefs,
+    prefs: WatchNotifyPrefs,
 ): WearAlertPlan {
     val pct = now.percent
     val card = now.charging == true && prefs.charging

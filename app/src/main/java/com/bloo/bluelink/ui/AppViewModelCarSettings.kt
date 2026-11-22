@@ -23,6 +23,7 @@ import com.bloo.bluelink.data.learnComfort
 import com.bloo.bluelink.data.SmartClimateMode
 import com.bloo.bluelink.data.ClimateRequest
 import kotlinx.coroutines.flow.update
+import com.bloo.bluelink.data.comfortLevelsOf
 import kotlinx.coroutines.launch
 
 /** This per-car map with [vin]'s entry set to [value], or dropped when [value] is null. */
@@ -150,7 +151,7 @@ fun AppViewModel.setTextClearPhoto(v: Vehicle, value: Boolean) {
  */
 fun AppViewModel.learnComfort(v: Vehicle, mode: SmartClimateMode, req: ClimateRequest) {
     viewModelScope.launch {
-        val next = settingsStore.learnComfort(v.vin, mode, com.bloo.bluelink.data.comfortLevelsOf(req, mode))
+        val next = settingsStore.learnComfort(v.vin, mode, comfortLevelsOf(req, mode))
         _state.update { it.copy(comfortModels = it.comfortModels + (v.vin to next)) }
     }
 }

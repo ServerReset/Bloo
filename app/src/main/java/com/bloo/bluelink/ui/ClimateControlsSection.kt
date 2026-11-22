@@ -144,7 +144,7 @@ internal fun ClimateControlsSection(
 
         // The reference layout: a big temperature and a duration, each with its own −/+, then the feature tiles, then the seats
         // they open into. Every control writes the same form the presets save, so a preset carries exactly what is shown here.
-        val tempColor = com.bloo.uicommon.tempColor(tempF, CLIMATE_TEMP_RANGE_F.first.toFloat(), CLIMATE_TEMP_RANGE_F.last.toFloat())
+        val tempColor = tempColor(tempF, CLIMATE_TEMP_RANGE_F.first.toFloat(), CLIMATE_TEMP_RANGE_F.last.toFloat())
         ClimateStepper(
             value = degLabel(tempF.toString(), fahrenheit),
             caption = "Temperature",

@@ -1,5 +1,7 @@
 package com.bloo.bluelink.data
 
+import com.bloo.bluelink.wear.WatchPresence
+
 /**
  * Evaluates per-car alert conditions, persisting bookkeeping so each fires once.
  * Returns the alerts that should be shown now (toast + notification).
@@ -297,7 +299,7 @@ object CarAlerts {
                         "Your car has finished charging.",
                         channelId = Notifications.CHANNEL_EVENTS,
                         // The watch raises its own "charged" alert, so don't also bridge this one.
-                        localOnly = com.bloo.bluelink.wear.WatchPresence.appInstalled(settings.context),
+                        localOnly = WatchPresence.appInstalled(settings.context),
                     )
                     // Reset for the next charge cycle -- only once it could be delivered; with the permission or
                     // channel off the alert used to be consumed unseen, and never retried.

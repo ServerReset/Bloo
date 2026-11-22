@@ -25,6 +25,7 @@ import com.bloo.bluelink.data.formatDistance
 import com.bloo.bluelink.data.openLabels
 import com.bloo.bluelink.data.rangeMiFor
 import com.bloo.uicommon.AppIcons
+import com.bloo.bluelink.data.Powertrain
 import androidx.compose.ui.graphics.vector.ImageVector
 
 // --- Diagnostics ----------------------------------------------------------
@@ -38,7 +39,7 @@ internal fun DiagnosticsPebble(v: Vehicle, status: VehicleStatus?, state: UiStat
     val metric = a.metricDistance
     // A pure EV has no tank, but the API still reports fuelLevel=0, which rendered as a misleading
     // "Fuel level 0% / Low fuel No" pair. Only show the fuel rows where there is a tank to read.
-    val hasFuel = state.powertrainOf(v) != com.bloo.bluelink.data.Powertrain.EV
+    val hasFuel = state.powertrainOf(v) != Powertrain.EV
     val rows = remember(status, fahrenheit, metric, hasFuel) { buildList {
         status?.tirePressureLamp?.let { tp ->
             // No psi suffix. `TirePressure.all` was only ever populated FROM the warning lamp --

@@ -74,6 +74,10 @@ import com.bloo.uicommon.Haptics
 import com.bloo.uicommon.SoftDamping
 import androidx.compose.animation.AnimatedVisibility
 import androidx.lifecycle.Lifecycle
+import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.bluelink.perf.PerfMonitor
+import com.bloo.bluelink.perf.TrackRecompositions
+import com.bloo.uicommon.reduceMotionCached
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
@@ -100,15 +104,15 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
         withFrameNanos { }
         StartupTrace.once("compose-first-frame", StartupLabels.BLOO_APP_FIRST_FRAME_CALLBACK)
     }
-    com.bloo.bluelink.perf.TrackRecompositions("BlooApp")
+    TrackRecompositions("BlooApp")
     val stateHolder = vm.state.collectAsStateWithLifecycle()
     val state by stateHolder
     val appearance by vm.appearance.collectAsStateWithLifecycle()
-    val powerPolicy by com.bloo.bluelink.data.DeviceStatus.policy.collectAsStateWithLifecycle()
+    val powerPolicy by DeviceStatus.policy.collectAsStateWithLifecycle()
     // Narrow derived reads, so unrelated UiState emissions don't recompose the whole root.
     val screen by remember { derivedStateOf { state.screen } }
     // Frames are filed under the screen that is showing, so a log says "Garage" or "Settings", not just "slow".
-    LaunchedEffect(screen) { com.bloo.bluelink.perf.PerfMonitor.screen(screen::class.simpleName ?: screen.toString()) }
+    LaunchedEffect(screen) { PerfMonitor.screen(screen::class.simpleName ?: screen.toString()) }
     val locked by remember { derivedStateOf { state.locked } }
     // Latches once the app has been unlocked; only the cold-start lock defers composing the garage.
     var unlockedThisSession by remember { mutableStateOf(false) }
@@ -159,7 +163,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
 
     // The phone's tilt, read once for the aurora and the pebbles' glass edges. Silent under battery saver, with animations off in
     // Accessibility, or once the app has sat untouched (see rememberTilt).
-    val tilt = rememberTilt(active = powerPolicy.ambientMotion && !com.bloo.uicommon.reduceMotionCached(context), ambient = ambientActivity)
+    val tilt = rememberTilt(active = powerPolicy.ambientMotion && !reduceMotionCached(context), ambient = ambientActivity)
 
     // One haptics engine; written in a SideEffect because composition-time writes can be discarded.
     val haptics = remember { Haptics(context.applicationContext) }
@@ -269,7 +273,7 @@ private fun BlooAppContent(vm: AppViewModel, centralMap: CentralMap) {
 // [LockBlurLayer].
 
 internal val FieldShape: RoundedCornerShape
-    get() = com.bloo.uicommon.FieldShape
+    get() = FieldShape
 
 // --- Garage (main) --------------------------------------------------------
 

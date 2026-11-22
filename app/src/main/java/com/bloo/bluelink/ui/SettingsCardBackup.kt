@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.GapGroup
 import com.bloo.uicommon.ButtonEmphasis
+import com.bloo.bluelink.data.relativeLabel
 import com.bloo.uicommon.MorphTextButton
 
 /**
@@ -53,7 +54,7 @@ internal fun BackupSyncCardContent(state: UiState, vm: AppViewModel, context: Co
     val status = when {
         !configured -> "Not set up"
         failed -> "Sync failed"
-        else -> com.bloo.bluelink.data.relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
+        else -> relativeLabel(state.lastSyncMs).takeIf { it.isNotBlank() }?.let { "Synced $it" } ?: "Active"
     }
     var showDriveDialog by remember { mutableStateOf(false) }
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -152,7 +153,7 @@ private fun SyncDiagnostics(state: UiState, vm: AppViewModel) {
     MorphTextButton(if (open) "Hide diagnostics" else "Diagnostics", onClick = { open = !open })
     ExpandVisibility(open, from = Alignment.Bottom) {
         SettingsGroup("Diagnostics") {
-            val lastSync = com.bloo.bluelink.data.relativeLabel(state.lastSyncMs)
+            val lastSync = relativeLabel(state.lastSyncMs)
             StatusRow("Last synced", lastSync.ifBlank { "Never" })
             // Two phones truly on the SAME Drive file show the same code. If they differ they
             // picked different files (Drive allows duplicate names), the usual reason sync doesn't

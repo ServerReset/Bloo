@@ -13,6 +13,7 @@ import com.bloo.bluelink.data.setEnabledShortcuts
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.Shortcuts
 import com.bloo.uicommon.content
 
 // --- App-icon shortcuts and OEM app launch (extracted from AppViewModel) --
@@ -79,13 +80,13 @@ private fun AppViewModel.openOemApp(v: Vehicle) {
 /** Toggle whether a given car+action app-icon shortcut is shown. */
 fun AppViewModel.setShortcutEnabled(vin: String, cmd: String, enabled: Boolean) {
     val universe = _state.value.vehicles.flatMap { v ->
-        com.bloo.bluelink.Shortcuts.ACTIONS.map { "${it}_${v.vin}" }
+        Shortcuts.ACTIONS.map { "${it}_${v.vin}" }
     }.toSet()
     val current = _state.value.shortcutSet ?: universe
     val updated = if (enabled) current + "${cmd}_$vin" else current - "${cmd}_$vin"
     _state.update { it.copy(shortcutSet = updated) }
     viewModelScope.launch {
         settingsStore.setEnabledShortcuts(updated)
-        com.bloo.bluelink.Shortcuts.refresh(getApplication(), _state.value.vehicles, updated)
+        Shortcuts.refresh(getApplication(), _state.value.vehicles, updated)
     }
 }

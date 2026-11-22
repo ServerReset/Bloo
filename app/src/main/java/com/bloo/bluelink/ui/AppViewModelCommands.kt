@@ -16,6 +16,9 @@ import com.bloo.bluelink.data.toGeoLocation
 import com.bloo.bluelink.rethrowIfCancellation
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.bloo.bluelink.autolock.LocationHelper
+import com.bloo.bluelink.data.DeviceStatus
+import com.bloo.bluelink.data.smartClimateRequestFor
 import kotlinx.coroutines.sync.withLock
 
 // --- Live device location + remote vehicle commands (extracted from AppViewModel) --
@@ -26,7 +29,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Starts the continuous [UiState.deviceLocation] subscription
- * ([com.bloo.bluelink.autolock.LocationHelper.liveUpdates]). [restart] replaces an already-running
+ * ([LocationHelper.liveUpdates]). [restart] replaces an already-running
  * one. The flow CLOSES with no location permission, so a permission-less start leaves a COMPLETED
  * job behind rather than a dead-but-"active" one -- [ensureLiveDeviceLocation] can then start a
  * working one the instant permission is granted.
@@ -49,7 +52,7 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
             var lastPublishedAtMs = 0L
             var lastGeocodedAtMs = 0L
             var lastWeatherAtMs = 0L
-            com.bloo.bluelink.autolock.LocationHelper.liveUpdates(getApplication()).collect { loc ->
+            LocationHelper.liveUpdates(getApplication()).collect { loc ->
                 val now = System.currentTimeMillis()
                 val last = lastPublished
                 // Published only when the phone has really moved: further than the fix's own accuracy, and at least the minimum. It used
@@ -65,7 +68,7 @@ fun AppViewModel.beginLiveDeviceLocation(restart: Boolean = false) {
                 _state.update { it.copy(deviceLocation = loc.toDeviceGeoLocation()) }
                 // Weather follows the phone, but a forecast does not change by the metre: at most once a
                 // minute (each pass can geocode, write the store and fetch).
-                val pollScale = com.bloo.bluelink.data.DeviceStatus.policy(getApplication()).pollIntervalMultiplier
+                val pollScale = DeviceStatus.policy(getApplication()).pollIntervalMultiplier
                 if (lastWeatherAtMs == 0L || now - lastWeatherAtMs >= DEVICE_GEOCODE_INTERVAL_MS * pollScale) {
                     lastWeatherAtMs = now
                     weather.refreshDeviceLocationForWeather(loc)
@@ -264,7 +267,7 @@ fun AppViewModel.setChargeLimits(v: Vehicle, acPercent: Int, dcPercent: Int) =
  */
 fun AppViewModel.startSmartClimate(v: Vehicle, onResolved: (ClimateRequest) -> Unit = {}) {
     viewModelScope.launch {
-        val request = com.bloo.bluelink.data.smartClimateRequestFor(getApplication(), v.vin)
+        val request = smartClimateRequestFor(getApplication(), v.vin)
         if (request == null) {
             _state.update { it.copy(message = "Smart climate needs the car's location.", messageType = ToastKind.ERROR) }
             return@launch

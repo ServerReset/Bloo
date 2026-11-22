@@ -21,6 +21,8 @@ import com.bloo.bluelink.data.privatePrefs
 import com.bloo.bluelink.ioScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.bloo.bluelink.data.IntentExtras
+import com.bloo.bluelink.data.WatchSyncProtocol
 import kotlinx.serialization.json.Json
 
 /** Which watch notifications the user wants. Plain prefs: nothing here is secret. */
@@ -45,7 +47,7 @@ class WearNotificationPrefs(context: Context) {
             runCatching {
                 com.google.android.gms.wearable.Wearable.getNodeClient(app).connectedNodes.await().forEach {
                     com.google.android.gms.wearable.Wearable.getMessageClient(app)
-                        .sendMessage(it.id, com.bloo.bluelink.data.WatchSyncProtocol.PATH_NOTIF_PREFS, bytes).await()
+                        .sendMessage(it.id, WatchSyncProtocol.PATH_NOTIF_PREFS, bytes).await()
                 }
             }
         }
@@ -258,7 +260,7 @@ class WearActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val EXTRA_VIN = com.bloo.bluelink.data.IntentExtras.VIN
-        const val EXTRA_ACTION = com.bloo.bluelink.data.IntentExtras.ACTION
+        const val EXTRA_VIN = IntentExtras.VIN
+        const val EXTRA_ACTION = IntentExtras.ACTION
     }
 }

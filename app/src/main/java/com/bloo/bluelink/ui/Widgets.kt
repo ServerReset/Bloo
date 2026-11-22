@@ -48,11 +48,12 @@ import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.glassTint
 import com.bloo.uicommon.MorphSegmented
+import com.bloo.bluelink.MainActivity
 import com.bloo.uicommon.ambientRing
 
 /**
  * True while the Activity is in multi-window/split-screen/freeform mode. Set from
- * [com.bloo.bluelink.MainActivity].
+ * [MainActivity].
  */
 internal var inMultiWindowMode by mutableStateOf(false)
 
@@ -131,7 +132,7 @@ internal fun SettingsModeTab(settingsMode: String, onSettingsModeChange: (String
         contentAlignment = Alignment.TopEnd,
     ) {
         GlassSurface(shape = StandardShape, modifier = Modifier.width(172.dp), hazeState = hazeState) {
-            com.bloo.uicommon.MorphSegmented(
+            MorphSegmented(
                 options = segmentsOf("simple" to "Simple", "advanced" to "Advanced"),
                 selectedKey = settingsMode,
                 onSelect = onSettingsModeChange,

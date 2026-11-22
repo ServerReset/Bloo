@@ -14,6 +14,8 @@ import com.bloo.bluelink.data.displayChargeLimit
 import com.bloo.bluelink.data.percentFor
 import com.bloo.bluelink.data.platformOverridable
 import com.bloo.bluelink.data.rangeMiFor
+import com.bloo.bluelink.data.ComfortCaps
+import com.bloo.bluelink.data.SeatConfig
 import com.bloo.bluelink.data.toGeoLocation
 
     internal fun snapshotOf(v: Vehicle, status: VehicleStatus?, state: UiState): VehicleSnapshot {
@@ -82,7 +84,7 @@ import com.bloo.bluelink.data.toGeoLocation
         if (state.hasBattery(v)) v.copy(isEv = true) else v
 
 /** The heat and cool a car has, from the person's seat setup, for smart comfort. */
-internal fun comfortCapsOf(s: com.bloo.bluelink.data.SeatConfig): com.bloo.bluelink.data.ComfortCaps = com.bloo.bluelink.data.ComfortCaps(
+internal fun comfortCapsOf(s: SeatConfig): ComfortCaps = ComfortCaps(
     driverHeat = s.driverHeat,
     driverCool = s.driverCool,
     passHeat = s.passHeat,

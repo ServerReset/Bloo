@@ -63,7 +63,7 @@ internal fun WeatherGlyph(code: WeatherCode, isDay: Boolean, size: Dp, describe:
 
 @Composable
 internal fun weatherTint(code: WeatherCode, isDay: Boolean): Color =
-    com.bloo.uicommon.weatherTint(code, isDay, MaterialTheme.colorScheme.onSurfaceVariant)
+    weatherTint(code, isDay, MaterialTheme.colorScheme.onSurfaceVariant)
 
 /**
  * A compact one-line weather readout: icon, temperature and condition, with a small [caption] underneath
@@ -203,7 +203,7 @@ private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifi
         RevealText(label, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         WeatherGlyph(hour.condition, true, 22.dp)
         RevealText(
-            com.bloo.bluelink.data.weatherTemp(hour.tempC, fahrenheit),
+            weatherTemp(hour.tempC, fahrenheit),
             style = PrimaryTextStyle(),
             fontWeight = FontWeight.SemiBold,
         )
