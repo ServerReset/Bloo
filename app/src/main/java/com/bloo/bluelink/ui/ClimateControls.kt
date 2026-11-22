@@ -89,6 +89,10 @@ import com.bloo.uicommon.ButtonPaddingH
 import com.bloo.uicommon.ChipPaddingH
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 
 /**
  * Reusable climate-control pieces: seat/wheel heat controls, preset pills and the charge-limit pill
@@ -318,6 +322,12 @@ internal fun ChargeLimitPill(
 ) {
     val haptics = LocalHaptics.current
     val step = { onValueChange(if (limit >= 100) 50 else limit + 10) }
+    val valueStyle = PrimaryTextStyle()
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val widestValue = remember(valueStyle, density) {
+        with(density) { measurer.measure("100%", valueStyle.copy(fontWeight = FontWeight.Bold)).size.width.toDp() }
+    }
     Column(Modifier.fillMaxWidth()) {
         ButtonCluster(
             listOf(
@@ -338,7 +348,11 @@ internal fun ChargeLimitPill(
                         ButtonIcon(icon)
                         Spacer(Modifier.width(ButtonIconGap))
                         RevealText(label, style = PrimaryTextStyle(), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        RollingNumber(text = "$limit%", style = PrimaryTextStyle(), fontWeight = FontWeight.Bold)
+                        // Held at the width "100%" takes, right-aligned: a three-digit value otherwise widened this half and narrowed
+                        // "Set", so the AC and DC rows stopped lining up.
+                        Box(Modifier.widthIn(min = widestValue), contentAlignment = Alignment.CenterEnd) {
+                            RollingNumber(text = "$limit%", style = valueStyle, fontWeight = FontWeight.Bold)
+                        }
                     }
                 },
                 // "Set": sends the command; active while it is in flight.
