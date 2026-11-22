@@ -69,6 +69,39 @@ anr_stack() {
   adb shell "cat /data/anr/$f" | awk '/^"main"/{p=1} p{print} /^$/{if(p) exit}' | head -60
 }
 
+# Every text and content description on screen, so a run shows what the taps could have matched.
+labels() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || return
+  echo "=====LABELS"
+  python3 - <<'PY'
+import re
+xml = open("/tmp/ui.xml", encoding="utf-8", errors="ignore").read()
+seen = []
+for n in re.findall(r'<node [^>]*>', xml):
+    for attr in ("text", "content-desc"):
+        m = re.search(' %s="([^"]+)"' % attr, n)
+        if m and m.group(1) not in seen: seen.append(m.group(1))
+print(" | ".join(seen[:80]))
+PY
+}
+
+# The same garage swipes with the system Battery Saver on, which runs the app lean (solid fills instead of live
+# blur, plain fades instead of springs): the difference between the two timings is what the glass costs.
+lean_pass() {
+  adb shell cmd power set-mode 1
+  launch 20
+  alive lean
+  adb shell dumpsys gfxinfo $PKG reset >/dev/null
+  for i in 1 2 3 4 5 6; do
+    adb shell input swipe 950 1200 130 1200 280; sleep 1.5
+    adb shell input swipe 130 1200 950 1200 280; sleep 1.5
+  done
+  frames garage-swipes-lean
+  shot 10-garage-lean
+  adb shell cmd power set-mode 0
+}
+
 fixture() { adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd "$1" >/dev/null; sleep 2; }
 
 frames() {
@@ -92,10 +125,11 @@ adb wait-for-device
 until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
 sleep 45
 adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
+# Root first: it restarts adbd, which would cut a logcat stream started before it.
+adb root >/dev/null 2>&1; sleep 3; adb wait-for-device
 adb logcat -c
 (adb logcat -v brief > /tmp/logcat.txt 2>&1 &)
 
-adb root >/dev/null 2>&1; sleep 3; adb wait-for-device
 adb install -r -g "$APK"
 adb shell wm size
 fixture full
@@ -106,6 +140,8 @@ anr_stack
 sleep 17
 shot 01-garage-dark
 anr_stack
+frames cold-start
+labels
 
 # The card list, scrolled.
 adb shell input swipe 540 1900 540 800 500; sleep 3
@@ -124,7 +160,7 @@ shot 03-second-car-dark
 adb shell input swipe 130 1200 950 1200 280; sleep 3
 
 # The climate card, opened.
-tap_node '^ *Climate *$'; sleep 3
+tap_node 'Climate'; sleep 3
 shot 04-climate-open-dark
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
@@ -140,16 +176,19 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 
 # Settings.
 launch 15
-tap_node '^ *Settings *$'; sleep 4
+labels
+tap_node 'Settings'; sleep 4
 shot 06-settings-dark
 adb shell input swipe 540 1900 540 700 500; sleep 3
 shot 07-settings-dark-scrolled
+
+lean_pass
 
 # The light theme.
 fixture light
 launch 20
 shot 08-garage-light
-tap_node '^ *Climate *$'; sleep 3
+tap_node 'Climate'; sleep 3
 shot 09-climate-open-light
 
 echo "=====CRASHES"
