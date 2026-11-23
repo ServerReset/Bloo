@@ -146,8 +146,8 @@ front() {
 # a quick swipe ends before it has seen enough of the drag to move the pager.
 next_car() { adb shell input swipe 900 600 180 600 2500; sleep 6; }
 prev_car() { adb shell input swipe 180 600 900 600 2500; sleep 6; }
-scroll_down() { adb shell input swipe 540 1800 540 900 600; sleep 3; }
-scroll_up() { adb shell input swipe 540 900 540 1800 600; sleep 3; }
+scroll_down() { adb shell input swipe 540 1800 540 700 1800; sleep 4; }
+scroll_up() { adb shell input swipe 540 700 540 1800 1800; sleep 4; }
 
 fixture full
 fixture dark

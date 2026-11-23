@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only additions, merged into debug builds only, so nothing here ships in a release build. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- The watch's sample cars, for photographing its screens (see WearDebugFixturesReceiver). exported with no permission on
+             purpose: an adb broadcast cannot hold a declared permission. Debug build only, so it never ships. -->
+        <receiver
+            android:name=".WearDebugFixturesReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver" />
+    </application>
+</manifest>
