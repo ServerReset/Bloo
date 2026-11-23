@@ -359,9 +359,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearLogs() = AppLog.clear()
 
     /** Dismiss the current snackbar. */
-    fun clearMessage() = showError(null)
+    fun clearMessage() = _state.update { it.copy(message = null, messageType = ToastKind.ERROR) }
 
-    /** Surface (and log) an error raised by the UI layer. */
     /** Logs [msg] and shows it as an error toast. */
     fun reportError(msg: String) {
         AppLog.log("⚠ $msg")
@@ -369,12 +368,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Shows [msg] as an error toast, without logging it (for callers that log their own, more detailed line). */
-    fun showError(msg: String) = showError(msg)
+    fun showError(msg: String) = _state.update { it.copy(message = msg, messageType = ToastKind.ERROR) }
 
     /** A neutral, non-error snackbar message (e.g. a setup nudge). */
-    fun reportInfo(msg: String) {
-        reportInfo(msg)
-    }
+    fun reportInfo(msg: String) = _state.update { it.copy(message = msg, messageType = ToastKind.INFO) }
 
     /** Switch between simple and advanced settings view. */
     fun setSettingsMode(mode: String) {
