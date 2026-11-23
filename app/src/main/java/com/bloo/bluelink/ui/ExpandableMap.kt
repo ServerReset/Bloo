@@ -237,12 +237,7 @@ internal fun ExpandableMapLayer(
     val pull = remember { MapPullState() }
     // The gap above the sheet: how far it can rise before it meets the top of the screen.
     val gapPx = LocalWindowInfo.current.containerSize.height * 0.15f
-    val refreshIndicator = LocalRefreshIndicator.current
-    // Keep the shared indicator spinning for as long as the location request is actually running.
-    DisposableEffect(refreshing) {
-        refreshIndicator?.setRefreshing(pull, refreshing)
-        onDispose { refreshIndicator?.setRefreshing(pull, false) }
-    }
+    KeepRefreshSpinning(pull, refreshing)
     // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
     // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't be
     // called from inside a suspend lambda.
@@ -261,12 +256,7 @@ internal fun ExpandableMapLayer(
     // The bar's details, held here: a dismiss folds them back to the car's single line first.
     // Opening the map on a car shows that car's line, half expanded, and the bar comes down with the map. The details open on a tap.
     var barDetailsOpen by remember { mutableStateOf(false) }
-    // The bar's one state, from what is selected and whether its details are open. Nothing selected is always the handle.
-    val barMode = when {
-        !barSelected -> MapBarMode.Handle
-        barDetailsOpen -> MapBarMode.Details
-        else -> MapBarMode.Line
-    }
+    val barMode = mapBarMode(barSelected, barDetailsOpen)
     // The top bar and bottom buttons exist only once the chrome's own track has left zero. A derived
     // boolean, so the sheet recomposes when it FLIPS, not on every frame of the springs.
     val chromeShown by remember { derivedStateOf { chrome.value > 0.01f } }
@@ -274,17 +264,7 @@ internal fun ExpandableMapLayer(
     // The bar shows while the map is open, and also while it is closed in its card once a car is selected by a tap on its icon.
     val barVisible = isExpanded || barSelected
     SideEffect { chromeInsets?.chromeOn = barVisible && chromeShown }
-    // Once the bars have settled after opening, log where they were measured, so an edge marker under the bar can be traced from a log.
-    LaunchedEffect(isExpanded, chromeShown, barDetailsOpen) {
-        if (isExpanded && chromeShown) {
-            kotlinx.coroutines.delay(500)
-            chromeInsets?.let {
-                AppLog.log(
-                    "Map chrome: mapTop=${it.mapTop} mapBottom=${it.mapBottom} barBottom=${it.barBottom} rowTop=${it.rowTop} topPx=${it.topPx()}",
-                )
-            }
-        }
-    }
+    LogMapChromeWhenSettled(isExpanded && chromeShown, barDetailsOpen, chromeInsets)
     // Closed, the bar comes in on a selection and goes again when it is cleared (opening and closing run their own motion).
     LaunchedEffect(barSelected) {
         if (!isExpanded) chrome.animateTo(if (barSelected) 1f else 0f, tween(MapOpenMs))
@@ -554,6 +534,41 @@ internal fun ExpandableMapLayer(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+            }
+        }
+    }
+}
+
+/** The open map bar's one state, from whether a car is selected and whether its details are open. Nothing selected is always the handle. */
+private fun mapBarMode(selected: Boolean, detailsOpen: Boolean): MapBarMode = when {
+    !selected -> MapBarMode.Handle
+    detailsOpen -> MapBarMode.Details
+    else -> MapBarMode.Line
+}
+
+/** Keeps the shared refresh indicator spinning, under [owner], for as long as [refreshing] (the map's location request) runs. */
+@Composable
+private fun KeepRefreshSpinning(owner: Any, refreshing: Boolean) {
+    val refreshIndicator = LocalRefreshIndicator.current
+    DisposableEffect(refreshing) {
+        refreshIndicator?.setRefreshing(owner, refreshing)
+        onDispose { refreshIndicator?.setRefreshing(owner, false) }
+    }
+}
+
+/**
+ * Once the open map's bars have settled ([shown]), logs where they were measured, so an edge marker under a bar can be traced from a
+ * log. Again when the bar's details open or close ([detailsOpen]), which moves them.
+ */
+@Composable
+private fun LogMapChromeWhenSettled(shown: Boolean, detailsOpen: Boolean, chromeInsets: MapChromeInsets?) {
+    LaunchedEffect(shown, detailsOpen) {
+        if (shown) {
+            kotlinx.coroutines.delay(500)
+            chromeInsets?.let {
+                AppLog.log(
+                    "Map chrome: mapTop=${it.mapTop} mapBottom=${it.mapBottom} barBottom=${it.barBottom} rowTop=${it.rowTop} topPx=${it.topPx()}",
+                )
             }
         }
     }

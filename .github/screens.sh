@@ -175,7 +175,9 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 
 front map; launch 20
 # The Location card is under Car info, near the bottom of the garage.
-for i in 1 2 3 4 5 6 7 8 9 10 11 12; do scroll_down; done
+for i in 1 2 3 4 5 6 7 8 9 10; do scroll_down; done
+shot 06b-location-card
+labels
 labels
 shot 06a-garage-dark-bottom
 tap_node 'Map showing where' || true
