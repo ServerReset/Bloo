@@ -324,17 +324,7 @@ internal fun ExpandableMapLayer(
             .fillMaxSize()
             .onGloballyPositioned { rootPos = it.positionOnScreen() }
             // Only while it is open: closed, the map is in its card and the card's swipes and taps must reach it.
-            .then(
-                if (isExpanded) {
-                    Modifier.pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) awaitPointerEvent().changes.forEach { it.consume() }
-                        }
-                    }
-                } else {
-                    Modifier
-                },
-            ),
+            .consumeAllTouches(isExpanded),
     ) {
         // Clear, not blurred: the app behind the map is not dimmed or blurred. Only the strip above the sheet closes it on a tap. A
         // full-screen catcher here would also get every tap on the map, since pointer events reach each node they land on, so a pin
@@ -575,3 +565,11 @@ private fun LogMapChromeWhenSettled(shown: Boolean, detailsOpen: Boolean, chrome
         }
     }
 }
+
+/** While [enabled], takes every touch that reaches this node, so nothing under it (the cards behind the open map) gets one. */
+private fun Modifier.consumeAllTouches(enabled: Boolean): Modifier =
+    if (!enabled) this else pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) awaitPointerEvent().changes.forEach { it.consume() }
+        }
+    }
