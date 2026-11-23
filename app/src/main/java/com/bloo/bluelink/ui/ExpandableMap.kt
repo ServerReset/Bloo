@@ -94,7 +94,6 @@ internal data class MapFeature(
     val onClick: () -> Unit,
 )
 
-/** How long the map takes to open and to close, and the curve: a ramp up and a slowing down, with no overshoot: the map does not bounce. */
 /**
  * The part of the layer's space the map may show, top and bottom, in the layer's own coordinates: between the status bar and the search bar
  * when closed, and the whole layer as the map opens (by [t], 0 closed to 1 open). [root] is the layer's place on screen, or null before it
@@ -107,6 +106,7 @@ private fun visibleBand(root: Offset?, windowH: Float, statusTop: Float, searchC
     return top to bottom
 }
 
+/** How long the map takes to open and to close, and the curve: a ramp up and a slowing down, with no overshoot: the map does not bounce. */
 private const val MapOpenMs = 520
 private const val MapCloseMs = 440
 private val MapOpenEasing = CubicBezierEasing(0.32f, 0f, 0.2f, 1f)

@@ -115,6 +115,8 @@ class MainActivity : FragmentActivity() {
         // The logging switches first: everything after this logs, and the monitor starts only if advanced logging was left on.
         DiagSettings.load(this)
         PerfMonitor.install(this)
+        // A high-refresh screen steps down to a steady 60 Hz while the glass cannot keep up with it (see AdaptiveFrameRate).
+        com.bloo.bluelink.perf.AdaptiveFrameRate.install(this)
         // Seed com.bloo.bluelink.ui.inMultiWindowMode from the Activity's actual starting state --
         // onMultiWindowModeChanged (below) only fires on a TRANSITION, so a cold start directly
         // INTO split-screen/freeform would otherwise never set this at all and StatusBarScrim would
@@ -246,6 +248,7 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         if (current === this) current = null
         PerfMonitor.uninstall()
+        com.bloo.bluelink.perf.AdaptiveFrameRate.uninstall(this)
         runCatching { unregisterReceiver(screenOffReceiver) }
         runCatching { shizukuInstall().unregisterPermissionResultListener() }
         super.onDestroy()

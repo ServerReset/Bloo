@@ -185,16 +185,16 @@ shot 06a-garage-dark-bottom
 scroll_up
 # The map's open and close, recorded and cut into frames: at the emulator's speed each motion takes seconds, so the frames show its
 # whole path rather than one moment.
-adb shell "screenrecord --time-limit 30 /sdcard/map.mp4" &
+adb shell "screenrecord --time-limit 40 /sdcard/map.mp4" &
 rec=$!
 sleep 2
-tap_node 'Map showing where'; sleep 14
+tap_node '^Expand$'; sleep 14
 shot 06-map-dark
-adb shell input keyevent KEYCODE_BACK; sleep 12
+adb shell input keyevent KEYCODE_BACK; sleep 20
 wait $rec
 adb pull /sdcard/map.mp4 /tmp/map.mp4 >/dev/null 2>&1
 if [ -s /tmp/map.mp4 ]; then
-  ffmpeg -loglevel error -i /tmp/map.mp4 -vf "fps=1/3,scale=360:-1" /tmp/mapframe_%02d.jpg
+  ffmpeg -loglevel error -i /tmp/map.mp4 -vf "fps=1/2,scale=360:-1" /tmp/mapframe_%02d.jpg
   for f in /tmp/mapframe_*.jpg; do
     n=$(basename "$f" .jpg)
     echo "=====SHOT motion-$n BEGIN"; base64 -w 0 "$f"; echo; echo "=====SHOT motion-$n END"
