@@ -297,30 +297,18 @@ internal fun OwnerLinks(v: Vehicle, state: UiState, context: Context, vm: AppVie
         val isGen5W = state.isGen5WEffective(v)
         group("Digital Car Key") {
             if (isGen5W) {
-                when (v.brand) {
-                    Brand.HYUNDAI -> MorphActionButton(
+                // The brand's own Digital Key app (DK1): only the US Hyundai and Genesis apps exist for these head units.
+                val keyApp = when (v.brand) {
+                    Brand.HYUNDAI -> "com.hyundaiusa.hyundai.digitalcarkey"
+                    Brand.GENESIS -> "com.genesisusa.genesis.digitalcarkey"
+                    Brand.KIA, Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA, Brand.HYUNDAI_EU -> null
+                }
+                if (keyApp != null) {
+                    MorphActionButton(
                         label = "Digital Key",
                         icon = Icons.Filled.VpnKey,
-                        onClick = {
-                            openApp(
-                                context,
-                                listOf("com.hyundaiusa.hyundai.digitalcarkey"),
-                                "https://play.google.com/store/apps/details?id=com.hyundaiusa.hyundai.digitalcarkey",
-                            )
-                        },
+                        onClick = { openApp(context, listOf(keyApp), "https://play.google.com/store/apps/details?id=$keyApp") },
                     )
-                    Brand.GENESIS -> MorphActionButton(
-                        label = "Digital Key",
-                        icon = Icons.Filled.VpnKey,
-                        onClick = {
-                            openApp(
-                                context,
-                                listOf("com.genesisusa.genesis.digitalcarkey"),
-                                "https://play.google.com/store/apps/details?id=com.genesisusa.genesis.digitalcarkey",
-                            )
-                        },
-                    )
-                    Brand.KIA, Brand.HYUNDAI_CA, Brand.GENESIS_CA, Brand.KIA_CA, Brand.HYUNDAI_EU -> Unit
                 }
             } else {
                 if (isSamsung) {
