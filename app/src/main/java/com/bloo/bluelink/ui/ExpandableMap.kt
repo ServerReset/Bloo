@@ -585,5 +585,10 @@ private fun AskForLocationOnOpen(isExpanded: Boolean, deviceRequest: DeviceLocat
  */
 private fun openingPan(origin: androidx.compose.ui.geometry.Rect, width: Float, height: Float, scale: Float): Pair<Float, Float> {
     val k = scale.coerceAtLeast(0.5f)
-    return (origin.center.x - width / 2f) / k to (origin.center.y - (height - height * 0.85f / 2f)) / k
+    // Where the pin is kept, held inside the open map's clear middle: a card scrolled mostly under the status bar (or down by the search
+    // bar) had its pin there, and the map opened with the car hidden under the top bar or the buttons.
+    val sheetTop = height * 0.15f
+    val pinX = origin.center.x.coerceIn(width * 0.2f, width * 0.8f)
+    val pinY = origin.center.y.coerceIn(sheetTop + height * 0.14f, height * 0.8f)
+    return (pinX - width / 2f) / k to (pinY - (height - height * 0.85f / 2f)) / k
 }
