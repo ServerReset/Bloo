@@ -68,7 +68,10 @@ internal fun AppViewModel.bootstrapColdStart() {
  * interactive login(). After a phone restart (see BootGate) it stops at the sign-in form instead and
  * runs again once the whole re-auth flow has passed.
  */
-internal fun AppViewModel.coldStartAutoLogin() {
+internal fun AppViewModel.coldStartAutoLogin(
+    /** The person has just been confirmed (the restart sign-in's prompt): the app lock is not put up again on top of it. */
+    justConfirmed: Boolean = false,
+) {
     // Debug-only sample garage. A store screenshot cannot sign in, and signing in is exactly what
     // would put a real car's name and location on a public listing -- so the state is fabricated
     // instead (see DebugSampleGarage). This is dead code in a release build: BuildConfig.DEBUG is
@@ -108,7 +111,7 @@ internal fun AppViewModel.coldStartAutoLogin() {
             val keyguard = getApplication<android.app.Application>().getSystemService(android.content.Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
             val justBooted = android.os.SystemClock.elapsedRealtime() < JUST_BOOTED_MS
             val skipAppLockAfterBoot = justBooted && !keyguard.isDeviceLocked
-            if (lockMechanisms && !skipAppLockAfterBoot) {
+            if (lockMechanisms && !skipAppLockAfterBoot && !justConfirmed) {
                 logStartup("Cold start: lock screen required, deferring garage load until unlock")
                 _state.update { it.copy(locked = true) }
             }

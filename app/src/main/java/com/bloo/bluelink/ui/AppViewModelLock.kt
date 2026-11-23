@@ -172,15 +172,16 @@ fun AppViewModel.reauthAfterRestart(
 /** The restart sign-in is complete (details matched, and the one prompt passed when there was one): the app opens without asking again. */
 private fun AppViewModel.openAfterBootReauth() {
     _state.update { it.copy(bootReauth = false) }
-    openBootAndStart()
+    openBootAndStart(justConfirmed = true)
 }
 
 /** Opens this boot for good (see BootGate), clears the "sign in" notification and starts as normal. */
-private fun AppViewModel.openBootAndStart() {
+private fun AppViewModel.openBootAndStart(justConfirmed: Boolean = false) {
     val app = getApplication<android.app.Application>()
     com.bloo.bluelink.data.BootGate.markOpen(app)
     BootReauthNotice.cancel(app)
     BlooWidgetUpdater.requestUpdate(app)
     AutoLockBootReceiver.startWatchIfEnabled(app)
-    coldStartAutoLogin()
+    // The cold start would otherwise put the app lock up again, a second prompt straight after the sign-in's one.
+    coldStartAutoLogin(justConfirmed = justConfirmed)
 }
