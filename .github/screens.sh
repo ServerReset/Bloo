@@ -12,6 +12,7 @@ PKG=com.bloo.bluelink.debug
 APP=com.bloo.bluelink
 APK=$(ls app/build/outputs/apk/sideload/debug/*.apk | head -1)
 command -v convert >/dev/null || sudo apt-get install -y -qq imagemagick >/dev/null
+command -v ffmpeg >/dev/null || sudo apt-get install -y -qq ffmpeg >/dev/null
 
 shot() {
   local name=$1
