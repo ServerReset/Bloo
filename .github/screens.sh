@@ -142,9 +142,10 @@ front() {
 }
 
 # Swipes between cars across the car card at the top, well inside the screen: a swipe from near the edge is the system's back
-# gesture, and one lower down can land on a slider, which takes it.
-next_car() { adb shell input swipe 820 600 260 600 300; sleep 3; }
-prev_car() { adb shell input swipe 260 600 820 600 300; sleep 3; }
+# gesture, and one lower down can land on a slider, which takes it. Slow (2.5 s): the emulator draws a frame every few seconds, and
+# a quick swipe ends before it has seen enough of the drag to move the pager.
+next_car() { adb shell input swipe 900 600 180 600 2500; sleep 6; }
+prev_car() { adb shell input swipe 180 600 900 600 2500; sleep 6; }
 scroll_down() { adb shell input swipe 540 1800 540 900 600; sleep 3; }
 scroll_up() { adb shell input swipe 540 900 540 1800 600; sleep 3; }
 
