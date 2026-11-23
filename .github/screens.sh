@@ -191,13 +191,15 @@ scroll_up
 shot 06c-before-open
 # The map's open and close, recorded and cut into frames: at the emulator's speed each motion takes seconds, so the frames show its
 # whole path rather than one moment.
+adb shell settings put global animator_duration_scale 10
 adb shell "screenrecord --time-limit 40 /sdcard/map.mp4" &
 rec=$!
 sleep 2
-adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd openmap >/dev/null; sleep 14
+adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd openmap >/dev/null; sleep 16
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 20
 wait $rec
+adb shell settings put global animator_duration_scale 1
 adb pull /sdcard/map.mp4 /tmp/map.mp4 >/dev/null 2>&1
 if [ -s /tmp/map.mp4 ]; then
   # Only the frames where the picture changed, so the motion itself is caught rather than the still screen either side of it.
@@ -226,6 +228,8 @@ shot 10-second-car-light
 # grows and shrinks without squashing (its blocks are half the screen at both ends, and should stay so all the way).
 adb shell wm size 1600x2560
 adb shell wm density 320
+# Ten times slower motion (Compose follows the system animator scale), so the emulator's few frames a second land inside the motion.
+adb shell settings put global animator_duration_scale 10
 fixture dark
 launch 25
 shot 11-tablet-two-cars
@@ -245,6 +249,7 @@ if [ -s /tmp/cols.mp4 ]; then
   done
 fi
 adb shell wm size reset; adb shell wm density reset
+adb shell settings put global animator_duration_scale 1
 
 echo "=====CRASHES"
 adb logcat -d -b crash | tail -60
