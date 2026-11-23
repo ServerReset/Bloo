@@ -43,6 +43,9 @@ internal object DebugSampleGarage {
     /** Debug captures only: asks the garage to open its map, as the Location card's Expand does (the captures cannot find the button reliably). */
     val openMapRequests = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    /** Debug captures only: toggles a car between sharing the width and full screen, as its hero's full-screen button does. */
+    val fullScreenRequests = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     private const val PREFS = "bloo_debug_fixtures"
     private const val KEY_GARAGE = "sample_garage"
     private const val KEY_LOCK = "sample_lock"

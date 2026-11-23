@@ -222,6 +222,30 @@ shot 09-garage-light
 front light-second; next_car
 shot 10-second-car-light
 
+# Two columns on a tablet-sized screen (800dp across): a car opening to full screen and back, recorded and cut into frames, to check it
+# grows and shrinks without squashing (its blocks are half the screen at both ends, and should stay so all the way).
+adb shell wm size 1600x2560
+adb shell wm density 320
+fixture dark
+launch 25
+shot 11-tablet-two-cars
+adb shell "screenrecord --time-limit 50 /sdcard/cols.mp4" &
+rec=$!
+sleep 2
+adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd fullscreen >/dev/null; sleep 18
+shot 12-tablet-full-screen
+adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd fullscreen >/dev/null; sleep 18
+wait $rec
+adb pull /sdcard/cols.mp4 /tmp/cols.mp4 >/dev/null 2>&1
+if [ -s /tmp/cols.mp4 ]; then
+  ffmpeg -loglevel error -i /tmp/cols.mp4 -vf "select='gt(scene,0.004)',scale=400:-1" -vsync vfr -frames:v 36 /tmp/colframe_%02d.jpg
+  for f in /tmp/colframe_*.jpg; do
+    n=$(basename "$f" .jpg)
+    echo "=====SHOT motion-$n BEGIN"; base64 -w 0 "$f"; echo; echo "=====SHOT motion-$n END"
+  done
+fi
+adb shell wm size reset; adb shell wm density reset
+
 echo "=====CRASHES"
 adb logcat -d -b crash | tail -60
 echo "=====PERF LOG"

@@ -107,6 +107,9 @@ internal fun GarageScreen(
     // sharing it with its neighbours. Only meaningful in the grid, so a narrow window resets it.
     var fullScreen by remember { mutableStateOf(false) }
     LaunchedEffect(multiColumn) { if (!multiColumn) fullScreen = false }
+    if (com.bloo.bluelink.BuildConfig.DEBUG) {
+        LaunchedEffect(multiColumn) { DebugSampleGarage.fullScreenRequests.collect { if (multiColumn) fullScreen = !fullScreen } }
+    }
     val perPage = if (fullScreen && multiColumn) 1 else naturalColumns
     // THE single experience, scaling to the device: a car reflows to two columns (hero beside its pebbles, hot seat and all) when its
     // own page is wide enough, and stays one column on a narrow window. No second screen, nothing to open or close, except the
