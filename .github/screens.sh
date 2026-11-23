@@ -178,7 +178,7 @@ front map; launch 20
 for i in 1 2 3 4 5 6 7 8 9; do scroll_down; done
 labels
 shot 06a-garage-dark-bottom
-tap_node '(^Location$|Open the map|^Map$)'; sleep 6
+tap_node 'Map showing where'; sleep 8
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 3
 
