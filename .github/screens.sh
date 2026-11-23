@@ -186,14 +186,15 @@ shot 06b-location-card
 labels
 labels
 shot 06a-garage-dark-bottom
-# Ten scrolls leave the map near the top edge; one back brings it into the middle, where a tap on it lands.
+# The scrolls do not land in the same place on every run; one back keeps the Location card on screen, for the map to grow out of.
 scroll_up
+shot 06c-before-open
 # The map's open and close, recorded and cut into frames: at the emulator's speed each motion takes seconds, so the frames show its
 # whole path rather than one moment.
 adb shell "screenrecord --time-limit 40 /sdcard/map.mp4" &
 rec=$!
 sleep 2
-tap_node '^Expand$' 280 285; sleep 14
+adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd openmap >/dev/null; sleep 14
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 20
 wait $rec

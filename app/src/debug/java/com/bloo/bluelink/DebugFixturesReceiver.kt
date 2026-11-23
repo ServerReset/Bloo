@@ -20,6 +20,7 @@ import com.bloo.bluelink.ui.DebugSampleGarage
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd light
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd dark
+ *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd openmap   (the running app, now)
  *
  * The flags are persisted, so the effect lands on the next cold start rather than needing the app
  * to already be running.
@@ -39,6 +40,11 @@ class DebugFixturesReceiver : BroadcastReceiver() {
             // theme has to be written through its own store.
             "light" -> DebugSampleGarage.setTheme(context, "light")
             "dark" -> DebugSampleGarage.setTheme(context, "dark")
+            "openmap" -> {
+                DebugSampleGarage.openMapRequests.tryEmit(Unit)
+                AppLog.log("DebugFixturesReceiver: cmd=openmap")
+                return
+            }
             else -> {
                 AppLog.log("DebugFixturesReceiver: unknown cmd '$cmd'")
                 return

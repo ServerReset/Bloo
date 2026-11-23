@@ -49,6 +49,9 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
     LaunchedEffect(Unit) { snapshotFlow { pins }.collect { centralMap.cars = it } }
     val locations by remember { derivedStateOf(structuralEqualityPolicy()) { state.value.locations } }
     LaunchedEffect(centralMap.vin) { vm.setMapExpanded(centralMap.vin != null) }
+    if (com.bloo.bluelink.BuildConfig.DEBUG) {
+        LaunchedEffect(Unit) { DebugSampleGarage.openMapRequests.collect { centralMap.homeVin?.let(centralMap::open) } }
+    }
     // A car chosen on the map becomes the app's current car, so the garage travels to it behind the map.
     SideEffect {
         centralMap.onCarChosen = { vin ->

@@ -40,6 +40,9 @@ import com.bloo.bluelink.data.VehicleStatus
  *   adb shell am broadcast -n com.bloo.bluelink/.DebugFixturesReceiver --es cmd off
  */
 internal object DebugSampleGarage {
+    /** Debug captures only: asks the garage to open its map, as the Location card's Expand does (the captures cannot find the button reliably). */
+    val openMapRequests = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     private const val PREFS = "bloo_debug_fixtures"
     private const val KEY_GARAGE = "sample_garage"
     private const val KEY_LOCK = "sample_lock"
