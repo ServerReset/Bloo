@@ -170,14 +170,7 @@ internal fun ExpandableMapLayer(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val mapHazeState = remember { HazeState() }
-    // Opening the map asks for location once per run if there's no fix yet, AND always grabs a
-    // fresh fix so the "you are here" dot is current rather than whatever was last seen.
-    LaunchedEffect(isExpanded) {
-        if (isExpanded) {
-            deviceRequest?.askOnce?.invoke()
-            deviceRequest?.refresh?.invoke()
-        }
-    }
+    AskForLocationOnOpen(isExpanded, deviceRequest)
     val showMe = rememberShowMyLocation(location, deviceLocation, mapState, deviceRequest)
 
     // The overlay's own place on screen: the pebble's rect is in screen coordinates, and the map is placed in this box's.
@@ -219,11 +212,8 @@ internal fun ExpandableMapLayer(
         // what carries the pin to the middle of the collapsed map.
         val root = rootPos ?: return@LaunchedEffect
         AppLog.log("Map: placed at ${root.x.toInt()},${root.y.toInt()}, opening")
-        val o = originBounds().translate(-root.x, -root.y)
-        val w = windowSize.width.toFloat()
-        val h = windowSize.height.toFloat()
-        val k = mapState.scale.coerceAtLeast(0.5f)
-        mapState.panTo((o.center.x - w / 2f) / k, (o.center.y - (h - h * 0.85f / 2f)) / k)
+        val (panX, panY) = openingPan(originBounds().translate(-root.x, -root.y), windowSize.width.toFloat(), windowSize.height.toFloat(), mapState.scale)
+        mapState.panTo(panX, panY)
         PerfMonitor.scope("map-open", 1_000)
         // The sheet grows and the bar flies in together: the bar comes down from above the screen, under the status bar, and
         // overshoots its place a little before it settles.
@@ -573,3 +563,27 @@ private fun Modifier.consumeAllTouches(enabled: Boolean): Modifier =
             while (true) awaitPointerEvent().changes.forEach { it.consume() }
         }
     }
+
+/**
+ * Opening the map asks for the device location once per run if there is no fix yet, and always fetches a fresh one, so the "you are
+ * here" dot is current rather than whatever was last seen.
+ */
+@Composable
+private fun AskForLocationOnOpen(isExpanded: Boolean, deviceRequest: DeviceLocationRequest?) {
+    LaunchedEffect(isExpanded) {
+        if (isExpanded) {
+            deviceRequest?.askOnce?.invoke()
+            deviceRequest?.refresh?.invoke()
+        }
+    }
+}
+
+/**
+ * The pan an opening starts from, so the car's pin stays where it was on screen: the card's map ([origin], in the overlay's coordinates)
+ * is this far from the middle of the sheet (85% of the [height], at the bottom of a [width]-wide window), divided by the map's [scale].
+ * The pan ramps in with the opening (see MapInputs.panWeight), so the map opens off-centre and just grows.
+ */
+private fun openingPan(origin: androidx.compose.ui.geometry.Rect, width: Float, height: Float, scale: Float): Pair<Float, Float> {
+    val k = scale.coerceAtLeast(0.5f)
+    return (origin.center.x - width / 2f) / k to (origin.center.y - (height - height * 0.85f / 2f)) / k
+}
