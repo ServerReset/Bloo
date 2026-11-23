@@ -297,26 +297,7 @@ internal fun ClimatePebble(
     ) {
         // No hero: the summary is the same expression and already renders as the tile headline.
         if (running) {
-            if (climateOn) {
-                RevealMutedText("On at the car. Read-only while the car is running.")
-                status.airTemp?.let { t ->
-                    t.value?.let { StatusRow("Set to", degLabel(it, fahrenheit, t.unit)) }
-                }
-                status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
-                status.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
-                status.seatHeaterVentState?.let { s ->
-                    listOf(
-                        "Driver seat" to s.flSeatHeatState,
-                        "Passenger seat" to s.frSeatHeatState,
-                        "Rear left seat" to s.rlSeatHeatState,
-                        "Rear right seat" to s.rrSeatHeatState,
-                    ).forEach { (label, level) ->
-                        if (level != null) StatusRow(label, seatLevelLabel(level))
-                    }
-                }
-            } else {
-                RevealMutedText("Climate can't be started while the car is running.")
-            }
+            ClimateWhileRunning(status?.takeIf { climateOn }, fahrenheit)
             return@Pebble
         }
 
@@ -343,44 +324,26 @@ internal fun ClimatePebble(
             )
         }
 
-        // Presets and seats & wheel are all shown inline, each in its own inner panel, so the climate controls are
-        // in reach without opening anything first. They give way to the running summary while climate is on.
+        // Presets and the controls are shown inline, each in its own inner panel, so the climate controls are in reach without opening
+        // anything first. They give way to the running summary while climate is on.
         ExpandVisibility(!climateOn) {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
-                // Only once there is a preset: with none, the panel was an empty pill (the way to make one is "Save as preset" below).
-                // It folds away with the list, so deleting the last preset still animates out.
-                ExpandVisibility(presets.isNotEmpty()) { ClimateSubPanel {
-                    ClimatePresetSection(
-                        presets = presets,
-                        activeId = activePresetId,
-                        fahrenheit = fahrenheit,
-                        onStart = startPreset,
-                        onDelete = { id ->
-                            if (activePresetId == id) activePresetId = null
-                            vm.deleteClimatePreset(v, id)
-                        },
-                        onReorder = { vm.reorderClimatePresets(v, it) },
-                        onUpdate = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
-                        steeringLevels = steeringLevels,
-                        seats = seats,
-                        showSeats = showSeatControls,
-                    )
-                } }
-                // No heading: the panel is the temperature, the duration and the features as well as the seats and wheel, and a
-                // heading naming the card again ("Climate") would add a word and no meaning.
-                ClimateSubPanel {
-                    ClimateControlsSection(
-                        form = form,
-                        fahrenheit = fahrenheit,
-                        seats = seats,
-                        // state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here
-                        // too.
-                        showSeats = showSeatControls,
-                        onSaveAsPreset = { showAddPreset = true },
-                        steeringLevels = steeringLevels,
-                    )
-                }
-            }
+            ClimatePanels(
+                presets = presets,
+                activePresetId = activePresetId,
+                fahrenheit = fahrenheit,
+                form = form,
+                seats = seats,
+                showSeats = showSeatControls,
+                steeringLevels = steeringLevels,
+                onStartPreset = startPreset,
+                onDeletePreset = { id ->
+                    if (activePresetId == id) activePresetId = null
+                    vm.deleteClimatePreset(v, id)
+                },
+                onReorderPresets = { vm.reorderClimatePresets(v, it) },
+                onUpdatePreset = { id, name, request -> vm.updateClimatePreset(v, id, name, request) },
+                onSaveAsPreset = { showAddPreset = true },
+            )
         }
 
         ExpandVisibility(showAddPreset && !climateOn) {
@@ -396,6 +359,85 @@ internal fun ClimatePebble(
                 presetName = presets.firstOrNull { it.id == activePresetId }?.name,
                 fahrenheit = fahrenheit,
             )
+        }
+    }
+}
+
+/** The presets (once there is one) and the controls, each in its own inner panel. */
+@Composable
+private fun ClimatePanels(
+    presets: List<ClimatePreset>,
+    activePresetId: String?,
+    fahrenheit: Boolean,
+    form: ClimateFormState,
+    seats: SeatConfig,
+    showSeats: Boolean,
+    steeringLevels: List<WheelHeatLevel>,
+    onStartPreset: (ClimatePreset) -> Unit,
+    onDeletePreset: (String) -> Unit,
+    onReorderPresets: (List<ClimatePreset>) -> Unit,
+    onUpdatePreset: (id: String, name: String, request: ClimateRequest) -> Unit,
+    onSaveAsPreset: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(GapGroup)) {
+        // Only once there is a preset: with none, the panel was an empty pill (the way to make one is "Save as preset" below).
+        // It folds away with the list, so deleting the last preset still animates out.
+        ExpandVisibility(presets.isNotEmpty()) {
+            ClimateSubPanel {
+                ClimatePresetSection(
+                    presets = presets,
+                    activeId = activePresetId,
+                    fahrenheit = fahrenheit,
+                    onStart = onStartPreset,
+                    onDelete = onDeletePreset,
+                    onReorder = onReorderPresets,
+                    onUpdate = onUpdatePreset,
+                    steeringLevels = steeringLevels,
+                    seats = seats,
+                    showSeats = showSeats,
+                )
+            }
+        }
+        // No heading: the panel is the temperature, the duration and the features as well as the seats and wheel, and a heading naming
+        // the card again ("Climate") would add a word and no meaning.
+        ClimateSubPanel {
+            ClimateControlsSection(
+                form = form,
+                fahrenheit = fahrenheit,
+                seats = seats,
+                // The caller passes state.powertrainOf, not the raw v.isEv: a user's powertrain override is honoured here too.
+                showSeats = showSeats,
+                onSaveAsPreset = onSaveAsPreset,
+                steeringLevels = steeringLevels,
+            )
+        }
+    }
+}
+
+/**
+ * The climate card while the car is running, when remote climate commands are refused: what the car reports it is set to if climate
+ * is on ([status] non-null), read-only, or why it cannot be started if it is off.
+ */
+@Composable
+private fun ClimateWhileRunning(status: VehicleStatus?, fahrenheit: Boolean) {
+    if (status == null) {
+        RevealMutedText("Climate can't be started while the car is running.")
+        return
+    }
+    RevealMutedText("On at the car. Read-only while the car is running.")
+    status.airTemp?.let { t ->
+        t.value?.let { StatusRow("Set to", degLabel(it, fahrenheit, t.unit)) }
+    }
+    status.defrost?.let { StatusRow("Defrost", if (it) "On" else "Off") }
+    status.steerWheelHeat?.let { StatusRow("Steering wheel heat", onOff(it)) }
+    status.seatHeaterVentState?.let { s ->
+        listOf(
+            "Driver seat" to s.flSeatHeatState,
+            "Passenger seat" to s.frSeatHeatState,
+            "Rear left seat" to s.rlSeatHeatState,
+            "Rear right seat" to s.rrSeatHeatState,
+        ).forEach { (label, level) ->
+            if (level != null) StatusRow(label, seatLevelLabel(level))
         }
     }
 }
