@@ -237,6 +237,8 @@ internal fun ExpandableMapLayer(
     val pull = remember { MapPullState() }
     // The gap above the sheet: how far it can rise before it meets the top of the screen.
     val gapPx = LocalWindowInfo.current.containerSize.height * 0.15f
+    // The shared refresh disc: held spinning while the location request runs, and dropped in by a pull on the bar (below).
+    val refreshIndicator = LocalRefreshIndicator.current
     KeepRefreshSpinning(pull, refreshing)
     // Read here, at composable scope, not inline inside the scope.launch{} blocks below --
     // lowPowerAwareSpring is itself @Composable (it reads battery-saver state), so it can't be
