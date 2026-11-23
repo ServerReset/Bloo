@@ -134,8 +134,8 @@ internal fun rememberShowMyLocation(
 @Composable
 internal fun MapFeatureRow(features: List<MapFeature>, modifier: Modifier = Modifier) {
     Box(modifier.padding(horizontal = GapGroup, vertical = GapRow)) {
-        // Never wraps onto a second line: when the labels do not fit, the buttons drop to their icons.
-        ExpressiveButtonGroup(modifier = Modifier.fillMaxWidth(), spacing = GapRow, wrap = false) {
+        // Never wraps onto a second line: when the labels do not all fit, every button drops to its icon, so the row stays one set.
+        ExpressiveButtonGroup(modifier = Modifier.fillMaxWidth(), spacing = GapRow, wrap = false, collapseTogether = true) {
             features.forEach { feature ->
                 MorphActionButton(
                     label = feature.label, icon = feature.icon, onClick = feature.onClick, enabled = feature.enabled,

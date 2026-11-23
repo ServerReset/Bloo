@@ -48,6 +48,12 @@ fun ExpressiveButtonGroup(
      * pebble header chevron, the lock group), where a single icon button must never balloon.
      */
     growWhenAlone: Boolean = true,
+    /**
+     * When a line cannot hold every label, all of its buttons drop to their symbols together, not just enough of them to fit. For a
+     * toolbar that should read as one set (the map's buttons): a mix of words and bare symbols there looked unfinished, and which
+     * buttons kept their words changed as the room settled.
+     */
+    collapseTogether: Boolean = false,
     content: @Composable ExpressiveButtonGroupScope.() -> Unit,
 ) {
     // Natural (unpressed) child widths from the last resting pass. Deliberately not snapshot state:
@@ -180,7 +186,9 @@ fun ExpressiveButtonGroup(
                     !resting && prior != null && prior.size == n -> prior
                     else -> {
                         val margin = if (prior != null && prior.size == n && prior.any { it }) collapseReturnMarginPx else 0
-                        chooseSymbolOnly(memberIdx, full, ::compactWidths, room, margin)
+                        chooseSymbolOnly(memberIdx, full, ::compactWidths, room, margin).also { chosen ->
+                            if (collapseTogether && memberIdx.any { chosen[it] }) for (i in memberIdx) chosen[i] = true
+                        }
                     }
                 }
                 if (constraints.hasBoundedWidth) naturals.decided[li] = collapsed
