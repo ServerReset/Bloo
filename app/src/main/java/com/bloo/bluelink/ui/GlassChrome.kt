@@ -295,28 +295,11 @@ internal fun BoxScope.GlassCardBackdrop(shape: Shape, tint: Color) {
     // TRANSPARENT one, so it still reads as glass rather than a solid card.
     val haze = LocalBackdropHaze.current.takeUnless { floating }
     val ultra = LocalAppearance.current.ultraGlass
-    val blur = LocalPagerBlur.current
-    val drawBlur = androidx.compose.runtime.remember(blur) { androidx.compose.runtime.derivedStateOf { blur() > 0.01f } }
-    // The card keeps its blur while the garage moves; the blur's own fade and the tint are the only things that change.
     if (haze != null && blurCapable()) {
-        Box(
-            Modifier.matchParentSize()
-                // Faded, and not drawn at all at 0: while it is skipped Haze does no capture or blur work.
-                // The fade lives in the layer (a re-composite, not a redraw); only crossing the on/off
-                // threshold invalidates the draw. Reading blur() in drawWithContent made every card re-capture
-                // and re-blur its backdrop on every frame of the post-swipe fade.
-                .graphicsLayer {
-                    alpha = blur()
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
-                }
-                .drawWithContent { if (drawBlur.value) drawContent() }
-                .clip(shape)
-                // ALWAYS the cheap blur, even in Ultra glass. A card is large and flat: the liquid
-                // refraction's edge bend is lost across it, but the displacement + chromatic pass is
-                // paid in full, on the most numerous glass nodes on the screen and again on every
-                // tick the aurora moves. Refraction stays where it reads: the floating surfaces.
-                .appHazeEffect(haze, cheap = true),
-        )
+        // No backdrop blur under a card. What is behind every card is the aurora alone (see AuroraBackground: a few radial gradients,
+        // each about half the screen across), and a 20dp blur of something that smooth gives back the same picture, so each card paid a
+        // full capture-and-blur pass, on every frame it moved and on every aurora tick, for no visible change. The veil over the aurora is
+        // the frosted look.
         // The veil and sheen are plain draws and stay on while moving.
         Box(
             Modifier
