@@ -26,9 +26,11 @@ shot() {
   echo "=====SHOT $name END"
 }
 
-# Taps the centre of the first on-screen node whose text or content description matches the regex [$1].
+# Taps the centre of the first on-screen node whose text or content description matches the regex [$1], or the point [$2 $3]
+# when the screen cannot be read: uiautomator gives up waiting for an idle screen while the ambient background is still moving.
 tap_node() {
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  rm -f /tmp/ui.xml; adb shell rm -f /sdcard/ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml 2>&1 | tail -1
   adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
   local xy
   xy=$(python3 - "$1" <<'PY'
@@ -49,6 +51,9 @@ PY
   if [ -n "$xy" ]; then
     echo "tap '$1' at $xy"
     adb shell input tap $xy
+  elif [ -n "${2:-}" ]; then
+    echo "no node matches '$1': tapping $2 $3"
+    adb shell input tap "$2" "$3"
   else
     echo "no node matches '$1'"
   fi
@@ -188,7 +193,7 @@ scroll_up
 adb shell "screenrecord --time-limit 40 /sdcard/map.mp4" &
 rec=$!
 sleep 2
-tap_node '^Expand$'; sleep 14
+tap_node '^Expand$' 280 285; sleep 14
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 20
 wait $rec
