@@ -36,3 +36,12 @@ class ChargeFormatTest {
         assertEquals("100 mi", formatKmDistance(160.9, metric = false, decimals = 0))
     }
 }
+
+/** Pins the forecast's bare degrees: a whole number in the preferred unit with no unit letter. */
+class WeatherDegreesTest {
+    @Test
+    fun degreesInEitherUnit() {
+        assertEquals("39°", weatherDegrees(3.9, fahrenheit = true))
+        assertEquals("4°", weatherDegrees(3.9, fahrenheit = false))
+    }
+}

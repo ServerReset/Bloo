@@ -27,6 +27,10 @@ fun weatherTemp(tempC: Double, fahrenheit: Boolean): String =
 
     if (fahrenheit) "${cToF(tempC).roundToInt()}°F" else "${tempC.roundToInt()}°C"
 
+/** A temperature as bare degrees in the preferred unit ("39°"), for a tight spot where the unit is already plain, as in the forecast. */
+fun weatherDegrees(tempC: Double, fahrenheit: Boolean): String =
+    "${(if (fahrenheit) cToF(tempC) else tempC).roundToInt()}°"
+
 /**
  * The one mile/kilometre conversion factor, exact. Those are not reciprocals -- 1 / 0.621371 =
  * 1.609344 -- so a Canadian metric user's value round-tripped lossily through the API boundary and

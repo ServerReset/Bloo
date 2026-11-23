@@ -180,9 +180,9 @@ shot 06b-location-card
 labels
 labels
 shot 06a-garage-dark-bottom
-tap_node 'Map showing where' || true
-# The map is drawn by the app's root overlay over the card's slot, so its node can be missing from the dump; tap where it is.
-adb shell input tap 540 1900; sleep 8
+# Ten scrolls leave the map near the top edge; one back brings it into the middle, where a tap on it lands.
+scroll_up
+tap_node 'Map showing where'; sleep 8
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 3
 

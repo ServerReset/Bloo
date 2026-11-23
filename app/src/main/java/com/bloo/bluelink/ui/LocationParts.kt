@@ -34,7 +34,6 @@ import com.bloo.bluelink.data.Weather
 import com.bloo.bluelink.data.WeatherCode
 import com.bloo.bluelink.data.cToF
 import com.bloo.bluelink.data.formatSpeed
-import com.bloo.bluelink.data.weatherTemp
 import com.bloo.uicommon.PrimaryTextStyle
 import com.bloo.uicommon.SecondaryTextStyle
 import kotlin.math.roundToInt
@@ -46,6 +45,7 @@ import com.bloo.uicommon.GapSection
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.weatherIcon
 import com.bloo.uicommon.weatherTint
+import com.bloo.bluelink.data.weatherDegrees
 
 /**
  * A weather symbol in its condition's own tint -- the icon + tint + size every weather surface
@@ -202,10 +202,12 @@ private fun HourCell(hour: HourPoint, fahrenheit: Boolean, label: String, modifi
     ) {
         RevealText(label, style = SecondaryTextStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         WeatherGlyph(hour.condition, true, 22.dp)
+        // Bare degrees on one line, as the week rows below show them: "39°F" did not fit the cell and broke the unit onto a line of its own.
         RevealText(
-            weatherTemp(hour.tempC, fahrenheit),
+            weatherDegrees(hour.tempC, fahrenheit),
             style = PrimaryTextStyle(),
             fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
         RevealText(
             hour.precipProbability?.takeIf { it > 0 }?.let { "$it%" } ?: " ",
