@@ -30,11 +30,11 @@ round() {
   sleep 30
   adb shell dumpsys gfxinfo $PKG reset >/dev/null
   for i in 1 2 3; do
-    adb shell input swipe 900 600 180 600 2500; sleep 5
-    adb shell input swipe 180 600 900 600 2500; sleep 5
+    adb shell input swipe 450 300 90 300 2500; sleep 5
+    adb shell input swipe 90 300 450 300 2500; sleep 5
   done
-  for i in 1 2 3; do adb shell input swipe 540 1800 540 700 1800; sleep 4; done
-  for i in 1 2 3; do adb shell input swipe 540 700 540 1800 1800; sleep 4; done
+  for i in 1 2 3; do adb shell input swipe 270 900 270 350 1800; sleep 4; done
+  for i in 1 2 3; do adb shell input swipe 270 350 270 900 1800; sleep 4; done
   echo "=====PERF $label"
   # Exact per-frame times from the last 120 frames (framestats), not gfxinfo's coarse buckets.
   adb shell dumpsys gfxinfo $PKG framestats > /tmp/fs.txt
