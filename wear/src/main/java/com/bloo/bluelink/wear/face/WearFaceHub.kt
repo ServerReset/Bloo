@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.uicommon.AnimatedValue
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.foundation.layout.Arrangement
 
 /**
  * The centre of the face: the value where the quarters meet (the charge or fuel, or the lock state), what the car is doing under it
@@ -57,7 +58,13 @@ fun WearFaceHub(
             .padding(horizontal = size * 0.12f, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // The value and the lines under it are one centred stack. The lines used to be pinned to the hub's bottom on their own, and
+        // with two state lines ("Parked", "Locked") they grew up into the value and drew over it (seen on the watch captures).
+        val stateLines = if (status == null) state.split(" · ").filter { it.isNotBlank() } else emptyList()
+        val lineCount = stateLines.size + if ((status?.text ?: caption).isNotBlank()) 1 else 0
+        // With two or more lines under it the value takes a little less of the hub, so the whole stack fits inside the circle.
+        val valueShare = if (lineCount >= 2) 0.30f else 0.36f
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             AnimatedValue(
                 value = value,
                 style = TextStyle(
@@ -69,23 +76,15 @@ fun WearFaceHub(
                     // In dp-sized text: the hub is a fixed circle, so the value must not grow with the font setting.
                     // A long value ("Unlocked" for a car with no charge to show) shrinks to fit the hub instead of breaking mid-word.
                     fontSize = with(LocalDensity.current) {
-                        val base = (size.value * 0.36f).coerceIn(18f, 40f)
+                        val base = (size.value * valueShare).coerceIn(18f, 40f)
                         (if (value.length > 4) (base * 4.5f / value.length).coerceAtLeast(12f) else base).dp.toSp()
                     },
                 ),
                 reduceMotion = false,
             )
-        }
-        // The state sits at the bottom of the hub, as in the phone app, so the value keeps the middle and no line runs into it.
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = size * 0.1f),
-        ) {
             // The car's state can run to two lines ("Parked · Locked · Climate on"); cut to one it read as "Parked · L…".
             // One short line per part of the state ("Parked", then "Locked"), so no line is wider than the hub and nothing is cut off.
-            if (state.isNotBlank() && status == null) {
-                state.split(" · ").filter { it.isNotBlank() }.forEach { HubLine(it, scheme.onSurface, size) }
-            }
+            stateLines.forEach { HubLine(it, scheme.onSurface, size) }
             val line = status?.text ?: caption
             if (line.isNotBlank()) {
                 HubLine(
