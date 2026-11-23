@@ -93,16 +93,22 @@ internal fun StatusBarScrim(haze: HazeState? = LocalBackdropHaze.current, mapOpe
     val topAlpha = if (dark) StatusStripTintAlpha else StatusStripTintAlpha * 2f
     // While the big map is open the whole app is blurred evenly (MapBlurLayer), so the strip cross-fades from its tapering frost to the
     // same even blur over the map's own duration: the status bar then continues the blur with no seam.
-    val mapAmount by androidx.compose.animation.core.animateFloatAsState(
+    val mapAmount = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (mapOpen) 1f else 0f,
         animationSpec = androidx.compose.animation.core.tween(320),
         label = "statusMapBlur",
     )
+    // Each blur is composed only while it can be seen: one at alpha 0 still cost a blur pass every frame on devices that draw it anyway.
+    // Read as two flags, so the strip recomposes when a layer comes or goes, not on every frame of the cross-fade.
+    val frostShown by remember { androidx.compose.runtime.derivedStateOf { mapAmount.value < 1f } }
+    val evenShown by remember { androidx.compose.runtime.derivedStateOf { mapAmount.value > 0f } }
     Box(Modifier.fillMaxWidth().height(topInset).clipToBounds()) {
         if (haze != null && canBlurBackdrops()) {
             // Strongest at the very top, none at the bar's bottom edge.
-            Box(Modifier.matchParentSize().graphicsLayer { alpha = 1f - mapAmount }.appHazeEffect(haze, progressive = true, progressiveEnd = 0f))
-            Box(Modifier.matchParentSize().graphicsLayer { alpha = mapAmount }.appHazeEffect(haze))
+            if (frostShown) {
+                Box(Modifier.matchParentSize().graphicsLayer { alpha = 1f - mapAmount.value }.appHazeEffect(haze, progressive = true, progressiveEnd = 0f))
+            }
+            if (evenShown) Box(Modifier.matchParentSize().graphicsLayer { alpha = mapAmount.value }.appHazeEffect(haze))
         }
         Box(
             Modifier.matchParentSize().background(
