@@ -174,7 +174,8 @@ shot 05-climate-open-dark
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
 front map; launch 20
-scroll_down; scroll_down; scroll_down; scroll_down; scroll_down
+# The Location card is under Car info, near the bottom of the garage.
+for i in 1 2 3 4 5 6 7 8 9; do scroll_down; done
 labels
 shot 06a-garage-dark-bottom
 tap_node '(^Location$|Open the map|^Map$)'; sleep 6
