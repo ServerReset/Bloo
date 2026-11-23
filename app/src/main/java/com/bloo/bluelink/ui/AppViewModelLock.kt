@@ -138,22 +138,26 @@ fun AppViewModel.reauthAfterRestart(
         // The vault reports itself locked only once a read has failed, so the details are checked first and the lock looked at after.
         var ok = matches()
         val vaultLocked = withContext(Dispatchers.IO) { credentialStore.secretsLocked }
-        if (!ok && !vaultLocked) {
-            reportError("Those details don't match.")
-            return@launch
-        }
         val appLockArmed = withContext(Dispatchers.IO) {
             val a = settingsStore.appearance.first()
             a.biometricLock && canUseBiometrics()
         }
-        if (!vaultLocked && !appLockArmed) {
-            openAfterBootReauth()
-            return@launch
+        when (BootReauthPolicy.afterDetails(ok, vaultLocked, appLockArmed, canPrompt = canUseBiometrics() && activity != null)) {
+            BootReauthPolicy.Step.Reject -> {
+                reportError("Those details don't match.")
+                return@launch
+            }
+            BootReauthPolicy.Step.Open -> {
+                openAfterBootReauth()
+                return@launch
+            }
+            BootReauthPolicy.Step.CannotPrompt -> {
+                reportError(if (activity == null) "Couldn't ask for your phone's lock. Try again." else "Set a screen lock to sign in.")
+                return@launch
+            }
+            BootReauthPolicy.Step.Prompt -> Unit
         }
-        if (!canUseBiometrics() || activity == null) {
-            reportError(if (activity == null) "Couldn't ask for your phone's lock. Try again." else "Set a screen lock to sign in.")
-            return@launch
-        }
+        activity ?: return@launch
         val passed = awaitBiometricPrompt(activity, title = "Unlock Bloo", subtitle = "Confirm it's you to finish signing in", strong = true)
         if (!passed) {
             reportInfo("Sign in again once your phone's lock is confirmed.")
@@ -161,7 +165,7 @@ fun AppViewModel.reauthAfterRestart(
         }
         // The secrets were sealed: now that the prompt has opened them, the details can be checked.
         if (vaultLocked) ok = matches()
-        if (!ok) {
+        if (!BootReauthPolicy.opensAfterPrompt(passed, ok)) {
             reportError("Those details don't match.")
             return@launch
         }

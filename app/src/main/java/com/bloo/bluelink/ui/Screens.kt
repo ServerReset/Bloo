@@ -485,7 +485,7 @@ private fun LoginPage(
                 updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
                 // After a restart there is no biometric way in: the account details come first, and the one prompt follows them (see
                 // reauthAfterRestart).
-                onFingerprint = if (vm.canUseBiometrics() && !bootReauth) ({ vm.promptBiometricUnlock(loginContext) }) else null,
+                onFingerprint = if (BootReauthPolicy.offersFingerprint(vm.canUseBiometrics(), bootReauth)) ({ vm.promptBiometricUnlock(loginContext) }) else null,
             )
             kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
             canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }

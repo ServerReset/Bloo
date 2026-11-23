@@ -110,8 +110,7 @@ internal fun AppViewModel.coldStartAutoLogin(
             // once the device is unlocked: any later cold start still locks.
             val keyguard = getApplication<android.app.Application>().getSystemService(android.content.Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
             val justBooted = android.os.SystemClock.elapsedRealtime() < JUST_BOOTED_MS
-            val skipAppLockAfterBoot = justBooted && !keyguard.isDeviceLocked
-            if (lockMechanisms && !skipAppLockAfterBoot && !justConfirmed) {
+            if (BootReauthPolicy.coldStartLocks(lockMechanisms, justBooted, keyguard.isDeviceLocked, justConfirmed)) {
                 logStartup("Cold start: lock screen required, deferring garage load until unlock")
                 _state.update { it.copy(locked = true) }
             }
