@@ -175,10 +175,12 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 
 front map; launch 20
 # The Location card is under Car info, near the bottom of the garage.
-for i in 1 2 3 4 5 6 7 8 9; do scroll_down; done
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do scroll_down; done
 labels
 shot 06a-garage-dark-bottom
-tap_node 'Map showing where'; sleep 8
+tap_node 'Map showing where' || true
+# The map is drawn by the app's root overlay over the card's slot, so its node can be missing from the dump; tap where it is.
+adb shell input tap 540 1900; sleep 8
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 3
 
