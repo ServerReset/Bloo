@@ -96,8 +96,10 @@ internal fun CentralMapHost(state: State<UiState>, vm: AppViewModel, centralMap:
             opening -> centralMap.cardBounds(openVin) ?: fallback
             else -> {
                 val screen = Rect(0f, 0f, windowSize.width.toFloat(), windowSize.height.toFloat())
-                // The rectangle captured when the collapse began; only a card wholly on screen is a place to land.
-                centralMap.closeRect?.takeIf { screen.contains(it.topLeft) && screen.contains(it.bottomRight) } ?: fallback
+                // The rectangle captured when the collapse began. A card partly on screen (peeking up from under the search bar, or half under
+                // the status bar) is still where the map goes: it lands there and the visible band cuts what is off screen. Landing in the middle
+                // instead left the map to jump into the card at the end. Only a card nowhere on screen falls back to the middle.
+                centralMap.closeRect?.takeIf { it.overlaps(screen) && it.width > 0f && it.height > 0f } ?: fallback
             }
         }
     }
