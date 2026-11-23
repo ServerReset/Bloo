@@ -121,16 +121,25 @@ internal fun GarageScreen(
     // everything else on screen does instead of arriving flat.
     val carSpring = lowPowerBounce<Float>(stiffness = Spring.StiffnessMediumLow)
     val perPageAnim = remember { androidx.compose.animation.core.Animatable(perPageTarget.toFloat()) }
-    LaunchedEffect(perPageTarget) { perPageAnim.animateTo(perPageTarget.toFloat(), carSpring) }
+    // Where the current column change started (the count on screen when the target changed) and where it is going: the layout is eased
+    // between those two ends (see ColumnMotion).
+    val fromColumns = remember { androidx.compose.runtime.mutableFloatStateOf(perPageTarget.toFloat()) }
+    val toColumns = remember { androidx.compose.runtime.mutableFloatStateOf(perPageTarget.toFloat()) }
+    LaunchedEffect(perPageTarget) {
+        fromColumns.floatValue = perPageAnim.value
+        toColumns.floatValue = perPageTarget.toFloat()
+        perPageAnim.animateTo(perPageTarget.toFloat(), carSpring)
+    }
     // The count the layout reads: the bounce is clamped to the real range. An overshoot past one car (or past the grid's count) would
     // widen every column for a beat and then snap back, so the car's photo swelled and shrank; clamped, the column only ever eases.
     val shownColumns = remember(naturalColumns) {
         androidx.compose.runtime.derivedStateOf { perPageAnim.value.coerceIn(1f, naturalColumns.toFloat()) }
     }
     val density = LocalDensity.current
-    val expandedT = remember(density, shownColumns) {
-        ColumnReflow(shownColumns, widthDp = { windowInfo.containerSize.width / density.density })
+    val columnMotion = remember(density, shownColumns) {
+        ColumnMotion(shownColumns, fromColumns, toColumns, widthDp = { windowInfo.containerSize.width / density.density })
     }
+    val expandedT = columnMotion.reflow
 
     // The other cars, drawn as pins on the expanded map. The car that is expanded is the map's own pin, so it is left out.
     CompositionLocalProvider(LocalPullFraction provides pullFractionState) {
@@ -143,6 +152,7 @@ internal fun GarageScreen(
             vehicles, count, slots, perPage, naturalColumns, shownColumns, vm.currentIndex,
             windowInfo.containerSize.width, state, vm, hazeState,
             expandedT = expandedT,
+            blockWidthDp = columnMotion::blockWidthDp,
             multiColumn = multiColumn,
             fullScreen = fullScreen,
             // ONE COLUMN's width, not the page's. ReflowPair measures both blocks at this and moves

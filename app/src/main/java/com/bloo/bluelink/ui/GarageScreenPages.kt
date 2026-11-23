@@ -28,6 +28,7 @@ import com.bloo.uicommon.MotionMedium
 import com.bloo.bluelink.perf.PerfMonitor
 import com.bloo.bluelink.perf.TrackRecompositions
 import com.bloo.uicommon.LocalHaptics
+import androidx.compose.ui.unit.dp
 
 /**
  * True while the car pager is at rest (not being dragged or flung). Page content that is expensive to
@@ -67,6 +68,8 @@ internal fun CollapsedGaragePager(
     hazeState: HazeState,
     /** 0 = one column, 1 = two columns: the car's own reflow, sized from the device width. */
     expandedT: State<Float>,
+    /** The width, in dp, a car's blocks are laid out at right now (see ColumnMotion). Read only in the measure phase. */
+    blockWidthDp: () -> Float,
     /** True when the grid shows more than one car column: the hero's full-screen button appears. */
     multiColumn: Boolean,
     /** One car is filling the whole window instead of sharing it with its neighbours. */
@@ -196,13 +199,10 @@ internal fun CollapsedGaragePager(
         androidx.compose.runtime.CompositionLocalProvider(LocalPagerIdle provides pagerIdle, LocalPagerBlur provides pagerBlur) {
         Box(Modifier.fillMaxSize()) {
             val density = LocalDensity.current
-            // One column's width, per frame and only in the measure phase: the page width (the window over the EASED car count)
-            // over the reflow's own fraction of two columns. Continuous, so a car widening to full screen grows its blocks
-            // with the page; read nowhere in composition, so the animation never recomposes the car.
-            val columnWidthOf: () -> androidx.compose.ui.unit.Dp = remember(density, perPageAnim, expandedT) {
-                // Same width source as the reflow fraction (ColumnReflow reads the window width): the two cannot disagree mid-change.
-                { with(density) { (windowWidthPx / perPageAnim.value.coerceAtLeast(1f) / (1f + expandedT.value)).toDp() } }
-            }
+            // One column's width, per frame and only in the measure phase: eased between the starting layout's and the final one's
+            // (see ColumnMotion), so a car opening to full screen or closing from it keeps its blocks' size instead of shrinking and
+            // swelling on the way. Read nowhere in composition, so the animation never recomposes the car.
+            val columnWidthOf: () -> androidx.compose.ui.unit.Dp = remember(blockWidthDp) { { blockWidthDp().dp } }
             // One column per car, `perPage` of them side by side: a car never grows to swallow the
             // pager any more -- the layout INSIDE the page scales (one column or two) with the
             // device width instead.

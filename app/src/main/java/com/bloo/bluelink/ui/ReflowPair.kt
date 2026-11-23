@@ -75,21 +75,49 @@ private val WidthStep = 6.dp
 /** How wide, in dp, the band is over which a car's columns turn into two: the reflow eases across it rather than switching at its edge. */
 private const val TwoColumnRampDp = 12f
 
+
 /**
- * How far a car has reflowed into two columns, 0 (one) to 1 (two), derived from how wide one of its columns is right now. The column
- * count ([columns]) is an animated value, so as it eases (a car widening to full screen) the page widens and the reflow follows it
- * through the same frames: there is no separate switch that could fall out of step with the column change.
+ * The garage's column change as one motion between two layouts: from the car count it started at ([from]) to the one it is going to
+ * ([to]), with [columns] the eased count in between. The reflow (two columns or one, see [ReflowPair]) and the width each block is laid
+ * out at are each eased from their value in the starting layout to their value in the final one.
  *
- * It is a [State] whose value is read only inside the measure and draw lambdas, so driving it never recomposes the car.
+ * Deriving them from the in-between count instead, as the garage once did, squashed and stretched a car opening to full screen: in the
+ * grid each car is half the window, and at full screen its two columns are half the window each, so the block width is the same at both
+ * ends; but at 1.5 cars the reflow was already two columns, the blocks fell to a third of the window and grew back, and the hero shrank
+ * and swelled on the way. Eased between the ends, a width that is the same at both ends stays the same throughout.
+ *
+ * At rest (the motion done) both read the live window width, so a window that changes size (a fold opened) still reflows as before.
  */
-internal class ColumnReflow(
+@androidx.compose.runtime.Stable
+internal class ColumnMotion(
     private val columns: State<Float>,
+    private val from: State<Float>,
+    private val to: State<Float>,
     private val widthDp: () -> Float,
-) : State<Float> {
-    override val value: Float
-        get() {
-            val column = widthDp() / columns.value.coerceAtLeast(1f)
-            val low = TWO_COLUMN_MIN_DP - TwoColumnRampDp
-            return ((column - low) / (2f * TwoColumnRampDp)).coerceIn(0f, 1f)
-        }
+) {
+    private fun reflowAt(count: Float): Float {
+        val column = widthDp() / count.coerceAtLeast(1f)
+        val low = TWO_COLUMN_MIN_DP - TwoColumnRampDp
+        return ((column - low) / (2f * TwoColumnRampDp)).coerceIn(0f, 1f)
+    }
+
+    private fun blockAt(count: Float): Float = widthDp() / count.coerceAtLeast(1f) / (1f + reflowAt(count))
+
+    /** How far the motion has gone, 0 (the starting layout) to 1 (the final one). */
+    private fun progress(): Float {
+        val a = from.value
+        val b = to.value
+        if (kotlin.math.abs(b - a) < 0.001f) return 1f
+        return ((columns.value - a) / (b - a)).coerceIn(0f, 1f)
+    }
+
+    private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
+
+    /** The reflow, 0 (one column) to 1 (two): read only in measure and draw, so driving it never recomposes the car. */
+    val reflow: State<Float> = object : State<Float> {
+        override val value: Float get() = lerp(reflowAt(from.value), reflowAt(to.value), progress())
+    }
+
+    /** The width, in dp, each of a car's blocks is laid out at right now. Read in the measure phase. */
+    fun blockWidthDp(): Float = lerp(blockAt(from.value), blockAt(to.value), progress())
 }
