@@ -108,8 +108,8 @@ fun WearFaceHub(
 @Composable
 private fun HubLine(text: String, color: Color, hubSize: Dp) {
     val base = (hubSize.value * 0.15f).coerceIn(10f, 14f)
-    // Shrink from a shorter length, and keep the line inside the circle's chord at the bottom, so nothing is cut off at the edge.
-    val fit = if (text.length > 11) base * 11f / text.length else base
+    // Shrink a longer line so it stays whole: "Unlocked" was cut at the hub's edge at full size.
+    val fit = if (text.length > 8) base * 8f / text.length else base
     RevealText(
         text,
         style = MaterialTheme.typography.labelSmall.copy(
@@ -121,7 +121,8 @@ private fun HubLine(text: String, color: Color, hubSize: Dp) {
         maxLines = 1,
         softWrap = false,
         overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
-        modifier = Modifier.width(hubSize * 0.62f),
+        // The hub's width inside its side padding (12% each side): the lines sit in the middle of the hub now, where the circle is widest.
+        modifier = Modifier.width(hubSize * 0.76f),
     )
 }
 
