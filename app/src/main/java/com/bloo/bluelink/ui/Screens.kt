@@ -472,10 +472,6 @@ private fun LoginPage(
             val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
             val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
             val loginContext = LocalContext.current
-            // After a restart the phone's lock is asked for as the sign-in screen opens (see promptDeviceLockForBoot).
-            LaunchedEffect(bootReauth) {
-                if (bootReauth) vm.promptDeviceLockForBoot(loginContext.findFragmentActivity())
-            }
             LoginScreen(
                 loading = loading,
                 onLogin = if (bootReauth) ({ user, password, pin, brand ->
@@ -487,8 +483,9 @@ private fun LoginPage(
                 onCheckForUpdates = { vm.checkForUpdate(force = true, surfaceResult = true) },
                 updateChecking = loginUpdateChecking,
                 updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
-                // Once the phone's lock is confirmed for this boot, the login screen does not offer the fingerprint button again.
-                onFingerprint = if (vm.canUseBiometrics() && !stateHolder.value.bootDeviceLockProven) ({ vm.promptBiometricUnlock(loginContext) }) else null,
+                // After a restart there is no biometric way in: the account details come first, and the one prompt follows them (see
+                // reauthAfterRestart).
+                onFingerprint = if (vm.canUseBiometrics() && !bootReauth) ({ vm.promptBiometricUnlock(loginContext) }) else null,
             )
             kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
             canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }

@@ -17,7 +17,6 @@ fun Context.findFragmentActivity(): FragmentActivity? {
     return null
 }
 
-/** Shows the system biometric prompt and routes the result to callbacks. */
 /** The activity whose biometric prompt is on screen, if any. See [showBiometricPrompt]. */
 private var inFlight: java.lang.ref.WeakReference<FragmentActivity>? = null
 
@@ -27,11 +26,19 @@ fun showBiometricPrompt(
     subtitle: String,
     onSuccess: () -> Unit,
     onError: (String) -> Unit,
+    /**
+     * Only what the encrypted vault's key accepts: a STRONG biometric or the phone's own PIN, pattern or password. A weak biometric
+     * (most face unlocks) passes the prompt but does not unseal the vault, so a sign-in that must open the vault asks this way.
+     */
+    strong: Boolean = false,
 ) {
     // One prompt at a time: a second request while one is on screen is ignored, so the lock never stacks two fingerprint prompts.
     // The guard clears when that prompt succeeds, fails or is cancelled, or when its activity is gone.
     val showing = inFlight?.get()
-    if (showing != null && !showing.isDestroyed && !showing.isFinishing) return
+    if (showing != null && !showing.isDestroyed && !showing.isFinishing) {
+        onError("A prompt is already open")
+        return
+    }
     inFlight = java.lang.ref.WeakReference(activity)
     val done = { inFlight = null }
     val executor = ContextCompat.getMainExecutor(activity)
@@ -55,7 +62,23 @@ fun showBiometricPrompt(
         .setSubtitle(subtitle)
         // The device's own lock (fingerprint, face, or the lock screen's PIN, pattern or password). The device lock is a
         // fallback the prompt offers itself, so there is no negative button: DEVICE_CREDENTIAL does not allow one.
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+        .setAllowedAuthenticators(
+            (if (strong) BiometricManager.Authenticators.BIOMETRIC_STRONG else BiometricManager.Authenticators.BIOMETRIC_WEAK) or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+        )
         .build()
     prompt.authenticate(info)
 }
+
+/** [showBiometricPrompt] as a suspending call: true once the person passes it, false if they cancel or it fails. */
+suspend fun awaitBiometricPrompt(activity: FragmentActivity, title: String, subtitle: String, strong: Boolean = false): Boolean =
+    kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        showBiometricPrompt(
+            activity = activity,
+            title = title,
+            subtitle = subtitle,
+            onSuccess = { if (cont.isActive) cont.resumeWith(Result.success(true)) },
+            onError = { if (cont.isActive) cont.resumeWith(Result.success(false)) },
+            strong = strong,
+        )
+    }

@@ -152,8 +152,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile
     internal var deferredStatusLoad = false
 
-    /** The post-restart account check passed; the app lock (fingerprint or PIN) is the last step. */
-    internal var pendingBootUnlock = false
 
     internal val _state = MutableStateFlow(UiState())
 
