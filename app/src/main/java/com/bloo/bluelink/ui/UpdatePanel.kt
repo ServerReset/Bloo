@@ -97,8 +97,10 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
 
     // One card holds the whole update: the status, the one action, dismiss, and the details. One glass surface, and one size animation
     // (the details' own), instead of a stack of panels that each animate on their own.
-    NestedGlassPanel(hazeState) {
-        Column(Modifier.padding(GapGroup), verticalArrangement = Arrangement.spacedBy(GapRow)) {
+    // With no update waiting there is only the details disclosure, which sits on the card as it is: a glass panel round one button
+    // read as a box with nothing in it.
+    val body: @Composable () -> Unit = {
+        Column(Modifier.then(if (info != null) Modifier.padding(GapGroup) else Modifier), verticalArrangement = Arrangement.spacedBy(GapRow)) {
             if (info != null) {
                 val newLabel = buildLabel(info.run.runNumber)
                 // Build delta ("build 812 → build 828") when the installed build is known, else just the target.
@@ -142,6 +144,7 @@ private fun GitHubUpdateBody(state: UiState, vm: AppViewModel, hazeState: HazeSt
             }
         }
     }
+    if (info != null) NestedGlassPanel(hazeState) { body() } else body()
 
     // The two ways to look for this yourself, always at the foot.
     EnterOnce(expandFrom = Alignment.Top) { ActionRow {

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -161,7 +160,8 @@ internal fun SettingsHeroCard(state: UiState, vm: AppViewModel) {
     UpdateBadgedCard(visible = state.updateOffered(), modifier = Modifier.fillMaxWidth()) {
     Surface(
         modifier = Modifier.fillMaxWidth().semantics { heading() },
-        shape = RoundedCornerShape(22.dp),
+        // The garage hero's own corner, so Settings' hero matches the car's.
+        shape = PanelShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(Modifier.padding(GapPage)) {
