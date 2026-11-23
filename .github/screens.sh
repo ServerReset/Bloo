@@ -181,9 +181,9 @@ tap_node '(^Location$|Open the map|^Map$)'; sleep 6
 shot 06-map-dark
 adb shell input keyevent KEYCODE_BACK; sleep 3
 
-# Settings is a page of the car pager, beside the cars: one swipe back from the first car.
+# Settings is a page of the car pager, after the last car: two swipes on from the first (the pager does not wrap back to it).
 front settings; launch 20
-prev_car; sleep 2
+next_car; next_car
 shot 07-settings-dark
 scroll_down
 shot 08-settings-dark-scrolled
