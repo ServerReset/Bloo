@@ -144,9 +144,7 @@ fun AppViewModel.locate(v: Vehicle) = runCommand(v.vin, CarCommandIds.LOCATE, "L
             // status refresh happened to run persistSnapshots() for another reason.
             persistSnapshots()
         }
-        hadCached -> _state.update {
-            it.copy(message = "Showing last known location.", messageType = ToastKind.INFO)
-        }
+        hadCached -> reportInfo("Showing last known location.")
         else -> throw BlueLinkException(
             "Couldn't get the car's location.",
         )
@@ -269,7 +267,7 @@ fun AppViewModel.startSmartClimate(v: Vehicle, onResolved: (ClimateRequest) -> U
     viewModelScope.launch {
         val request = smartClimateRequestFor(getApplication(), v.vin)
         if (request == null) {
-            _state.update { it.copy(message = "Smart climate needs the car's location.", messageType = ToastKind.ERROR) }
+            showError("Smart climate needs the car's location.")
             return@launch
         }
         // Told before the start goes out, so the sliders can bounce to what it sets.
@@ -337,8 +335,7 @@ internal fun AppViewModel.runCommand(
             rethrowIfCancellation(e)
             val msg = e.message ?: "Command failed"
             recordRemoteAction(vin, success, status = "Failed", details = msg)
-            AppLog.log("⚠ $msg")
-            _state.update { it.copy(message = msg, messageType = ToastKind.ERROR) }
+            reportError(msg)
             if (optimistic != null && prior != null) {
                 _state.update { st -> st.copy(statuses = st.statuses + (vin to prior)) }
                 persistSnapshots()
@@ -419,7 +416,7 @@ private fun AppViewModel.confirmWithCar(vin: String, key: String, success: Strin
             }
             AppLog.log("$success: sent, the car has not confirmed yet")
             loadStatus(v, refresh = false, errorMessage = "Refresh failed", surfaceErrors = false)
-            _state.update { it.copy(message = "$success was sent. The car hasn't confirmed yet", messageType = ToastKind.INFO) }
+            reportInfo("$success was sent. The car hasn't confirmed yet")
         } finally {
             // Only the newest confirmation clears the mark: one it replaced is cancelled and must not unblur a command it no longer owns.
             if (commandConfirmJobs[key] === me) _state.update { it.copy(awaitingCar = it.awaitingCar - key) }

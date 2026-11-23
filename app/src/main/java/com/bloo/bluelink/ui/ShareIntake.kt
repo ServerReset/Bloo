@@ -45,19 +45,15 @@ fun AppViewModel.offerSharedFile(uri: Uri, mime: String?) {
             val problem = if (json == null) "Couldn't read that file." else settingsStore.settingsBackupProblem(json)
             if (problem != null) {
                 AppLog.log("⚠ Shared settings file refused: $problem")
-                _state.update { it.copy(message = problem, messageType = ToastKind.ERROR) }
+                showError(problem)
                 return@launch
             }
             _state.update { it.copy(sharedSettingsUri = uri.toString()) }
         }
-        else -> _state.update {
-            it.copy(message = "Bloo can take a photo or a settings file (.json).", messageType = ToastKind.ERROR)
-        }
+        else -> showError("Bloo can take a photo or a settings file (.json).")
     }
 }
 
-/** Says why a share was refused or dropped, in the app's own message toast. */
-internal fun AppViewModel.showMessage(text: String) = _state.update { it.copy(message = text, messageType = ToastKind.ERROR) }
 
 /** Picks the car a shared picture is for; the crop step then runs for it. */
 internal fun AppViewModel.chooseSharedImageCar(vin: String) = _state.update { it.copy(sharedImageVin = vin) }
@@ -84,7 +80,7 @@ internal fun ShareIntakeHost(vm: AppViewModel, stateHolder: State<UiState>) {
         when {
             vehicles.isEmpty() -> {
                 vm.endSharedImage()
-                vm.showMessage("Sign in to a car first, then share the photo again.")
+                vm.showError("Sign in to a car first, then share the photo again.")
             }
             imageVin == null && vehicles.size == 1 -> vm.chooseSharedImageCar(vehicles.first().vin)
         }

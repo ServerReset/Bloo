@@ -39,9 +39,7 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
         if (!com.bloo.bluelink.update.UpdateRuntime.usesGitHub(getApplication())) {
             // The same surface either way: Play's answer lands in PlayUpdates.available, which the update panel reads.
             com.bloo.bluelink.update.PlayUpdates.refresh(getApplication())
-            if (surfaceResult) _state.update {
-                it.copy(message = "Checked with Google Play.", messageType = ToastKind.INFO)
-            }
+            if (surfaceResult) reportInfo("Checked with Google Play.")
             return@launch
         }
         if (surfaceResult) _state.update { it.copy(updateChecking = true) }
@@ -67,12 +65,10 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                     WatchPresence.pushWatchUpdateAdvice(getApplication(), result.info.run)
                     // A manual check also confirms via snackbar, since the update tile isn't
                     // visible from Settings.
-                    if (surfaceResult) _state.update {
-                        it.copy(message = "Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}", messageType = ToastKind.INFO)
-                    }
+                    if (surfaceResult) reportInfo("Update available: ${com.bloo.bluelink.data.buildLabel(result.info.run.runNumber)}")
                 }
                 is UpdateCheckResult.Failed ->
-                    if (surfaceResult) _state.update { it.copy(message = "Couldn't reach GitHub to check for updates.", messageType = ToastKind.ERROR) }
+                    if (surfaceResult) showError("Couldn't reach GitHub to check for updates.")
                 // else: silent -- next refresh tries again
                 is UpdateCheckResult.Skipped -> {
                     // No network call happened (debounce or snooze), so this says nothing about
@@ -87,7 +83,7 @@ internal fun AppViewModel.checkForUpdate(force: Boolean = false, surfaceResult: 
                         if (it.updateDownloading || it.updateInstalling || it.updateApkReady) it
                         else it.copy(updateAvailable = null, updateApkReady = false, updateTileDismissed = false)
                     }
-                    if (surfaceResult) _state.update { it.copy(message = "You're on the latest build.", messageType = ToastKind.INFO) }
+                    if (surfaceResult) reportInfo("You're on the latest build.")
                 }
             }
         } finally {

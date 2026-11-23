@@ -32,7 +32,7 @@ internal suspend fun AppViewModel.checkAlerts(v: Vehicle, status: VehicleStatus)
     // carries no location fix.
     val alerts = CarAlerts.evaluate(settingsStore, v, status, driving = _state.value.isDriving(v))
     alerts.forEach { Notifications.post(getApplication(), it.id, it.title, it.text, it.actions, it.channelId, it.localOnly) }
-    alerts.firstOrNull()?.let { a -> _state.update { it.copy(message = a.text, messageType = ToastKind.ERROR) } }
+    alerts.firstOrNull()?.let { a -> showError(a.text) }
 }
 
 // --- App PIN (device unlock PIN) -------------------------------------
@@ -176,8 +176,7 @@ internal fun AppViewModel.launchBusy(block: suspend () -> Unit) {
         } catch (e: Exception) {
             rethrowIfCancellation(e)
             val msg = e.message ?: "Something went wrong"
-            AppLog.log("⚠ $msg")
-            _state.update { it.copy(message = msg, messageType = ToastKind.ERROR) }
+            reportError(msg)
         } finally {
             // Only the last of overlapping operations lowers the spinner: the first to finish used to clear it
             // while another (a garage load already running) was still going.

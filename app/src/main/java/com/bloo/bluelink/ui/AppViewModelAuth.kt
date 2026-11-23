@@ -196,6 +196,6 @@ internal fun AppViewModel.finishSignIn() {
 
 /** The one-time code as typed, or null (after saying so) when it is blank. */
 private fun AppViewModel.codeOrComplain(code: String): String? = code.trim().ifBlank {
-    _state.update { it.copy(message = "Enter the code you received.", messageType = ToastKind.ERROR) }
+    showError("Enter the code you received.")
     null
 }

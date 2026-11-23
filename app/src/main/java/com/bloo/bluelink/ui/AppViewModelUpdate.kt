@@ -102,7 +102,7 @@ fun AppViewModel.installDownloadedUpdate() {
     if (!installer.hasPermission()) {
         // Ask; the grant arrives on onShizukuPermissionResult, which retries. Until then leave the
         // APK ready so a second tap (or the grant) completes it.
-        _state.update { it.copy(message = "Grant Shizuku access to install updates silently.", messageType = ToastKind.INFO) }
+        reportInfo("Grant Shizuku access to install updates silently.")
         installer.requestPermission(SHIZUKU_INSTALL_REQUEST_CODE)
         return
     }
@@ -182,7 +182,7 @@ fun AppViewModel.onShizukuPermissionResult(requestCode: Int, grantResult: Int) {
     if (grantResult != android.content.pm.PackageManager.PERMISSION_GRANTED) {
         // Info, not error: the user made a choice and the normal installer still works, so nothing
         // is actually broken to report in red.
-        _state.update { it.copy(message = "Shizuku denied. Using the normal installer.", messageType = ToastKind.INFO) }
+        reportInfo("Shizuku denied. Using the normal installer.")
         return
     }
     val dest = UpdateCleanup.stagedApkFile(getApplication())

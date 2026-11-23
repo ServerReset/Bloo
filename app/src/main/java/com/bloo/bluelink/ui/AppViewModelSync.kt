@@ -98,7 +98,7 @@ private fun AppViewModel.persistSyncUriOrReport(uri: android.net.Uri): Boolean {
     }.isSuccess
     if (!granted) {
         AppLog.log("⚠ Drive sync: couldn't get persistent access to that file")
-        _state.update { it.copy(message = "Couldn't keep access. Pick the file again.", messageType = ToastKind.ERROR) }
+        showError("Couldn't keep access. Pick the file again.")
     }
     return granted
 }
