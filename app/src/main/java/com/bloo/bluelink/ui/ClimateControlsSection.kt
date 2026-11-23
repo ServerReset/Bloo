@@ -35,6 +35,7 @@ import com.bloo.uicommon.GapRow
 import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.MorphTextButton
 import com.bloo.uicommon.tempColor
+import com.bloo.bluelink.data.ClimateSync
 
 /**
  * The editable state behind the climate controls -- temperature, duration, defrost, wheel heat and the four seats -- in one
@@ -61,6 +62,18 @@ internal class ClimateFormState(initial: ClimateRequest? = null) {
         passenger = r.seatFrontRight
         rearLeft = r.seatRearLeft
         rearRight = r.seatRearRight
+    }
+
+    /** Copies another live copy of this car's card's settings into the form (they travel as raw API levels). */
+    fun loadSync(r: ClimateSync) {
+        tempF = r.tempF
+        duration = r.durationMinutes
+        defrost = r.defrost
+        steeringHeat = WheelHeatLevel.fromApi(r.steering)
+        driver = SeatLevel.fromApi(r.seatFrontLeft)
+        passenger = SeatLevel.fromApi(r.seatFrontRight)
+        rearLeft = SeatLevel.fromApi(r.seatRearLeft)
+        rearRight = SeatLevel.fromApi(r.seatRearRight)
     }
 
     /** What the form says right now, as a request. */

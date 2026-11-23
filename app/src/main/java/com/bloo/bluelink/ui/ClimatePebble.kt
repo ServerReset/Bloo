@@ -71,6 +71,7 @@ import com.bloo.bluelink.data.Powertrain
 import com.bloo.uicommon.LocalHaptics
 import com.bloo.uicommon.content
 import com.bloo.uicommon.tempColor
+import com.bloo.bluelink.data.SmartComfort
 
 // --- Climate --------------------------------------------------------------
 
@@ -94,8 +95,8 @@ internal fun ClimatePebble(
     val form = rememberClimateForm(v.vin)
     var settingsLoaded by remember(v.vin) { mutableStateOf(false) }
 
-    // Copies a ClimateRequest into the slider state; shared by restore and preset-apply. The
-    // cross-composition sync below maps through SeatLevel.fromApi, so it doesn't reuse this.
+    // Copies a ClimateRequest into the slider state; shared by restore and preset-apply. (The cross-composition sync below takes raw
+    // API levels, so it uses the form's loadSync instead.)
     val applyRequest: (ClimateRequest) -> Unit = form::load
 
     // Restore the car's last-used climate settings the first time the pebble shows.
@@ -133,17 +134,7 @@ internal fun ClimatePebble(
         if (w != null && comfort != null) {
             SmartComfortLearning.noteSmart(v.vin, comfort, smartClimateMode(cToF(w.feelsLikeC).roundToInt()))
         }
-        startClimateWithEngineCheck(
-            base.copy(
-                tempF = target,
-                defrost = comfort?.defrost ?: false,
-                steeringWheelHeat = comfort?.wheel ?: base.steeringWheelHeat,
-                seatFrontLeft = comfort?.seatDriver ?: base.seatFrontLeft,
-                seatFrontRight = comfort?.seatPassenger ?: base.seatFrontRight,
-                seatRearLeft = comfort?.seatRearLeft ?: base.seatRearLeft,
-                seatRearRight = comfort?.seatRearRight ?: base.seatRearRight,
-            ),
-        )
+        startClimateWithEngineCheck(smartStartRequest(base, target, comfort))
     }
     // Read through snapshotFlow, not as a key: a key read the whole form in this card's body, so every slider tick recomposed the card.
     LaunchedEffect(presets) {
@@ -160,14 +151,7 @@ internal fun ClimatePebble(
     val remoteClimate = state.climateSync[v.vin]
     LaunchedEffect(remoteClimate) {
         val r = remoteClimate ?: return@LaunchedEffect
-        form.tempF = r.tempF
-        form.duration = r.durationMinutes
-        form.defrost = r.defrost
-        form.steeringHeat = WheelHeatLevel.fromApi(r.steering)
-        form.driver = SeatLevel.fromApi(r.seatFrontLeft)
-        form.passenger = SeatLevel.fromApi(r.seatFrontRight)
-        form.rearLeft = SeatLevel.fromApi(r.seatRearLeft)
-        form.rearRight = SeatLevel.fromApi(r.seatRearRight)
+        form.loadSync(r)
         activePresetId = r.activePresetId
     }
     // Persist + publish once settings stop changing, not per drag tick (which recomposed the whole
@@ -362,6 +346,20 @@ internal fun ClimatePebble(
         }
     }
 }
+
+/**
+ * The request a smart start sends: [base] at [target], with the seats, wheel and defrost the weather calls for ([comfort], when the car's
+ * comfort setup is known), else what [base] already has and no defrost.
+ */
+private fun smartStartRequest(base: ClimateRequest, target: Int, comfort: SmartComfort?): ClimateRequest = base.copy(
+    tempF = target,
+    defrost = comfort?.defrost ?: false,
+    steeringWheelHeat = comfort?.wheel ?: base.steeringWheelHeat,
+    seatFrontLeft = comfort?.seatDriver ?: base.seatFrontLeft,
+    seatFrontRight = comfort?.seatPassenger ?: base.seatFrontRight,
+    seatRearLeft = comfort?.seatRearLeft ?: base.seatRearLeft,
+    seatRearRight = comfort?.seatRearRight ?: base.seatRearRight,
+)
 
 /** The presets (once there is one) and the controls, each in its own inner panel. */
 @Composable
