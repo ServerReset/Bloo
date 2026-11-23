@@ -202,23 +202,10 @@ internal fun ColorPickerCanvas(color: Color, onColorChange: (Color) -> Unit, mod
                 .semantics {
                     contentDescription = "Saturation and brightness. Or type a hex below."
                 }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        down.consume()
-                        sat = snapStep((down.position.x / size.width).coerceIn(0.1f, 1f), 0.1f).coerceIn(0.1f, 1f)
-                        value = snapStep(1f - (down.position.y / size.height).coerceIn(0f, 1f), 0.1f).coerceIn(0.3f, 1f)
-                        update()
-                        while (true) {
-                            val ev = awaitPointerEvent()
-                            val ch = ev.changes.firstOrNull() ?: break
-                            if (!ch.pressed) break
-                            ch.consume()
-                            sat = snapStep((ch.position.x / size.width).coerceIn(0.1f, 1f), 0.1f).coerceIn(0.1f, 1f)
-                            value = snapStep(1f - (ch.position.y / size.height).coerceIn(0f, 1f), 0.1f).coerceIn(0.3f, 1f)
-                            update()
-                        }
-                    }
+                .dragPicker { at ->
+                    sat = snapStep((at.x / size.width).coerceIn(0.1f, 1f), 0.1f).coerceIn(0.1f, 1f)
+                    value = snapStep(1f - (at.y / size.height).coerceIn(0f, 1f), 0.1f).coerceIn(0.3f, 1f)
+                    update()
                 }
         ) {
             drawRect(satValueBrush)
@@ -235,21 +222,9 @@ internal fun ColorPickerCanvas(color: Color, onColorChange: (Color) -> Unit, mod
                 .semantics {
                     contentDescription = "Hue picker. Use the hex field below for exact values."
                 }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        down.consume()
-                        hue = snapStep((down.position.x / size.width) * 360f, 15f).coerceIn(0f, 345f)
-                        update()
-                        while (true) {
-                            val ev = awaitPointerEvent()
-                            val ch = ev.changes.firstOrNull() ?: break
-                            if (!ch.pressed) break
-                            ch.consume()
-                            hue = snapStep((ch.position.x / size.width) * 360f, 15f).coerceIn(0f, 345f)
-                            update()
-                        }
-                    }
+                .dragPicker { at ->
+                    hue = snapStep((at.x / size.width) * 360f, 15f).coerceIn(0f, 345f)
+                    update()
                 }
         ) {
             drawRect(hueBrush)
@@ -304,3 +279,22 @@ private fun swatchLabelColor(selected: Boolean): Color =
 
 /** A colour as its web hex, "#RRGGBB" (the alpha is dropped). */
 internal fun Color.hexCode(): String = String.format(java.util.Locale.US, "#%06X", 0xFFFFFF and toArgb())
+
+/**
+ * A press-and-drag picking surface: [onAt] gets every touch position while the finger is down (the press, then each move), with the
+ * surface's own size in reach. The colour square and the hue bar both pick this way.
+ */
+private fun Modifier.dragPicker(onAt: androidx.compose.ui.input.pointer.PointerInputScope.(Offset) -> Unit): Modifier = pointerInput(Unit) {
+    val scope = this
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        down.consume()
+        scope.onAt(down.position)
+        while (true) {
+            val change = awaitPointerEvent().changes.firstOrNull() ?: break
+            if (!change.pressed) break
+            change.consume()
+            scope.onAt(change.position)
+        }
+    }
+}

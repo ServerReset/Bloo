@@ -202,35 +202,27 @@ internal class CentralMap {
                 own.panTo(v.panX, v.panY)
             }
         }
-        CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
-            CarMap(
-                location = inputs.location,
-                modifier = modifier,
-                state = own,
-                deviceLocation = inputs.deviceLocation,
-                interactive = false,
-                tileArea = inputs.tileArea,
-                panWeight = { 1f },
-                cars = cars,
-                anchorVin = vin,
-                selectedVin = selectedVin,
-                onCarTap = { tapPin(it) },
-            )
-        }
+        MapView(modifier, inputs, own, interactive = false, panWeight = { 1f })
     }
 
     /** The map, as it is drawn wherever it is hosted: the one instance, anchored on the car it was opened for. */
     @Composable
     fun Content(modifier: Modifier, inputs: MapInputs) {
+        MapView(modifier, inputs, mapState, interactive = inputs.interactive, panWeight = inputs.panWeight)
+    }
+
+    /** Every car on a map with the given view [state]: the big map and each card's copy differ only in their state and whether they take touch. */
+    @Composable
+    private fun MapView(modifier: Modifier, inputs: MapInputs, state: CarMapState, interactive: Boolean, panWeight: () -> Float) {
         CompositionLocalProvider(LocalMapChrome provides chromeInsets) {
             CarMap(
                 location = inputs.location,
                 modifier = modifier,
-                state = mapState,
+                state = state,
                 deviceLocation = inputs.deviceLocation,
-                interactive = inputs.interactive,
+                interactive = interactive,
                 tileArea = inputs.tileArea,
-                panWeight = inputs.panWeight,
+                panWeight = panWeight,
                 cars = cars,
                 anchorVin = vin,
                 selectedVin = selectedVin,
