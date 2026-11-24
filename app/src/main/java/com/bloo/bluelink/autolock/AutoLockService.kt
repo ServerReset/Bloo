@@ -12,9 +12,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.bloo.bluelink.data.AppLog
-import com.bloo.bluelink.data.SettingsStore
 import com.bloo.bluelink.data.SnapshotStore
-import com.bloo.bluelink.data.allAutoLockConfigs
 import com.bloo.bluelink.ui.hasPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +47,15 @@ class AutoLockService : Service() {
     private var watcher: BroadcastReceiver? = null
     /** Cars whose notification is currently holding this service in the foreground (see postNotification). */
     private val foregroundVins = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    /**
+     * The car the persistent watcher was started for, or null when this instance is only showing an evaluation's progress. While it is
+     * set the service stays up between evaluations: it used to stop itself as soon as the first evaluation finished, which took the
+     * watcher's Bluetooth receiver with it, so AutoLock worked once and then not again until the app was opened.
+     */
+    @Volatile private var watchVin: String? = null
+
+    /** What every start returns: sticky while watching, so the system brings the watcher back after killing the process. */
+    private fun startMode(): Int = if (watchVin != null) START_STICKY else START_NOT_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -61,16 +68,19 @@ class AutoLockService : Service() {
                 val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
                     ?: return
                 val address = runCatching { device.address }.getOrNull() ?: return
-                scope.launch {
-                    SettingsStore(applicationContext).allAutoLockConfigs().forEach { (vin, config) ->
-                        if (!config.enabled || !address.equals(config.deviceAddress, ignoreCase = true)) return@forEach
-                        AppLog.log("AutoLock: watcher received ${intent.action} for $vin")
-                        if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
-                            AutoLockTrigger.onCarDisconnected(applicationContext, vin)
-                        } else if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
-                            AutoLockTrigger.onCarConnected(applicationContext, vin)
-                        }
-                    }
+                // The same synchronous mirror the manifest receiver reads, not an asynchronous settings read: that read could finish
+                // after the car's RECONNECT had already been handled, and start an evaluation for a car the person was sitting in.
+                val vin = AutoLockAddresses.vinFor(applicationContext, address) ?: return
+                AppLog.log("AutoLock: watcher received ${intent.action} for $vin")
+                if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED &&
+                    !AutoLockEvents.disconnectMeansLeaving(AutoLockBluetoothReceiver.bluetoothState(context))
+                ) {
+                    return
+                }
+                if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+                    AutoLockTrigger.onCarDisconnected(applicationContext, vin)
+                } else if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+                    AutoLockTrigger.onCarConnected(applicationContext, vin)
                 }
             }
         }
@@ -107,13 +117,21 @@ class AutoLockService : Service() {
                 return START_NOT_STICKY
             }
             AppLog.log("AutoLock: the system restarted the watcher; re-promoting it for $vin.")
+            watchVin = vin
             startForegroundCompat(vin, DetectionState.IDLE, 0)
             return START_STICKY
         }
         if (intent.action == ACTION_START_WATCH) {
             val vin = intent.getStringExtra(EXTRA_VIN)
             AppLog.log("AutoLock: background Bluetooth watcher started")
-            if (vin != null) startForegroundCompat(vin, DetectionState.IDLE, 0)
+            if (vin != null) {
+                watchVin = vin
+                startForegroundCompat(vin, DetectionState.IDLE, 0)
+            } else {
+                // A start must still promote, or Android kills the process for not doing so (see promoteThenStop).
+                promoteThenStop()
+                return START_NOT_STICKY
+            }
             return START_STICKY
         }
         if (intent.action == ACTION_STOP_WATCH) {
@@ -124,18 +142,23 @@ class AutoLockService : Service() {
             runCatching {
                 AutoLockController.state.value.keys.forEach { AutoLockController.cancel(it) }
             }
-            stopSelf()
+            watchVin = null
+            // Normally stopped with stopService (see stopWatch); a stop that still arrives as a foreground start must promote first.
+            promoteThenStop()
             return START_NOT_STICKY
         }
         val vin = intent.getStringExtra(EXTRA_VIN)
-        if (vin == null) return START_NOT_STICKY
+        if (vin == null) {
+            if (watchVin == null) promoteThenStop()
+            return startMode()
+        }
 
         when (intent.action) {
             ACTION_CANCEL -> {
                 AutoLockController.cancel(vin)
                 startForegroundCompat(vin, DetectionState.ABORTED, 0)
                 scope.launch { delay(3000); finishTracking(vin) }
-                return START_NOT_STICKY
+                return startMode()
             }
             ACTION_LOCK_NOW -> {
                 // "Lock now" from the notification: skip the rest of the grace countdown. The
@@ -143,8 +166,9 @@ class AutoLockService : Service() {
                 // nudges it -- no separate fallback path to reconcile any more (see
                 // AutoLockTrigger's own doc).
                 AutoLockController.lockNow(this, vin)
+                startForegroundCompat(vin, AutoLockController.stateFor(vin).detection, 0)
                 observe(vin)
-                return START_NOT_STICKY
+                return startMode()
             }
         }
 
@@ -162,8 +186,8 @@ class AutoLockService : Service() {
             // running in AutoLockController's own scope (the trigger started it before this
             // service was even asked for), so there is nothing to start here -- this service
             // is only the notification wrapper. Just stand down; the lock still happens.
-            stopSelf()
-            return START_NOT_STICKY
+            if (watchVin == null) stopSelf()
+            return startMode()
         }
         scope.launch {
             SnapshotStore(applicationContext).current().vehicles.firstOrNull { it.vin == vin }?.name?.let { carNames[vin] = it }
@@ -173,7 +197,7 @@ class AutoLockService : Service() {
         // evaluation, and calling it again would cancel and restart that very job (see
         // onTriggerFired). This service just observes.
         observe(vin)
-        return START_NOT_STICKY
+        return startMode()
     }
 
     private fun observe(vin: String) {
@@ -251,7 +275,12 @@ class AutoLockService : Service() {
         // path and never promote the service at all.
         foregroundVins.remove(vin)
         runCatching { NotificationManagerCompat.from(this).cancel(AutoLockNotification.notificationId(vin)) }
-        if (observeJobs.isEmpty()) stopSelf() else reanchorForeground()
+        when {
+            observeJobs.isNotEmpty() -> reanchorForeground()
+            // Back to watching: the quiet watcher notification takes the foreground again, so the service (and its receiver) stays.
+            watchVin != null -> watchVin?.let { w -> postNotification(w, DetectionState.IDLE, 0, promote = true) }
+            else -> stopSelf()
+        }
     }
 
     /** Foreground promotion is tied to whichever notification id was posted LAST via
@@ -323,6 +352,17 @@ class AutoLockService : Service() {
         const val ACTION_START_WATCH = "com.bloo.bluelink.AUTOLOCK_START_WATCH"
         const val ACTION_STOP_WATCH = "com.bloo.bluelink.AUTOLOCK_STOP_WATCH"
         const val EXTRA_VIN = IntentExtras.VIN
+
+        /**
+         * Stops the watcher and every evaluation it may have started. With stopService, never a foreground start: a service asked to
+         * start in the foreground must call startForeground within seconds even when all it is going to do is stop, or the app is
+         * killed; turning AutoLock off crashed it that way.
+         */
+        fun stopWatch(context: Context) {
+            runCatching { AutoLockController.state.value.keys.forEach { AutoLockController.cancel(it) } }
+            runCatching { context.stopService(Intent(context, AutoLockService::class.java)) }
+            AppLog.log("AutoLock: watcher stopped")
+        }
 
         /** Starts the notification wrapper for [vin] (Bluetooth disconnect / a manual
          *  "Simulate leaving" test from Settings). Best-effort: returns false when the OS

@@ -7,29 +7,35 @@ package com.bloo.bluelink.autolock
  *
  * Confirmation policy: after the Bluetooth disconnect trigger, Activity Recognition must confirm a walk before the grace countdown
  * starts. Physical detection is mandatory, so a disconnect alone never reaches GRACE.
+ *
+ * A finished evaluation stays finished: a reconnect or a cancel after LOCKED, SKIPPED, ABORTED or ERROR does not rewrite the outcome
+ * (a car that locked and was then got back into still locked).
  */
 class LockStateMachine {
 
     private var walkingConfirmed = false
 
-    fun next(current: DetectionState, event: DetectionEvent): DetectionState = when (event) {
-        DetectionEvent.CarBluetoothReconnected,
-        DetectionEvent.UserCancelled,
-        -> DetectionState.ABORTED
+    fun next(current: DetectionState, event: DetectionEvent): DetectionState {
+        if (current.isTerminal) return current
+        return when (event) {
+            DetectionEvent.CarBluetoothReconnected,
+            DetectionEvent.UserCancelled,
+            -> DetectionState.ABORTED
 
-        DetectionEvent.CarBluetoothDisconnected -> {
-            if (current == DetectionState.IDLE) {
-                if (walkingConfirmed) DetectionState.GRACE else DetectionState.CONFIRMING
-            } else current
+            DetectionEvent.CarBluetoothDisconnected -> {
+                if (current == DetectionState.IDLE) {
+                    if (walkingConfirmed) DetectionState.GRACE else DetectionState.CONFIRMING
+                } else current
+            }
+
+            DetectionEvent.WalkingConfirmed -> {
+                walkingConfirmed = true
+                promoteIfConfirming(current)
+            }
+
+            DetectionEvent.GraceElapsed ->
+                if (current == DetectionState.GRACE) DetectionState.VERIFYING else current
         }
-
-        DetectionEvent.WalkingConfirmed -> {
-            walkingConfirmed = true
-            promoteIfConfirming(current)
-        }
-
-        DetectionEvent.GraceElapsed ->
-            if (current == DetectionState.GRACE) DetectionState.VERIFYING else current
     }
 
     private fun promoteIfConfirming(current: DetectionState): DetectionState =

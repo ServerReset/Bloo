@@ -12,7 +12,7 @@ import com.bloo.bluelink.data.BootReauthNotice
 import com.bloo.bluelink.data.SettingsStore
 import kotlinx.coroutines.launch
 
-/** Relaunches [MainActivity] once an in-place app update finishes installing. */
+/** After a restart, asks the person to sign in; after an app update, restarts the AutoLock watcher and relaunches [MainActivity]. */
 class AutoLockBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
@@ -27,6 +27,9 @@ class AutoLockBootReceiver : BroadcastReceiver() {
             return
         }
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        // An update kills the running watcher, and nothing brought it back until the app was next opened. An update broadcast may
+        // start a foreground service, so the watcher is restarted here (not while sealed after a restart: see BootGate).
+        if (!com.bloo.bluelink.data.BootGate.isLocked(context.applicationContext)) startWatchIfEnabled(context.applicationContext)
         runCatching {
             val relaunch = Intent(context, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)

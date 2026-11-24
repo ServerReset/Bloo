@@ -65,6 +65,11 @@ object AutoLockController {
     private val machines = java.util.concurrent.ConcurrentHashMap<String, LockStateMachine>()
 
     private val skipGrace = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    /**
+     * The cars whose evaluation currently needs Activity Recognition. It is ONE app-wide registration, so it is stopped only when the
+     * last of them is done: stopping it when the first car finished left a second car still waiting for a walk that could never come.
+     */
+    private val arUsers = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val walkAwayConfirmed = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     private val _state = MutableStateFlow<Map<String, AutoLockEvalState>>(emptyMap())
@@ -87,10 +92,21 @@ object AutoLockController {
         _state.update { it - vins.toSet() }
     }
 
-    /** Bluetooth (or manual "simulate leaving") trigger: begin an evaluation for [vin]. */
+    /**
+     * Bluetooth (or manual "simulate leaving") trigger: begin an evaluation for [vin]. The same departure arriving again (the manifest
+     * receiver and the watcher both see it) is ignored while it is still being judged, rather than restarting it and losing a walk
+     * already seen (see [AutoLockEvents.startsNewEvaluation]).
+     */
     fun onTriggerFired(context: Context, vin: String) {
-        jobs[vin]?.cancel()
-        jobs[vin] = scope.launch { runEvaluation(context.applicationContext, vin) }
+        synchronized(jobs) {
+            val running = jobs[vin]?.isActive == true
+            if (!AutoLockEvents.startsNewEvaluation(_state.value[vin]?.detection, running)) {
+                AppLog.log("AutoLock: $vin is already being evaluated for this departure; the repeat is ignored.")
+                return
+            }
+            jobs[vin]?.cancel()
+            jobs[vin] = scope.launch { runEvaluation(context.applicationContext, vin) }
+        }
     }
 
     /** Skip the remaining grace period and lock immediately (notification "Lock now"). */
@@ -101,7 +117,14 @@ object AutoLockController {
 
     fun onWalkingConfirmed(vin: String) {
         walkAwayConfirmed.add(vin)
-        machines[vin]?.let { advance(vin, it.next(stateFor(vin).detection, DetectionEvent.WalkingConfirmed)) }
+        val machine = machines[vin] ?: return
+        // Decided and written in ONE atomic update: read first and written after, a cancel landing in between was overwritten with GRACE,
+        // and a countdown nothing was running any more stayed on screen.
+        _state.update { all ->
+            val current = all[vin] ?: return@update all
+            val next = machine.next(current.detection, DetectionEvent.WalkingConfirmed)
+            if (next == current.detection) all else all + (vin to current.copy(detection = next))
+        }
     }
 
     /** Activity Recognition transitions are app-wide (one Google Play Services request, not
@@ -110,9 +133,22 @@ object AutoLockController {
         _state.value.filterValues { it.detection == DetectionState.CONFIRMING }.keys.forEach { onWalkingConfirmed(it) }
     }
 
-    /** Reconnect or user cancel: abort a pending evaluation for [vin], if any. */
+    /**
+     * Reconnect or user cancel: abort a pending evaluation for [vin], if any. Once the lock command is on its way it is not interrupted
+     * (the car may already have locked, and "the car wasn't touched" would then be untrue), and with nothing running the last outcome
+     * is left as it was.
+     */
     fun cancel(vin: String) {
-        jobs[vin]?.cancel()
+        val job = jobs[vin]
+        if (job?.isActive != true) {
+            AppLog.log("AutoLock: cancel for $vin with nothing running; nothing to do.")
+            return
+        }
+        if (stateFor(vin).detection == DetectionState.LOCKING) {
+            AppLog.log("AutoLock: the lock command for $vin is already on its way; it is not cancelled.")
+            return
+        }
+        job.cancel()
         _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.ABORTED)) }
         AppLog.log("AutoLock: cancelled for $vin")
     }
@@ -144,6 +180,7 @@ object AutoLockController {
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
+            arUsers.add(vin)
             ActivityRecognitionManager.start(context)
             startedActivityRecognition = true
 
@@ -219,7 +256,10 @@ object AutoLockController {
             // evaluation) -- a plain suspend call here would throw immediately instead of
             // running, leaving Activity Recognition updates registered indefinitely.
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                if (startedActivityRecognition) ActivityRecognitionManager.stop(context)
+                if (startedActivityRecognition) {
+                    arUsers.remove(vin)
+                    if (arUsers.isEmpty()) ActivityRecognitionManager.stop(context)
+                }
             }
         }
     }
@@ -266,18 +306,23 @@ object AutoLockController {
             }
             return
         }
-        // ONE retry, and only here. A walk-away lock is the moment to spend it: the alternative is
-        // that a single network blip, or a token that expired a minute ago, leaves the car open and
-        // reports an error. Nothing else in this flow is retried, and this is bounded at one.
-        // Up to three attempts in all, 2.5s and then 5s apart: a network blip, or a token that expired a minute ago, should not leave
-        // the car open. Every failed attempt is logged, so the last one's reason is never the only trace.
+        // Up to three attempts, 2.5s and then 5s apart (see LockRetry): a network blip, or a token that expired a minute ago, should not
+        // leave the car open. Not retried when it cannot help: the same lock already being sent by another path, or the day's limit.
+        // Every failed attempt is logged, so the last one's reason is never the only trace.
         var result = suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
         var attempt = 1
-        while (result?.ok != true && attempt < 3) {
+        while (true) {
+            val wait = LockRetry.nextDelayMs(result, attempt) ?: break
             AppLog.log("AutoLock: lock attempt $attempt failed for $vin (${result?.message ?: "no response"}); trying again.")
-            delay(if (attempt == 1) 2_500L else 5_000L)
+            delay(wait)
             result = suspendRunCatching { CarCommandRunner.execute(context, CarCommand(vin, CarAction.LOCK)) }.getOrNull()
             attempt++
+        }
+        if (result?.refused == true) {
+            // Another path (the app, a widget, the watch) is sending this very lock right now: its own result is the one to report.
+            AppLog.log("AutoLock: the lock for $vin is already being sent by another path; leaving the outcome to it.")
+            _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.SKIPPED, lastOutcome = "Skipped. The car is already being locked.")) }
+            return
         }
         if (result?.ok == true) {
             AppLog.log("AutoLock: car locked automatically ($vin).")

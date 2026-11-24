@@ -29,15 +29,15 @@ fun AppViewModel.setAutoLockConfig(vin: String, config: AutoLockConfig) {
             runCatching { AutoLockController.cancel(vin) }
         }
         val anyEnabled = settingsStore.allAutoLockConfigs().values.any { it.enabled }
-        val action = if (anyEnabled) {
-            com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH
+        if (anyEnabled) {
+            // Through AutoLockService.start, not startForegroundService directly: that funnel refuses when
+            // the app is sealed or the permission is missing, and a raw startForegroundService here is how
+            // the sealed case reached the service and crashed the app (see AutoLockService.promoteThenStop).
+            com.bloo.bluelink.autolock.AutoLockService.start(getApplication(), vin, com.bloo.bluelink.autolock.AutoLockService.ACTION_START_WATCH)
         } else {
-            com.bloo.bluelink.autolock.AutoLockService.ACTION_STOP_WATCH
+            // Stopped, not started-to-stop: see AutoLockService.stopWatch.
+            com.bloo.bluelink.autolock.AutoLockService.stopWatch(getApplication())
         }
-        // Through AutoLockService.start, not startForegroundService directly: that funnel refuses when
-        // the app is sealed or the permission is missing, and a raw startForegroundService here is how
-        // the sealed case reached the service and crashed the app (see AutoLockService.promoteThenStop).
-        com.bloo.bluelink.autolock.AutoLockService.start(getApplication(), vin, action)
     }
 }
 

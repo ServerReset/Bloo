@@ -64,6 +64,10 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
         // also what makes the service start below land inside the broadcast.
         val vin = AutoLockAddresses.vinFor(context, deviceMac) ?: return
         val ctx = context.applicationContext
+        if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED && !AutoLockEvents.disconnectMeansLeaving(bluetoothState(context))) {
+            AppLog.log("AutoLock: $vin disconnected because the phone's Bluetooth is turning off, not because you left; ignored.")
+            return
+        }
         if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
             AutoLockTrigger.onCarDisconnected(ctx, vin)
         } else {
@@ -86,8 +90,13 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
         )
     }
 
-    private companion object {
+    internal companion object {
+        /** The phone's Bluetooth adapter state, or null when it cannot be read. */
+        fun bluetoothState(context: Context): Int? = runCatching {
+            context.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.state
+        }.getOrNull()
+
         /** Fixed, distinct from the per-car ids: a missing permission is about the phone, not one car. */
-        const val PERMISSION_NOTIFICATION_ID = 90301
+        private const val PERMISSION_NOTIFICATION_ID = 90301
     }
 }
