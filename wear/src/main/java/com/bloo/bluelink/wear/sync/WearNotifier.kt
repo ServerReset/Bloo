@@ -107,7 +107,7 @@ object WearNotifier {
                 manager.notify(idFor(now.vin, "complete"), alert(app, "${now.name} is charged", "Battery at $pct%"))
             }
             if (plan.lowBattery) {
-                manager.notify(idFor(now.vin, "low"), alert(app, "${now.name} battery is low", "$pct% left" + (now.rangeLabel(com.bloo.bluelink.wear.climate.WearPresets.metricDistance)?.let { " · $it" } ?: "")))
+                manager.notify(idFor(now.vin, "low"), alert(app, "${now.name} battery is low", "$pct% left" + (now.rangeLabel(com.bloo.bluelink.wear.WearPresets.metricDistance)?.let { " · $it" } ?: "")))
             }
         }
     }
@@ -136,7 +136,7 @@ object WearNotifier {
             .addPart("level", Status.TextPart(v.percent?.let { "$it%" } ?: ""))
             .build(),
     ) {
-        setContentText(listOfNotNull(v.percent?.let { "$it%" }, v.rangeLabel(com.bloo.bluelink.wear.climate.WearPresets.metricDistance)).joinToString(" · "))
+        setContentText(listOfNotNull(v.percent?.let { "$it%" }, v.rangeLabel(com.bloo.bluelink.wear.WearPresets.metricDistance)).joinToString(" · "))
         v.percent?.let { setProgress(100, it.coerceIn(0, 100), false) }
         addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CHARGE_OFF))
     }

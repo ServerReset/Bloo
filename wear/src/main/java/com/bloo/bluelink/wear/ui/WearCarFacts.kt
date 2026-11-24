@@ -14,7 +14,7 @@ import java.util.Locale
  * watch, and so the page grows with what the car actually tells us rather than with a fixed template.
  */
 internal object WearCarFacts {
-    fun status(v: VehicleSnapshot, metric: Boolean = com.bloo.bluelink.wear.climate.WearPresets.metricDistance): List<Pair<String, String>> = buildList {
+    fun status(v: VehicleSnapshot, metric: Boolean = com.bloo.bluelink.wear.WearPresets.metricDistance): List<Pair<String, String>> = buildList {
         if (v.hasBattery) v.percent?.let { add("Battery" to "$it%") }
         v.rangeLabel(metric)?.let { add("Range" to it) }
         doorLockLabel(v.locked)?.let { add("Doors" to it) }
