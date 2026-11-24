@@ -1,9 +1,8 @@
 package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
-import com.bloo.bluelink.data.isCarConfigured
-import com.bloo.bluelink.data.setCarConfigured
-import com.bloo.bluelink.data.setOnboardingSeen
+import com.bloo.bluelink.data.finishOnboarding
+import com.bloo.bluelink.data.setCarsConfigured
 import com.bloo.bluelink.data.snapshot
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -27,11 +26,7 @@ fun AppViewModel.restoreFromSyncThenContinue(context: android.content.Context, u
 /** Finish first-run onboarding (wizard complete) and land in the app. */
 fun AppViewModel.finishOnboarding() {
     val vins = _state.value.vehicles.map { it.vin }
-    viewModelScope.launch {
-        settingsStore.setOnboardingSeen()
-        vins.forEach { settingsStore.setCarConfigured(it) }
-        DebugProbe.mark("first-run pages finished: ${vins.count { settingsStore.isCarConfigured(it) }} of ${vins.size} cars set up")
-    }
+    viewModelScope.launch { settingsStore.finishOnboarding(vins) }
     landInApp()
 }
 
@@ -43,7 +38,7 @@ private fun AppViewModel.landInApp() = _state.update { it.copy(screen = Screen.G
 
 /** Mark newly-detected cars as configured and return to the garage. */
 fun AppViewModel.finishCarSetup(vins: List<String>) {
-    viewModelScope.launch { vins.forEach { settingsStore.setCarConfigured(it) } }
+    viewModelScope.launch { settingsStore.setCarsConfigured(vins) }
     landInApp()
 }
 

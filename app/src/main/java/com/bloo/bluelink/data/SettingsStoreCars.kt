@@ -152,25 +152,26 @@ suspend fun SettingsStore.setSeatFlag(vin: String, field: String, value: Boolean
     editTracked { it[booleanPreferencesKey("seat_${field}_$vin")] = value }
 }
 
-suspend fun SettingsStore.onboardingSeen(): Boolean = onboardingSeen(context.settingsDataStore.data.first())
-
 fun SettingsStore.onboardingSeen(p: Preferences): Boolean = p[booleanPreferencesKey(PrefKeys.ONBOARDING_SEEN)] ?: false
 
-suspend fun SettingsStore.setOnboardingSeen() {
-    editTracked { it[booleanPreferencesKey(PrefKeys.ONBOARDING_SEEN)] = true }
+/** True once a car has been through the feature-setup wizard. */
+fun SettingsStore.isCarConfigured(vin: String, p: Preferences): Boolean = p[booleanPreferencesKey("car_configured_$vin")] ?: false
+
+/**
+ * The first-run pages are done and every car in [vins] is set up, in ONE write. Written one key at a time, a restart (or the app
+ * being killed) moments later could land between them and leave a car to be set up again on the next start.
+ */
+suspend fun SettingsStore.finishOnboarding(vins: List<String>) {
+    editTracked { prefs ->
+        prefs[booleanPreferencesKey(PrefKeys.ONBOARDING_SEEN)] = true
+        vins.forEach { prefs[booleanPreferencesKey("car_configured_$it")] = true }
+    }
 }
 
-/** True once a car has been through the feature-setup wizard. */
-suspend fun SettingsStore.isCarConfigured(vin: String): Boolean =
-
-    isCarConfigured(vin, context.settingsDataStore.data.first())
-
-fun SettingsStore.isCarConfigured(vin: String, p: Preferences): Boolean =
-
-    p[booleanPreferencesKey("car_configured_$vin")] ?: false
-
-suspend fun SettingsStore.setCarConfigured(vin: String) {
-    editTracked { it[booleanPreferencesKey("car_configured_$vin")] = true }
+/** Every car in [vins] is set up, in one write (see [finishOnboarding]). */
+suspend fun SettingsStore.setCarsConfigured(vins: List<String>) {
+    if (vins.isEmpty()) return
+    editTracked { prefs -> vins.forEach { prefs[booleanPreferencesKey("car_configured_$it")] = true } }
 }
 
 /**
