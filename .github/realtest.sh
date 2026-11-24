@@ -32,10 +32,21 @@ launch() { adb shell am force-stop $PKG; adb shell am start -n $PKG/$APP.MainAct
 # Waits up to $2 seconds for a test line matching $1 in capture $3.
 await() { for _ in $(seq 1 "$2"); do grep -qE "$1" "/tmp/bt-$3.txt" 2>/dev/null && return 0; sleep 1; done; return 1; }
 show() { echo "=====BLOOTEST $1"; sed 's/^[^ ]* [^ ]* //' "/tmp/bt-$1.txt" | grep -v "^---------" ; }
+# Unlocks the emulator's lock screen with its PIN, until Android reports the user's storage unlocked (an app cannot start before).
 unlock_device() {
-  adb shell input keyevent KEYCODE_WAKEUP; sleep 2
-  adb shell input swipe 540 1800 540 600 400; sleep 2
-  adb shell input text $DEVICE_PIN; adb shell input keyevent KEYCODE_ENTER; sleep 4
+  for attempt in 1 2 3 4; do
+    adb shell input keyevent KEYCODE_WAKEUP; sleep 2
+    adb shell input keyevent KEYCODE_MENU; sleep 2
+    adb shell input swipe 540 1900 540 500 300; sleep 3
+    adb shell input text $DEVICE_PIN; sleep 1
+    adb shell input keyevent KEYCODE_ENTER; sleep 6
+    if adb shell dumpsys user | grep -q "RUNNING_UNLOCKED"; then echo "device unlocked (attempt $attempt)"; return 0; fi
+  done
+  echo "device still locked:"; adb shell dumpsys user | grep -E "State:|RUNNING" | head -3
+  return 1
+}
+device_state() {
+  echo "device: $(adb shell dumpsys user | grep -oE 'RUNNING_[A-Z_]+' | head -1), app pid: $(adb shell pidof $PKG | tr -d '\r'), focus: $(adb shell dumpsys window | grep -m1 mCurrentFocus | sed 's/.*{[^ ]* [^ ]* //; s/}.*//')"
 }
 
 booted
@@ -59,18 +70,23 @@ show first
 echo "--- restarting the emulator"
 adb reboot
 booted
-capture restart
 unlock_device
+device_state
+capture restart
+sleep 2
 launch 30
+device_state
 if await 'login form: fingerprint offered=false bootReauth=true' 30 restart; then
   echo "RESULT: the restart sign-in form offers no fingerprint"
 else
   echo "RESULT: the restart sign-in form was not seen without a fingerprint"
 fi
 echo "--- restart sign-in"
+device_state
 fixture testreauth --es user64 "$U64" --es password64 "$P64" --es pin64 "$N64" --es brand "$BRAND"
 if await 'prompt: shown' 60 restart; then
   sleep 6
+  device_state
   adb shell input text $DEVICE_PIN; adb shell input keyevent KEYCODE_ENTER
 fi
 await 'screen=Garage .*locked=false' 150 restart
