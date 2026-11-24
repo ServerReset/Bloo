@@ -257,6 +257,7 @@ internal suspend fun AppViewModel.resolveScreen(
 ): Screen {
     val firstRun = !settingsStore.onboardingSeen(prefs)
     val unconfiguredVins = vehicles.filter { !settingsStore.isCarConfigured(it.vin, prefs) }.map { it.vin }
+    DebugProbe.mark("resolve screen: firstRun=$firstRun cars=${vehicles.size} not set up=${unconfiguredVins.size} (car ${vehicles.indices.filter { vehicles[it].vin in unconfiguredVins }.map { it + 1 }})")
     return when {
         firstRun -> firstRunScreen
         unconfiguredVins.isNotEmpty() -> Screen.CarSetup(unconfiguredVins)

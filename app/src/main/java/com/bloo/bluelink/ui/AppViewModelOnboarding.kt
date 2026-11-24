@@ -29,6 +29,7 @@ fun AppViewModel.finishOnboarding() {
     viewModelScope.launch {
         settingsStore.setOnboardingSeen()
         vins.forEach { settingsStore.setCarConfigured(it) }
+        DebugProbe.mark("first-run pages finished: ${vins.count { settingsStore.isCarConfigured(it) }} of ${vins.size} cars set up")
     }
     landInApp()
 }
