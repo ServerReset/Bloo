@@ -22,6 +22,9 @@ booted() {
   adb wait-for-device
   until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
   sleep 40
+  # Root, for a hard kill of the app in the AutoLock test (its foreground watcher keeps "am kill" from touching it). Before any
+  # logcat capture starts: it restarts adbd.
+  adb root >/dev/null 2>&1; sleep 4; adb wait-for-device
   adb shell svc power stayon true
   adb shell input keyevent KEYCODE_WAKEUP
 }
@@ -99,13 +102,17 @@ echo "--- AutoLock: the app is killed between the disconnect and the walk"
 adb shell input keyevent KEYCODE_HOME; sleep 4
 $DBG trigger >/dev/null
 await_more 'autolock: detection=CONFIRMING' first 30
-adb shell am kill $PKG; sleep 4
-[ -z "$(adb shell pidof $PKG | tr -d '\r')" ] && echo "RESULT: the app process was killed mid-evaluation"
+oldpid=$(adb shell pidof $PKG | tr -d '\r')
+# A hard kill, as Android's low-memory killer does: no cleanup runs, nothing in memory survives.
+adb shell kill -9 "$oldpid"; sleep 3
+if [ "$(adb shell pidof $PKG | tr -d '\r')" != "$oldpid" ]; then echo "RESULT: the app process ($oldpid) was killed mid-evaluation"; else echo "RESULT: the app process could NOT be killed"; fi
 before=$(count "$DONE" first)
 $DBG walk >/dev/null
 for _ in $(seq 1 120); do [ "$(count "$DONE" first)" -gt "$before" ] && break; sleep 1; done
-if [ "$(count "$DONE" first)" -gt "$before" ]; then
-  echo "RESULT: the walk in the restarted app resumed the departure: $(grep -E "$DONE" /tmp/bt-first.txt | tail -1 | sed 's/.*autolock: //')"
+newpid=$(adb shell pidof $PKG | tr -d '\r')
+if [ "$(count "$DONE" first)" -gt "$before" ] && [ -n "$newpid" ] && [ "$newpid" != "$oldpid" ]; then
+  echo "RESULT: the walk in the restarted app (process $newpid) resumed the departure: $(grep -E "$DONE" /tmp/bt-first.txt | tail -1 | sed 's/.*autolock: //')"
+  grep -q "BlooTest( *$newpid).*detection=GRACE" /tmp/bt-first.txt && echo "RESULT: the resumed departure ran its countdown in the new process"
 else
   echo "RESULT: the walk in the restarted app did NOT resume the departure"
 fi
