@@ -44,4 +44,16 @@ class WearAutoLockTest {
         assertTrue(WearAutoLock.BETA)
         assertFalse(WearAutoLock.GRACE_MS <= 0L)
     }
+
+    @Test fun neverLocksACarThatIsMoving() {
+        val moving = VehicleSnapshot(vin = "A", name = "A", model = "M", isEv = true, locked = false, engineOn = null, speedMph = 31.0)
+        assertEquals(emptyList(), WearAutoLock.targets(listOf(moving)), "someone is driving it")
+    }
+
+    @Test fun oneWalkLocksOnceThenRestsForTheCooldown() {
+        assertFalse(WearAutoLock.inCooldown(lastRunElapsed = 0L, nowElapsed = 5_000L), "never run: not in a cooldown")
+        assertTrue(WearAutoLock.inCooldown(lastRunElapsed = 10_000L, nowElapsed = 10_000L + 60_000L), "a minute later, same walk")
+        assertFalse(WearAutoLock.inCooldown(lastRunElapsed = 10_000L, nowElapsed = 10_000L + WearAutoLock.COOLDOWN_MS), "after it")
+        assertFalse(WearAutoLock.inCooldown(lastRunElapsed = 50_000L, nowElapsed = 1_000L), "a reboot reset the clock")
+    }
 }

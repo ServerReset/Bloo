@@ -180,9 +180,12 @@
              one of the implicit broadcasts Android still delivers to a manifest receiver even
              with the app process dead, so this alone is what makes "phone disconnects from
              the car -> lock it" work with no persistent service running in between. -->
+        <!-- Exported: the ACL broadcasts come from the Bluetooth stack's own process, not from this app or the system server, and a
+             receiver that is not exported turns them away, so this one never fired. Safe to export: ACL_CONNECTED and
+             ACL_DISCONNECTED are protected broadcasts, which no other app can send. -->
         <receiver
             android:name=".autolock.AutoLockBluetoothReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />

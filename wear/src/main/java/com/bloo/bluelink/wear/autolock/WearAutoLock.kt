@@ -11,6 +11,7 @@ import android.hardware.TriggerEventListener
 import android.os.SystemClock
 import androidx.core.content.edit
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.isDriving
 import com.bloo.bluelink.data.privatePrefs
 
 /**
@@ -36,6 +37,16 @@ object WearAutoLock {
 
     private const val PREFS = "bloo_wear_autolock"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_LAST_RUN = "last_run_elapsed"
+
+    /** The countdown notification's Cancel. */
+    internal const val ACTION_CANCEL = "com.bloo.bluelink.wear.AUTOLOCK_CANCEL"
+
+    /**
+     * After an auto lock has run, further motion is ignored this long. Significant motion fires again and again on a walk, and each
+     * trigger used to judge the cars and lock again: a walk could send a run of lock commands against the brand's daily limit.
+     */
+    internal const val COOLDOWN_MS = 10L * 60_000L
 
     private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
@@ -51,7 +62,25 @@ object WearAutoLock {
      * engine is not running. Pure, so it is unit-tested without a watch.
      */
     fun targets(vehicles: List<VehicleSnapshot>): List<String> =
-        vehicles.filter { it.locked != true && it.engineOn != true }.map { it.vin }
+        // Not a car that is moving either: someone is driving it, whatever the engine flag says.
+        vehicles.filter { it.locked != true && it.engineOn != true && !it.isDriving }.map { it.vin }
+
+    /** Whether a trigger at [nowElapsed] falls inside the cooldown after a run at [lastRunElapsed] (0 = never). Pure, for tests. */
+    fun inCooldown(lastRunElapsed: Long, nowElapsed: Long): Boolean =
+        lastRunElapsed > 0L && nowElapsed >= lastRunElapsed && nowElapsed - lastRunElapsed < COOLDOWN_MS
+
+    /** Records that an auto lock has just run, which starts the cooldown. */
+    internal fun markRun(context: Context) {
+        prefs(context).edit { putLong(KEY_LAST_RUN, SystemClock.elapsedRealtime()) }
+    }
+
+    /** The person cancelled the countdown: the pending lock is dropped, and the cooldown starts so the same walk does not re-arm it. */
+    internal fun cancelPending(context: Context) {
+        val app = context.applicationContext
+        runCatching { (app.getSystemService(Context.ALARM_SERVICE) as? AlarmManager)?.cancel(pending(app)) }
+        markRun(app)
+        WearNotifier.clearAutoLockCountdown(app)
+    }
 
     // Held so the registration is not collected while armed; the sensor is one-shot, so this is a
     // single lightweight object, not a live stream.
@@ -102,8 +131,11 @@ object WearAutoLock {
 
     private fun scheduleGrace(context: Context) {
         val mgr = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
-        val at = SystemClock.elapsedRealtime() + GRACE_MS
+        val now = SystemClock.elapsedRealtime()
+        if (inCooldown(prefs(context).getLong(KEY_LAST_RUN, 0L), now)) return
+        val at = now + GRACE_MS
         runCatching { mgr.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, pending(context)) }
+        WearNotifier.autoLockCountdown(context, (GRACE_MS / 1000).toInt())
     }
 
     internal fun pending(context: Context): PendingIntent {

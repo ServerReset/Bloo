@@ -207,6 +207,39 @@ object WearNotifier {
         app.getSystemService(NotificationManager::class.java).notify(idFor(vin, "autolock"), alert(app, title, text))
     }
 
+    /** The id of the countdown before the watch's auto lock: one for the whole watch, since one trigger judges every car. */
+    internal const val AUTOLOCK_COUNTDOWN_ID = 0x57414C
+
+    /**
+     * "Locking in 45s": what the watch is about to do after it felt the wearer set off, with a Cancel. The watch cannot tell walking
+     * away from walking TO the car, so the person always gets the chance to stop it.
+     */
+    fun autoLockCountdown(context: Context, seconds: Int) {
+        val app = context.applicationContext
+        if (!canPost(app)) return
+        ensureChannels(app)
+        val cancel = PendingIntent.getBroadcast(
+            app, AUTOLOCK_COUNTDOWN_ID,
+            Intent(app, WearAutoLockReceiver::class.java).setAction(WearAutoLock.ACTION_CANCEL),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = NotificationCompat.Builder(app, CHANNEL_ALERTS)
+            .setSmallIcon(R.drawable.ic_stat_bloo)
+            .setContentTitle("Auto lock in ${seconds}s")
+            .setContentText("You set off, so your car will lock. Cancel if you're heading to it.")
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setTimeoutAfter(seconds * 1000L + 5_000L)
+            .addAction(0, "Cancel", cancel)
+            .setContentIntent(openApp(app))
+            .build()
+        app.getSystemService(NotificationManager::class.java).notify(AUTOLOCK_COUNTDOWN_ID, n)
+    }
+
+    /** Takes the countdown down (it ran, or it was cancelled). */
+    fun clearAutoLockCountdown(context: Context) {
+        runCatching { context.applicationContext.getSystemService(NotificationManager::class.java).cancel(AUTOLOCK_COUNTDOWN_ID) }
+    }
+
     private fun alert(app: Context, title: String, text: String) =
         NotificationCompat.Builder(app, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_bloo)

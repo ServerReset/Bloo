@@ -22,8 +22,15 @@ import com.bloo.bluelink.suspendRunCatching
  */
 class WearAutoLockReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == WearAutoLock.ACTION_CANCEL) {
+            WearAutoLock.cancelPending(context)
+            return
+        }
         if (!WearAutoLock.isEnabled(context)) return
         val app = context.applicationContext
+        // Ran: the countdown comes down, and the cooldown starts, so the rest of this walk does not lock again.
+        WearNotifier.clearAutoLockCountdown(app)
+        WearAutoLock.markRun(app)
         val result = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
