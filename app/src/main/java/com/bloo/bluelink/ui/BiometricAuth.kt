@@ -47,11 +47,13 @@ fun showBiometricPrompt(
         executor,
         object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                DebugProbe.mark("prompt: passed")
                 done()
                 onSuccess()
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                DebugProbe.mark("prompt: ended without passing ($errorCode)")
                 done()
                 onError(errString.toString())
             }
@@ -67,6 +69,7 @@ fun showBiometricPrompt(
                 BiometricManager.Authenticators.DEVICE_CREDENTIAL,
         )
         .build()
+    DebugProbe.mark("prompt: shown (title=\"$title\" strong=$strong)")
     prompt.authenticate(info)
 }
 

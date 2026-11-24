@@ -41,6 +41,31 @@ class DebugFixturesReceiver : BroadcastReceiver() {
             // theme has to be written through its own store.
             "light" -> DebugSampleGarage.setTheme(context, "light")
             "dark" -> DebugSampleGarage.setTheme(context, "dark")
+            // The real-account test (.github/realtest.sh): the details come in as extras, from CI secrets, and are never logged.
+            "testlogin", "testreauth" -> {
+                // Base64, so a password's quotes, spaces or dollar signs survive the shell that adb runs the broadcast through.
+                fun extra(name: String) = intent.getStringExtra(name)?.let {
+                    String(android.util.Base64.decode(it, android.util.Base64.DEFAULT), Charsets.UTF_8).trim()
+                }.orEmpty()
+                val user = extra("user64")
+                val password = extra("password64")
+                val pin = extra("pin64")
+                val brand = runCatching { com.bloo.bluelink.data.Brand.valueOf(intent.getStringExtra("brand") ?: "HYUNDAI") }
+                    .getOrDefault(com.bloo.bluelink.data.Brand.HYUNDAI)
+                com.bloo.bluelink.ui.DebugAccountTest.commands.tryEmit(
+                    if (cmd == "testlogin") com.bloo.bluelink.ui.DebugAccountCommand.Login(user, password, pin, brand)
+                    else com.bloo.bluelink.ui.DebugAccountCommand.Reauth(user, password, pin, brand),
+                )
+                return
+            }
+            "testapplock" -> {
+                com.bloo.bluelink.ui.DebugAccountTest.commands.tryEmit(com.bloo.bluelink.ui.DebugAccountCommand.AppLockOn)
+                return
+            }
+            "testlockcar" -> {
+                com.bloo.bluelink.ui.DebugAccountTest.commands.tryEmit(com.bloo.bluelink.ui.DebugAccountCommand.LockCar)
+                return
+            }
             "fullscreen" -> {
                 DebugSampleGarage.fullScreenRequests.tryEmit(Unit)
                 AppLog.log("DebugFixturesReceiver: cmd=fullscreen")

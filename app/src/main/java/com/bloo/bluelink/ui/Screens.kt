@@ -91,6 +91,7 @@ fun BlooApp(vm: AppViewModel) {
     CompositionLocalProvider(LocalCentralMap provides centralMap) {
         BlooAppContent(vm, centralMap)
     }
+    DebugAccountTestHost(vm)
 }
 
 @Composable
@@ -472,6 +473,10 @@ private fun LoginPage(
             val loginUpdateChecking by remember { derivedStateOf { stateHolder.value.updateChecking } }
             val bootReauth by remember { derivedStateOf { stateHolder.value.bootReauth } }
             val loginContext = LocalContext.current
+            val fingerprintOffered = BootReauthPolicy.offersFingerprint(vm.canUseBiometrics(), bootReauth)
+            LaunchedEffect(fingerprintOffered, bootReauth) {
+                DebugProbe.mark("login form: fingerprint offered=$fingerprintOffered bootReauth=$bootReauth")
+            }
             LoginScreen(
                 loading = loading,
                 onLogin = if (bootReauth) ({ user, password, pin, brand ->
@@ -485,7 +490,7 @@ private fun LoginPage(
                 updateAvailableUrl = loginUpdateAvailable?.run?.htmlUrl,
                 // After a restart there is no biometric way in: the account details come first, and the one prompt follows them (see
                 // reauthAfterRestart).
-                onFingerprint = if (BootReauthPolicy.offersFingerprint(vm.canUseBiometrics(), bootReauth)) ({ vm.promptBiometricUnlock(loginContext) }) else null,
+                onFingerprint = if (fingerprintOffered) ({ vm.promptBiometricUnlock(loginContext) }) else null,
             )
             kiaOtp?.let { otp -> KiaOtpDialog(otp, loading = loading, vm = vm) }
             canadaOtp?.let { otp -> CanadaOtpDialog(otp, loading = loading, vm = vm) }
