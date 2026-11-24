@@ -1,6 +1,7 @@
 package com.bloo.bluelink.ui
 
 import androidx.lifecycle.viewModelScope
+import com.bloo.bluelink.data.isCarConfigured
 import com.bloo.bluelink.data.setCarConfigured
 import com.bloo.bluelink.data.setOnboardingSeen
 import com.bloo.bluelink.data.snapshot
