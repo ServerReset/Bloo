@@ -80,8 +80,8 @@ internal fun DebugAccountTestHost(vm: AppViewModel) {
             message = message.replace(Regex("[^\\s@]+@[^\\s@]+"), "<email>").replace(Regex("\\d{4,}"), "<n>")
             val pending = s.pending.map { it.substringAfterLast(':') }.sorted()
             val awaiting = s.awaitingCar.map { it.substringAfterLast(':') }.sorted()
-            "state: screen=${s.screen} locked=${s.locked} bootReauth=${s.bootReauth} cars=${s.vehicles.size} " +
+            "state: screen=${s.screen::class.simpleName} locked=${s.locked} bootReauth=${s.bootReauth} cars=${s.vehicles.size} " +
                 "pending=$pending awaitingCar=$awaiting otp=${s.kiaOtp != null || s.canadaOtp != null} message=\"$message\""
-        }.distinctUntilChanged().collect { DebugProbe.mark(it) }
+        }.distinctUntilChanged().collect { DebugProbe.mark(it.replace(Regex("[A-HJ-NPR-Z0-9]{17}"), "<vin>")) }
     }
 }

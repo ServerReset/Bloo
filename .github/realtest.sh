@@ -31,7 +31,8 @@ fixture() { adb shell am broadcast -n $PKG/$APP.DebugFixturesReceiver --es cmd "
 launch() { adb shell am force-stop $PKG; adb shell am start -n $PKG/$APP.MainActivity >/dev/null; sleep "${1:-25}"; }
 # Waits up to $2 seconds for a test line matching $1 in capture $3.
 await() { for _ in $(seq 1 "$2"); do grep -qE "$1" "/tmp/bt-$3.txt" 2>/dev/null && return 0; sleep 1; done; return 1; }
-show() { echo "=====BLOOTEST $1"; sed 's/^[^ ]* [^ ]* //' "/tmp/bt-$1.txt" | grep -v "^---------" ; }
+# Any VIN-shaped run (17 letters and digits) is taken out here too, whatever the app wrote.
+show() { echo "=====BLOOTEST $1"; sed 's/^[^ ]* [^ ]* //; s/[A-HJ-NPR-Z0-9]\{17\}/<vin>/g' "/tmp/bt-$1.txt" | grep -v "^---------" ; }
 # Unlocks the emulator's lock screen with its PIN, until Android reports the user's storage unlocked (an app cannot start before).
 unlock_device() {
   for attempt in 1 2 3 4; do
