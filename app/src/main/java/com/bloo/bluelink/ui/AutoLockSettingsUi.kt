@@ -471,6 +471,15 @@ private fun AutoLockBesideCarRow(carName: String) {
     val backgroundOk = remember(recheck) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || context.hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
     }
+    // Whether this build asks for background location at all: the Play build holds it back until Play has approved its
+    // declaration (app/src/play/AndroidManifest.xml), and a request for an undeclared permission is silently refused.
+    val declared = remember {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || runCatching {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_PERMISSIONS)
+                .requestedPermissions?.contains(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == true
+        }.getOrDefault(false)
+    }
     var showDisclosure by remember { mutableStateOf(false) }
     val backgroundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { recheck++ }
     // Android asks for "while using the app" first; "all the time" can only be asked for after that (on 11+ it opens the setting).
@@ -480,6 +489,11 @@ private fun AutoLockBesideCarRow(carName: String) {
     }
 
     SectionDivider()
+    if (!declared) {
+        StatusRow("Stay unlocked while you're beside it", "Coming soon")
+        BodySmallText("Will hold the lock while you're still next to $carName. Not in this version yet.")
+        return
+    }
     StatusRow("Stay unlocked while you're beside it", if (fineOk && backgroundOk) "On" else "Off")
     BodySmallText(
         if (fineOk && backgroundOk) {
