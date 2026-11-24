@@ -17,6 +17,6 @@ class AutoLockActivityReceiver : BroadcastReceiver() {
             it.transitionType == ActivityTransition.ACTIVITY_TRANSITION_ENTER &&
                 (it.activityType == DetectedActivity.WALKING || it.activityType == DetectedActivity.ON_FOOT)
         }
-        if (walkedAway) AutoLockController.onWalkingConfirmedAny()
+        if (walkedAway) AutoLockController.onWalkingConfirmedAny(context.applicationContext)
     }
 }

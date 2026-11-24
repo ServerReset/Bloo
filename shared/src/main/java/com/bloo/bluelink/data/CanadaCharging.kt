@@ -350,7 +350,8 @@ suspend fun CanadaApi.tripPlan(
                     lon = lon,
                     arriveSoc = st.path("pointSoc").intLoose()?.takeIf { it in 0..100 },
                     targetSoc = st.path("targetSoc").intLoose()?.takeIf { it in 0..100 },
-                    chargeMinutes = st.path("chargingTime").dbl()?.let { (it / 60).toInt() },
+                    // Seconds to minutes, rounded up: a 59-second top-up read "about 0 min".
+                    chargeMinutes = st.path("chargingTime").dbl()?.takeIf { it > 0 }?.let { kotlin.math.ceil(it / 60).toInt() },
                     distanceM = st.path("pointDistance").intLoose(),
                     powerKw = st.path("pointChargerPower").intLoose(),
                 )

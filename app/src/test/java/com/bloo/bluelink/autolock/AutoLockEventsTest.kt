@@ -29,3 +29,16 @@ class AutoLockEventsTest {
         assertTrue(AutoLockEvents.startsNewEvaluation(DetectionState.CONFIRMING, running = false), "a job that died mid-way")
     }
 }
+
+/** Which saved departures a walk in a restarted process may still resume. */
+class AutoLockPendingTest {
+    @Test fun aRecentDepartureIsStillOpen() {
+        assertTrue(AutoLockPending.stillOpen(atMs = 1_000, nowMs = 61_000, windowMs = 120_000))
+        assertTrue(AutoLockPending.stillOpen(atMs = 1_000, nowMs = 121_000, windowMs = 120_000), "at the edge")
+    }
+
+    @Test fun anOldOrFutureDepartureIsNot() {
+        assertFalse(AutoLockPending.stillOpen(atMs = 1_000, nowMs = 121_001, windowMs = 120_000), "too old to be this walk")
+        assertFalse(AutoLockPending.stillOpen(atMs = 5_000, nowMs = 1_000, windowMs = 120_000), "a clock change put it in the future")
+    }
+}

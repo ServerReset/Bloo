@@ -142,7 +142,7 @@ private fun RouteCard(r: TripRoute) {
                     s.network,
                     s.arriveSoc?.let { "arrive $it%" },
                     s.targetSoc?.let { "leave $it%" },
-                    s.chargeMinutes?.let { "about $it min" },
+                    s.chargeMinutes?.let { "about ${com.bloo.bluelink.data.fmtMinutes(it)}" },
                     s.powerKw?.let { "$it kW" },
                 ).joinToString(" · ")
                 add(if (detail.isBlank()) s.name else "${s.name}: $detail")

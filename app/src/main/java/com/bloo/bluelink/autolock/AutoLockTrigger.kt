@@ -38,6 +38,8 @@ internal object AutoLockTrigger {
 
     /** The car reconnected (the user got back in): abort whatever is pending for it. */
     fun onCarConnected(context: Context, vin: String) {
+        // Back in the car: forget the departure on disk too, or a walk later could resume it (see AutoLockPending).
+        AutoLockPending.clear(context.applicationContext, vin)
         AutoLockController.cancel(vin)
     }
 }

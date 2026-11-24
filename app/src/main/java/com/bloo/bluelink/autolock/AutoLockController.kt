@@ -105,8 +105,25 @@ object AutoLockController {
                 return
             }
             jobs[vin]?.cancel()
+            AutoLockPending.record(context.applicationContext, vin)
             jobs[vin] = scope.launch { runEvaluation(context.applicationContext, vin) }
         }
+    }
+
+    /**
+     * A walk arrived in a process that has no evaluation waiting for it (Android stopped the one the disconnect started): resume each
+     * departure still on record (see [AutoLockPending]), with the walk already counted.
+     */
+    private fun resumeAfterWalk(context: Context): Boolean {
+        val open = AutoLockPending.open(context, System.currentTimeMillis(), CONFIRM_TIMEOUT_MS)
+            .filter { vin -> jobs[vin]?.isActive != true }
+        open.forEach { vin ->
+            AppLog.log("AutoLock: a walk arrived after the app was restarted; resuming the departure for $vin.")
+            // Best effort, as for a fresh departure: the progress notification, and with it a foreground process.
+            AutoLockService.start(context.applicationContext, vin)
+            jobs[vin] = scope.launch { runEvaluation(context.applicationContext, vin, walked = true) }
+        }
+        return open.isNotEmpty()
     }
 
     /** Skip the remaining grace period and lock immediately (notification "Lock now"). */
@@ -129,8 +146,10 @@ object AutoLockController {
 
     /** Activity Recognition transitions are app-wide (one Google Play Services request, not
      *  per-VIN), so a "walking" transition confirms every evaluation currently waiting on it. */
-    fun onWalkingConfirmedAny() {
-        _state.value.filterValues { it.detection == DetectionState.CONFIRMING }.keys.forEach { onWalkingConfirmed(it) }
+    fun onWalkingConfirmedAny(context: Context? = null) {
+        val waiting = _state.value.filterValues { it.detection == DetectionState.CONFIRMING }.keys
+        waiting.forEach { onWalkingConfirmed(it) }
+        if (waiting.isEmpty() && context != null) resumeAfterWalk(context)
     }
 
     /**
@@ -153,11 +172,12 @@ object AutoLockController {
         AppLog.log("AutoLock: cancelled for $vin")
     }
 
-    private suspend fun runEvaluation(context: Context, vin: String) = mutexFor(vin).withLock {
+    private suspend fun runEvaluation(context: Context, vin: String, walked: Boolean = false) = mutexFor(vin).withLock {
         var startedActivityRecognition = false
         try {
             skipGrace.remove(vin)
             walkAwayConfirmed.remove(vin)
+            if (walked) walkAwayConfirmed.add(vin)
             // Physical detection is mandatory: a walk must be confirmed by Activity Recognition before a lock, whatever is saved.
             val settings = SettingsStore(context).autoLockConfig(vin)
             if (!settings.enabled) return@withLock
@@ -177,6 +197,8 @@ object AutoLockController {
             }
 
             val sm = LockStateMachine().also { machines[vin] = it }
+            // A resumed departure already has its walk: the machine then goes straight to the countdown.
+            if (walked) sm.next(DetectionState.IDLE, DetectionEvent.WalkingConfirmed)
             advance(vin, sm.next(DetectionState.IDLE, DetectionEvent.CarBluetoothDisconnected))
             AppLog.log("AutoLock: left the car ($vin) — evaluating.")
 
@@ -256,6 +278,8 @@ object AutoLockController {
             // evaluation) -- a plain suspend call here would throw immediately instead of
             // running, leaving Activity Recognition updates registered indefinitely.
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                // Settled one way or another: nothing for a later walk to resume.
+                AutoLockPending.clear(context, vin)
                 if (startedActivityRecognition) {
                     arUsers.remove(vin)
                     if (arUsers.isEmpty()) ActivityRecognitionManager.stop(context)

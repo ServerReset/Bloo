@@ -155,6 +155,7 @@ class AutoLockService : Service() {
 
         when (intent.action) {
             ACTION_CANCEL -> {
+                AutoLockPending.clear(applicationContext, vin)
                 AutoLockController.cancel(vin)
                 startForegroundCompat(vin, DetectionState.ABORTED, 0)
                 scope.launch { delay(3000); finishTracking(vin) }
@@ -359,7 +360,9 @@ class AutoLockService : Service() {
          * killed; turning AutoLock off crashed it that way.
          */
         fun stopWatch(context: Context) {
-            runCatching { AutoLockController.state.value.keys.forEach { AutoLockController.cancel(it) } }
+            runCatching {
+                AutoLockController.state.value.keys.forEach { AutoLockPending.clear(context, it); AutoLockController.cancel(it) }
+            }
             runCatching { context.stopService(Intent(context, AutoLockService::class.java)) }
             AppLog.log("AutoLock: watcher stopped")
         }
