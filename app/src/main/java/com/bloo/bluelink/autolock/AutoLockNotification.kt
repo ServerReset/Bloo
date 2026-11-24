@@ -16,6 +16,12 @@ import com.bloo.bluelink.data.ensureNotificationChannel
 object AutoLockNotification {
     internal const val CHANNEL_ID = "bloo_autolock"
 
+    /**
+     * The countdown before a lock, on a channel that is heard. It is the person's one chance to stop the car locking with someone
+     * still beside it, and on the quiet channel it made no sound at all. It sounds once, as the countdown starts, not every second.
+     */
+    internal const val COUNTDOWN_CHANNEL_ID = "bloo_autolock_countdown"
+
     private fun ensureChannel(context: Context) = ensureNotificationChannel(
         context,
         id = CHANNEL_ID,
@@ -25,10 +31,29 @@ object AutoLockNotification {
         showBadge = false,
     )
 
+    private fun ensureCountdownChannel(context: Context) = ensureNotificationChannel(
+        context,
+        id = COUNTDOWN_CHANNEL_ID,
+        name = "AutoLock countdown",
+        importance = NotificationManager.IMPORTANCE_HIGH,
+        description = "The few seconds before AutoLock locks your car, so you can cancel",
+        showBadge = false,
+    )
+
     fun notificationId(vin: String): Int = 0x41_0000 or (vin.hashCode() and 0xFFFF)
 
-    fun build(context: Context, vin: String, carName: String, state: DetectionState, graceRemaining: Int): Notification {
+    /** [countdownStarted] is true for the first countdown update only: that one is heard, the per-second ticks after it are not. */
+    fun build(
+        context: Context,
+        vin: String,
+        carName: String,
+        state: DetectionState,
+        graceRemaining: Int,
+        countdownStarted: Boolean = false,
+    ): Notification {
         ensureChannel(context)
+        val countdown = state == DetectionState.GRACE
+        if (countdown) ensureCountdownChannel(context)
         val (title, text) = when (state) {
             DetectionState.CONFIRMING -> "Watching $carName" to "Confirming you've left before locking…"
             DetectionState.GRACE -> "Locking $carName in ${graceRemaining}s" to "Tap Cancel if you're coming right back."
@@ -40,14 +65,16 @@ object AutoLockNotification {
             DetectionState.ERROR -> "AutoLock error" to "Couldn't finish evaluating $carName."
             else -> "AutoLock" to carName
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, if (countdown) COUNTDOWN_CHANNEL_ID else CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_bloo)
             .setContentTitle(title)
             .setContentText(text)
-            .setOnlyAlertOnce(true)
+            // The notification is already showing (it was "Watching"), so "alert once" would swallow the countdown's sound: the
+            // first countdown update is let through, every later one stays silent.
+            .setOnlyAlertOnce(!(countdown && countdownStarted))
             .setOngoing(!state.isTerminal)
             .setAutoCancel(state.isTerminal)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(if (countdown) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
             .setContentIntent(openAppIntent(context))
         if (state == DetectionState.GRACE) {
             builder.addAction(0, "Lock now", actionIntent(context, vin, AutoLockService.ACTION_LOCK_NOW))

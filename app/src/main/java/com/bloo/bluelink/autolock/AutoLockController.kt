@@ -380,6 +380,7 @@ object AutoLockController {
             title = "AutoLock didn't lock $carName",
             text = text,
             clears = false,
+            channelId = Notifications.CHANNEL_AUTOLOCK_PROBLEMS,
         )
     }
 
@@ -393,6 +394,7 @@ object AutoLockController {
                 title = "AutoLock couldn't lock your car",
                 text = message,
                 clears = false,
+                channelId = Notifications.CHANNEL_AUTOLOCK_PROBLEMS,
             )
         }
     }
@@ -431,6 +433,7 @@ object AutoLockController {
             text = text,
             // Stays until it is dealt with, as above; the others about AutoLock clear themselves.
             clears = false,
+            channelId = Notifications.CHANNEL_AUTOLOCK_PROBLEMS,
         )
     }
 

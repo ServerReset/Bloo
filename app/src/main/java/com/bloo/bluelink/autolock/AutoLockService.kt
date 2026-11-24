@@ -54,6 +54,9 @@ class AutoLockService : Service() {
      */
     @Volatile private var watchVin: String? = null
 
+    /** The state each car's notification last showed, so the countdown's first update (and only that one) is heard. */
+    private val lastShown = java.util.concurrent.ConcurrentHashMap<String, DetectionState>()
+
     /** What every start returns: sticky while watching, so the system brings the watcher back after killing the process. */
     private fun startMode(): Int = if (watchVin != null) START_STICKY else START_NOT_STICKY
 
@@ -312,7 +315,9 @@ class AutoLockService : Service() {
      */
     private fun postNotification(vin: String, state: DetectionState, grace: Int, promote: Boolean): Boolean {
         val carName = carNames[vin] ?: "your car"
-        val notification = AutoLockNotification.build(this, vin, carName, state, grace)
+        val countdownStarted = state == DetectionState.GRACE && lastShown.put(vin, state) != DetectionState.GRACE
+        if (state != DetectionState.GRACE) lastShown[vin] = state
+        val notification = AutoLockNotification.build(this, vin, carName, state, grace, countdownStarted)
         val id = AutoLockNotification.notificationId(vin)
         if (!promote) {
             runCatching { NotificationManagerCompat.from(this).notify(id, notification) }

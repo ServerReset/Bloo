@@ -40,6 +40,11 @@ object Notifications {
     const val CHANNEL_EVENTS = "bloo_events"
     /** Bloo's own app updates: a newer build is available / was downloaded. */
     const val CHANNEL_UPDATES = "bloo_updates"
+    /**
+     * AutoLock could not lock a car, or could not run. Its own channel, high importance: on the general alerts channel, muting car
+     * alerts also muted "your car didn't lock", the one message a person most needs.
+     */
+    const val CHANNEL_AUTOLOCK_PROBLEMS = "bloo_autolock_problems"
 
     /** Kept as the alerts channel for the many existing call sites that mean "an alert". */
     private const val CHANNEL = CHANNEL_ALERTS
@@ -81,6 +86,13 @@ object Notifications {
                 name = "Car events",
                 importance = NotificationManager.IMPORTANCE_DEFAULT,
                 description = "Your car was started, or a charge session finished",
+            )
+            CHANNEL_AUTOLOCK_PROBLEMS -> ensureNotificationChannel(
+                context,
+                id = CHANNEL_AUTOLOCK_PROBLEMS,
+                name = "AutoLock problems",
+                importance = NotificationManager.IMPORTANCE_HIGH,
+                description = "AutoLock couldn't lock your car, or couldn't run",
             )
             CHANNEL_UPDATES -> ensureNotificationChannel(
                 context,

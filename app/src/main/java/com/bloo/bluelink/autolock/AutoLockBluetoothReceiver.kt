@@ -55,6 +55,7 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
                     title = "AutoLock can't see your car's Bluetooth",
                     text = "Bloo needs the Nearby devices permission to notice when you leave the car. Grant it in Settings.",
                     clears = false,
+                    channelId = Notifications.CHANNEL_AUTOLOCK_PROBLEMS,
                 )
             }
             return
@@ -87,6 +88,7 @@ class AutoLockBluetoothReceiver : BroadcastReceiver() {
             title = "AutoLock didn't run",
             text = "Your car left, but Bloo has been waiting for you to unlock it since the phone restarted. Open Bloo and unlock it to turn AutoLock back on.",
             clears = false,
+            channelId = Notifications.CHANNEL_AUTOLOCK_PROBLEMS,
         )
     }
 
