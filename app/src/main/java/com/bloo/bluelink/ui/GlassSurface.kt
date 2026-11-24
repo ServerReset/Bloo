@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import dev.chrisbanes.haze.HazeState
 import com.bloo.uicommon.blurCapable
-import androidx.compose.ui.draw.drawWithContent
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.glassTint
 import com.bloo.uicommon.LocalPowerPolicy

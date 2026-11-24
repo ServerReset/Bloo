@@ -1,7 +1,6 @@
 package com.bloo.bluelink.ui
 
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Box
 import dev.chrisbanes.haze.HazePerformanceMode
@@ -26,7 +25,6 @@ import dev.chrisbanes.haze.blur.hazeBlur
 import com.bloo.uicommon.canBlurBackdrops
 import com.bloo.uicommon.blurCapable
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.bloo.uicommon.LocalPowerPolicy
@@ -271,13 +269,6 @@ internal fun glassSheenBrush(): Brush = GlassSheen
 
 /** The shared glass sheen; see [glassSheenBrush]. */
 internal fun Modifier.glassSheen(): Modifier = this.background(glassSheenBrush())
-
-/**
- * How much of the cards' blur is showing, as a lambda to read in the DRAW phase (so a change redraws,
- * never recomposes): 0 the instant the car pager starts moving, easing back to 1 once it rests, so the
- * blur fades in rather than popping. 1 outside a pager.
- */
-internal val LocalPagerBlur = androidx.compose.runtime.staticCompositionLocalOf<() -> Float> { { 1f } }
 
 /**
  * A pebble card's glass fill as the first child of the card, instead of a modifier on it: the same

@@ -135,8 +135,8 @@ internal fun SearchPill(
             // the length of every scroll. That is the whole bug.
             //
             // Removing the gate costs one small node's blur per frame of a scroll, and a scroll is the
-            // cheapest moment to pay it: while the pager moves, every glass CARD has already dropped
-            // its own blur (see LocalPagerBlur), so this is the only backdrop blur still running.
+            // cheapest moment to pay it: the glass cards draw no backdrop blur at all (see
+            // GlassCardBackdrop), so this is one of very few blurs on screen.
             //
             // No `.clip(pillShape)` any more, unlike the chain this replaced. appGlassEffect's
             // GlassStyle carries the shape itself and Haze clips to it (GraphicsLayer.setClip), so that

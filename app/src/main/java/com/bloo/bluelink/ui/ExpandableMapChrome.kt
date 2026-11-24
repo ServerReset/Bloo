@@ -86,7 +86,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.animation.core.animate
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.customActions
