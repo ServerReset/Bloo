@@ -368,8 +368,13 @@ suspend fun SettingsStore.comfortModelNow(key: String): ComfortModel? =
 
 /** Learns the person's own comfort settings for a car on a kind of day, writes the result, and returns it. */
 suspend fun SettingsStore.learnComfort(key: String, mode: SmartClimateMode, levels: IntArray): ComfortModel {
-    val next = (comfortModelNow(key) ?: ComfortModel()).learn(mode, levels)
-    editTracked { it[stringPreferencesKey("comfort_model_$key")] = next.encode() }
+    // Read and written inside ONE edit: read before it, an answer from the watch and one from the phone at the same moment both
+    // started from the same stored model, and the second write dropped the first.
+    var next = ComfortModel()
+    editTracked { prefs ->
+        next = (comfortModel(key, prefs) ?: ComfortModel()).learn(mode, levels)
+        prefs[stringPreferencesKey("comfort_model_$key")] = next.encode()
+    }
     return next
 }
 
@@ -378,7 +383,11 @@ suspend fun SettingsStore.learnComfort(key: String, mode: SmartClimateMode, leve
  * means an answer from the watch and one from the phone both count, whichever arrives first.
  */
 suspend fun SettingsStore.learnClimate(vin: String, ambientF: Int, deltaF: Int): ClimateModel {
-    val next = (climateModelNow(vin) ?: ClimateModel()).learn(ambientF, deltaF)
-    setClimateModel(vin, next)
+    // Inside one edit, for the same reason as learnComfort: two answers at once both count.
+    var next = ClimateModel()
+    editTracked { prefs ->
+        next = (climateModel(vin, prefs) ?: ClimateModel()).learn(ambientF, deltaF)
+        prefs[stringPreferencesKey("climate_model_$vin")] = encodeClimateModel(next)
+    }
     return next
 }

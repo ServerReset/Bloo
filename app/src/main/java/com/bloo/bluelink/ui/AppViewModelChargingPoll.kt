@@ -32,8 +32,19 @@ fun AppViewModel.refreshSelectedIfCharging() {
     val now = System.currentTimeMillis()
     if (now - (lastChargeRefreshMs[v.vin] ?: 0L) < CHARGE_REFRESH_MIN_GAP_MS) return
     lastChargeRefreshMs[v.vin] = now
-    loadStatus(v, refresh = true, errorMessage = "Charge refresh failed", surfaceErrors = false)
+    // A live read wakes the car and counts toward the brand's daily request limit, and this poll runs every 30 seconds for as long
+    // as the app is open on a charging car: half an hour of it was sixty live reads. A charging car reports its progress to the
+    // server on its own, so the server's copy is read in between and the car itself is asked at most every few minutes.
+    val live = now - (lastLiveChargeRefreshMs[v.vin] ?: 0L) >= LIVE_CHARGE_REFRESH_GAP_MS
+    if (live) lastLiveChargeRefreshMs[v.vin] = now
+    loadStatus(v, refresh = live, errorMessage = "Charge refresh failed", surfaceErrors = false)
 }
+
+/** When each car was last asked directly (a live, car-waking read) while charging. */
+private val lastLiveChargeRefreshMs = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+/** The shortest gap between two live charge reads of the same car; the server's copy is read in between. */
+private const val LIVE_CHARGE_REFRESH_GAP_MS = 5L * 60_000L
 
 /** When each car's charge status was last asked for, so a settle does not ask again straight away. */
 private val lastChargeRefreshMs = java.util.concurrent.ConcurrentHashMap<String, Long>()

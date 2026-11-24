@@ -92,7 +92,7 @@ internal fun AiCommandProposal(
                         onClick = {
                             running = true
                             scope.launch {
-                                val r = runCatching {
+                                val r = com.bloo.bluelink.suspendRunCatching {
                                     VehicleCommandRunner.run(ctx, car.vin, p.first, "default")
                                 }.getOrNull()
                                 ran = r?.message ?: "Command failed"
@@ -206,11 +206,13 @@ internal fun CommandActionResult(
                 commandExecuted = true
             } else {
                 actionRunning = true
-                val result = runCatching { VehicleCommandRunner.run(ctx, targetVehicle.vin, command.cmd, command.climateTarget) }.getOrNull()
+                // Marked done BEFORE it is sent: marked after, a rotation mid-command recomposed this effect and sent the command again.
+                // suspendRunCatching, not runCatching: the latter swallowed the cancellation of a screen going away.
+                commandExecuted = true
+                val result = com.bloo.bluelink.suspendRunCatching { VehicleCommandRunner.run(ctx, targetVehicle.vin, command.cmd, command.climateTarget) }.getOrNull()
                 actionResult = result?.message ?: "Command failed"
                 actionRunning = false
                 vm.refreshStatus(targetVehicle)
-                commandExecuted = true
             }
 
             // Track this command as recently used
