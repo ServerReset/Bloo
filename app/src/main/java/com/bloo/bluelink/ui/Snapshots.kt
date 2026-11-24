@@ -62,9 +62,10 @@ import com.bloo.bluelink.data.toGeoLocation
             lon = fix?.longitude,
             speedMph = fix?.speed,
             updated = status?.dateTime,
-            // A non-null status is freshly-fetched data; null means we're building a placeholder
-            // snapshot with no live status yet (leave fetchedAt unknown).
-            fetchedAt = if (status != null) System.currentTimeMillis() else 0L,
+            // When this status was really fetched, not "now": every save (a reorder, a setting) used to stamp every car fresh, so the
+            // widget and watch called hours-old data "just now", and it outranked a newer status a background job had stored. 0 when
+            // there is no status yet (unknown).
+            fetchedAt = if (status != null) state.lastFetched[v.vin] ?: System.currentTimeMillis() else 0L,
             odometer = v.odometer,
             licensePlate = state.licensePlates[v.vin],
             lastServiceMiles = state.lastServiceMiles[v.vin],

@@ -289,12 +289,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     internal val pendingPublishes = mutableMapOf<String, Job>()
 
-    internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles) {
-        val snapshots = vehicles.map { snapshotOf(it, _state.value.statuses[it.vin], _state.value) }
+    /**
+     * Saves every car for the widget and watch. [changedNow] are the cars whose status the app itself has just changed (a command's
+     * optimistic flip, its revert, a fresh fix): they are stamped now, so the change is what the store keeps, while every other car
+     * keeps the stored status if that is newer (see SnapshotStore.saveVehiclesNewerStatusWins).
+     */
+    internal suspend fun persistSnapshots(vehicles: List<Vehicle> = _state.value.vehicles, changedNow: Set<String> = emptySet()) {
+        val now = System.currentTimeMillis()
+        val snapshots = vehicles.map { v ->
+            snapshotOf(v, _state.value.statuses[v.vin], _state.value).let { if (v.vin in changedNow && it.fetchedAt > 0L) it.copy(fetchedAt = now) else it }
+        }
         // The write is file I/O: off the main thread, so a swipe is not held up by a save (it used to take up to 68 ms there).
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             PerfMonitor.span("snapshot.save", thresholdMs = 8) {
-                snapshotStore.saveVehicles(snapshots)
+                snapshotStore.saveVehiclesNewerStatusWins(snapshots)
             }
         }
         refreshLiveChargeBar(vehicles)

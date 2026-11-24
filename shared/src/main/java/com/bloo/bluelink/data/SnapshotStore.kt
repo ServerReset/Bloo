@@ -147,6 +147,34 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
  * [merged]), for [SnapshotStore.saveVehiclesKeepingStatus]. Identity and user-entered fields come
  * from the caller and are not carried forward, so a renamed or re-plated car stays updatable.
  */
+/**
+ * This snapshot reconciled with the stored [old] one for [SnapshotStore.saveVehiclesNewerStatusWins]: identity and user-entered
+ * fields from this one; the status fields from whichever was fetched more recently (a tie keeps this one's), each still filled in
+ * from the other where it is missing; and the place name kept when this one has none.
+ */
+internal fun VehicleSnapshot.reconciledWith(old: VehicleSnapshot): VehicleSnapshot {
+    val statusFrom = if (old.fetchedAt > fetchedAt) withStatusOf(old).keepingStatusOf(this) else keepingStatusOf(old)
+    return statusFrom.copy(place = place ?: old.place)
+}
+
+/** This snapshot's identity with [other]'s status fields (the same fields [keepingStatusOf] carries). */
+internal fun VehicleSnapshot.withStatusOf(other: VehicleSnapshot): VehicleSnapshot = copy(
+    percent = other.percent,
+    rangeMi = other.rangeMi,
+    rangeMiExact = other.rangeMiExact,
+    locked = other.locked,
+    charging = other.charging,
+    chargeMinutes = other.chargeMinutes,
+    climateOn = other.climateOn,
+    engineOn = other.engineOn,
+    lat = other.lat,
+    lon = other.lon,
+    speedMph = other.speedMph,
+    updated = other.updated,
+    chargeLimitPct = other.chargeLimitPct,
+    fetchedAt = other.fetchedAt,
+)
+
 internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnapshot = copy(
     percent = percent ?: old.percent,
     rangeMi = rangeMi ?: old.rangeMi,
@@ -246,6 +274,20 @@ class SnapshotStore(private val context: Context) {
             val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.keepingStatusOf(it) } ?: fresh }
             val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } }
                 ?: merged.firstOrNull()?.vin
+            SnapshotPayload(merged, selected)
+        }
+    }
+
+    /**
+     * The app's own save of every car it holds: the list and each car's identity come from the app, but a car whose stored status is
+     * NEWER than the app's (a widget, watch or background job wrote it since) keeps that status, and a place name the app never sets
+     * is kept. Replacing wholesale rewrote a car the widget had just locked with the app's hours-old "unlocked", stamped "just now".
+     */
+    suspend fun saveVehiclesNewerStatusWins(vehicles: List<VehicleSnapshot>) {
+        editPayload { existing ->
+            val known = existing.vehicles.associateBy { it.vin }
+            val merged = vehicles.map { fresh -> known[fresh.vin]?.let { fresh.reconciledWith(it) } ?: fresh }
+            val selected = existing.selectedVin?.takeIf { sel -> merged.any { it.vin == sel } } ?: merged.firstOrNull()?.vin
             SnapshotPayload(merged, selected)
         }
     }

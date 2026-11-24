@@ -308,7 +308,7 @@ internal fun AppViewModel.runCommand(
                     st.copy(statuses = st.statuses + (vin to optimistic(st.statuses.getValue(vin))))
                 } else st
             }
-            persistSnapshots()
+            persistSnapshots(changedNow = setOf(vin))
         }
         try {
             // Serialize with status fetches: Hyundai rejects overlapping requests.
@@ -324,7 +324,7 @@ internal fun AppViewModel.runCommand(
                 }
                 st.copy(statuses = statuses)
             }
-            persistSnapshots()
+            persistSnapshots(changedNow = setOf(vin))
             if (confirm != null) {
                 _state.update { it.copy(awaitingCar = it.awaitingCar + key) }
                 confirmWithCar(vin, key, success, confirm)
@@ -338,7 +338,7 @@ internal fun AppViewModel.runCommand(
             reportError(msg)
             if (optimistic != null && prior != null) {
                 _state.update { st -> st.copy(statuses = st.statuses + (vin to prior)) }
-                persistSnapshots()
+                persistSnapshots(changedNow = setOf(vin))
             }
             // Still schedule a refresh to reconcile; `prior` may be slightly stale.
             viewModelScope.launch {
