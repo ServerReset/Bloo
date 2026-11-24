@@ -115,7 +115,7 @@ internal class CarMapState {
     fun showDevice(carLat: Double, carLon: Double, deviceLat: Double, deviceLon: Double) {
         userAdjusted = true
         scale = 1f
-        panX = (-(MapTiles.tileX(deviceLon, zoom) - MapTiles.tileX(carLon, zoom)) * MapTiles.TILE_PX).toFloat()
+        panX = (-MapTiles.tileDx(carLon, deviceLon, zoom) * MapTiles.TILE_PX).toFloat()
         panY = (-(MapTiles.tileY(deviceLat, zoom) - MapTiles.tileY(carLat, zoom)) * MapTiles.TILE_PX).toFloat()
     }
 
@@ -132,7 +132,7 @@ internal class CarMapState {
         if (userAdjusted || viewWidthPx <= 0f || viewHeightPx <= 0f) return
         var z = CarMapDefaultZoom
         while (z > CarMapMinZoom) {
-            val dxPx = kotlin.math.abs(MapTiles.tileX(deviceLon, z) - MapTiles.tileX(carLon, z)) * MapTiles.TILE_PX
+            val dxPx = kotlin.math.abs(MapTiles.tileDx(carLon, deviceLon, z)) * MapTiles.TILE_PX
             val dyPx = kotlin.math.abs(MapTiles.tileY(deviceLat, z) - MapTiles.tileY(carLat, z)) * MapTiles.TILE_PX
             // The car sits dead-centre, so the device only has to fit within HALF the viewport on
             // whichever side it's offset toward -- hence *2, not the raw distance. 0.8x leaves some

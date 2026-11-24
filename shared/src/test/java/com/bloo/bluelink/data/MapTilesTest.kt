@@ -199,4 +199,13 @@ class CoordStringTest {
         }
         kotlin.test.assertEquals(MapTiles.tileY(MapTiles.MAX_LATITUDE, 4), MapTiles.tileY(90.0, 4), 1e-9)
     }
+
+    @Test fun theShortWayRoundTheDateLine() {
+        val z = 10
+        val oneDegree = MapTiles.span(z) / 360.0
+        kotlin.test.assertEquals(oneDegree, MapTiles.tileDx(179.5, -179.5, z), 1e-9, "east across the line")
+        kotlin.test.assertEquals(-oneDegree, MapTiles.tileDx(-179.5, 179.5, z), 1e-9, "west across the line")
+        kotlin.test.assertEquals(oneDegree, MapTiles.tileDx(10.0, 11.0, z), 1e-9, "away from it, a plain difference")
+        kotlin.test.assertEquals(0.0, MapTiles.tileDx(42.0, 42.0, z), 1e-9)
+    }
 }

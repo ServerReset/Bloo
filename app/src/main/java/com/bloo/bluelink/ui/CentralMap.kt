@@ -242,7 +242,7 @@ private const val GlideMs = 420
  * The pan that centres the map on [to] when it is anchored on [from], at zoom [zoom]. The map glides this far, rather than jumping.
  */
 internal fun panBetween(from: GeoLocation, to: GeoLocation, zoom: Int): Pair<Float, Float> {
-    val tx = (-(MapTiles.tileX(to.longitude, zoom) - MapTiles.tileX(from.longitude, zoom)) * MapTiles.TILE_PX).toFloat()
+    val tx = (-MapTiles.tileDx(from.longitude, to.longitude, zoom) * MapTiles.TILE_PX).toFloat()
     val ty = (-(MapTiles.tileY(to.latitude, zoom) - MapTiles.tileY(from.latitude, zoom)) * MapTiles.TILE_PX).toFloat()
     return tx to ty
 }

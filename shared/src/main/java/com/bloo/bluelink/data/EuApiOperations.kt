@@ -57,7 +57,8 @@ internal fun EuApi.parseStatus(vh: JsonObject): VehicleStatus {
     val chassis = vh["Chassis"] as? JsonObject
     val electronics = vh["Electronics"] as? JsonObject
 
-    val soc = green.path("BatteryManagement", "BatteryRemain", "Ratio").dbl()?.toInt()
+    // Rounded, not truncated: 79.9% read as 79.
+    val soc = green.path("BatteryManagement", "BatteryRemain", "Ratio").dbl()?.let { kotlin.math.round(it).toInt() }
     // NOT ChargingDoor.State -- that is the charge-port DOOR's own open/closed flag, confirmed
     // against the reference this file is ported from (ApiImplType1.py): `charging_door_state in [0,
     // 2] -> door closed, == 1 -> door open`, nothing to do with whether a cable is actually

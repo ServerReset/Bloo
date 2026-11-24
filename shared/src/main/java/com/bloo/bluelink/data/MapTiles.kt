@@ -34,6 +34,20 @@ object MapTiles {
     /** The latitude where the Web Mercator square ends: atan(sinh(π)) in degrees. */
     const val MAX_LATITUDE = 85.05112878
 
+    /**
+     * How far east [toLon] is from [fromLon] in fractional tiles at [zoom], the short way round. Straight subtraction put a point just
+     * across the 180° line (Fiji, the Aleutians) a whole world away: the car and phone a few miles apart sent the map to its widest zoom.
+     */
+    fun tileDx(fromLon: Double, toLon: Double, zoom: Int): Double {
+        val span = span(zoom).toDouble()
+        val d = tileX(toLon, zoom) - tileX(fromLon, zoom)
+        return when {
+            d > span / 2 -> d - span
+            d < -span / 2 -> d + span
+            else -> d
+        }
+    }
+
     fun tileX(lon: Double, zoom: Int): Double = (lon + 180.0) / 360.0 * span(zoom)
 
     /**

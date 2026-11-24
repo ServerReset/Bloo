@@ -36,8 +36,13 @@ internal fun mapScreenOffset(placeX: Float, placeY: Float, panX: Float, panY: Fl
     Offset((placeX + panX * panWeight) * scale, (placeY + panY * panWeight) * scale)
 
 /** A point's place in tile pixels from the car at [xTileF]/[yTileF], at [zoom]. */
-internal fun tilePlace(lat: Double, lon: Double, zoom: Int, xTileF: Double, yTileF: Double, tilePx: Float): Offset =
-    Offset(((MapTiles.tileX(lon, zoom) - xTileF) * tilePx).toFloat(), ((MapTiles.tileY(lat, zoom) - yTileF) * tilePx).toFloat())
+internal fun tilePlace(lat: Double, lon: Double, zoom: Int, xTileF: Double, yTileF: Double, tilePx: Float): Offset {
+    // The short way round the 180° line (see MapTiles.tileDx), from the car's own tile column.
+    val span = MapTiles.span(zoom).toDouble()
+    var dx = MapTiles.tileX(lon, zoom) - xTileF
+    if (dx > span / 2) dx -= span else if (dx < -span / 2) dx += span
+    return Offset((dx * tilePx).toFloat(), ((MapTiles.tileY(lat, zoom) - yTileF) * tilePx).toFloat())
+}
 
 
 /**
