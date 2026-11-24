@@ -102,7 +102,10 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
         // is genuinely moving, and the parked-car alerts (unlocked, door open, running too long)
         // then fire mid-drive. A missing/empty snapshot just falls back to the status itself.
         val snapshots = suspendRunCatching { SnapshotStore(applicationContext).current().vehicles }.getOrDefault(emptyList())
-        val snapshotDriving = snapshots.associate { it.vin to it.isDriving }
+        // Only a RECENT reading counts: a speed from the middle of the last drive, kept by a status that carried no location, made
+        // a parked car read as driving indefinitely, and the unlocked and door-open alerts never fired.
+        val now = System.currentTimeMillis()
+        val snapshotDriving = snapshots.associate { it.vin to (it.isDriving && now - it.fetchedAt <= DRIVING_FRESH_MS) }
         // Vehicle IDENTITY comes from that snapshot too, as in LiveChargePollWorker: re-fetching the fleet list is a
         // network round trip per brand every tick for cars this worker already knows. A car added elsewhere is picked
         // up by the next foreground refresh; with no snapshot at all (a fresh install) the list is fetched as before.
@@ -139,7 +142,8 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
                     CarAlerts.evaluate(
                         settings, v, status, prefs,
                         canDeliver = Notifications.hasPermission(applicationContext),
-                        driving = snapshotDriving[v.vin],
+                        // The status's own speed when it carries a location (it is the newest reading); the snapshot's otherwise.
+                        driving = if (status?.vehicleLocation != null) status.isDriving else snapshotDriving[v.vin],
                     ).forEach {
                         Notifications.post(applicationContext, it.id, it.title, it.text, it.actions, it.channelId, it.localOnly)
                     }
@@ -213,3 +217,6 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
         fun schedule(context: Context) = enqueuePeriodic<AlertWorker>(context, "bloo_alerts", 30, TimeUnit.MINUTES)
     }
 }
+
+/** How old a snapshot's speed may be and still say the car is moving: a quarter of an hour. */
+private const val DRIVING_FRESH_MS = 15L * 60_000L

@@ -293,10 +293,15 @@ object CarAlerts {
                 if (unplugged) {
                     settings.setChargeCompleteNotificationSent(v.vin, false)
                 } else if (canDeliver) {
+                    // "Complete" only when the battery reached its limit (or full); a charge stopped short of it (stopped from the app,
+                    // a timer, the charger) says where it stopped instead of claiming it finished.
+                    val pct = ev.batteryStatus
+                    val limit = ev.displayChargeLimit()?.takeIf { it in 1..100 } ?: 100
+                    val reached = pct == null || pct >= limit - 1
                     out += Alert(
                         chargeCompleteId(v),
-                        "${v.name} charging is complete",
-                        "Your car has finished charging.",
+                        if (reached) "${v.name} charging is complete" else "${v.name} stopped charging",
+                        if (reached) "Your car has finished charging." else "Charging stopped at $pct%, short of its $limit% limit.",
                         channelId = Notifications.CHANNEL_EVENTS,
                         // The watch raises its own "charged" alert, so don't also bridge this one.
                         localOnly = WatchPresence.appInstalled(settings.context),
