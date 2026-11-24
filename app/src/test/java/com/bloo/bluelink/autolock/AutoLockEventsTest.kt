@@ -42,3 +42,30 @@ class AutoLockPendingTest {
         assertFalse(AutoLockPending.stillOpen(atMs = 5_000, nowMs = 1_000, windowMs = 120_000), "a clock change put it in the future")
     }
 }
+
+/** Whether a location fix holds a lock back: only on good evidence the phone is still beside the car. */
+class WalkAwayGeometryTest {
+    private val carLat = 43.6426
+    private val carLon = -79.3871
+    // About 0.00009° of latitude is 10 m.
+    private fun fix(dLatM: Double, accuracy: Double = 8.0, age: Long = 10_000, mock: Boolean = false) =
+        WalkAwayGeometry.Fix(carLat + dLatM / 111_195.0, carLon, accuracy, age, mock)
+
+    @Test fun aGoodFixBesideTheCarHoldsTheLock() {
+        assertTrue(WalkAwayGeometry.stillBesideCar(fix(5.0), carLat, carLon))
+        assertTrue(WalkAwayGeometry.stillBesideCar(fix(15.0), carLat, carLon))
+    }
+
+    @Test fun walkingAwayDoesNot() {
+        assertFalse(WalkAwayGeometry.stillBesideCar(fix(60.0), carLat, carLon))
+        assertFalse(WalkAwayGeometry.stillBesideCar(fix(25.0), carLat, carLon))
+    }
+
+    @Test fun aWeakFixSaysNothing_soTheLockGoesAhead() {
+        assertFalse(WalkAwayGeometry.stillBesideCar(null, carLat, carLon), "no fix")
+        assertFalse(WalkAwayGeometry.stillBesideCar(fix(5.0, accuracy = 80.0), carLat, carLon), "too vague")
+        assertFalse(WalkAwayGeometry.stillBesideCar(fix(5.0, age = 10 * 60_000L), carLat, carLon), "too old")
+        assertFalse(WalkAwayGeometry.stillBesideCar(fix(5.0, mock = true), carLat, carLon), "mocked")
+        assertFalse(WalkAwayGeometry.stillBesideCar(fix(5.0), null, carLon), "the car's place is unknown")
+    }
+}

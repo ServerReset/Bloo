@@ -56,7 +56,11 @@ object AutoLockNotification {
         if (countdown) ensureCountdownChannel(context)
         val (title, text) = when (state) {
             DetectionState.CONFIRMING -> "Watching $carName" to "Confirming you've left before locking…"
-            DetectionState.GRACE -> "Locking $carName in ${graceRemaining}s" to "Tap Cancel if you're coming right back."
+            DetectionState.GRACE -> if (graceRemaining > 0) {
+                "Locking $carName in ${graceRemaining}s" to "Tap Cancel if you're coming right back."
+            } else {
+                "Waiting to lock $carName" to "You're still beside it. It locks once you step away."
+            }
             DetectionState.VERIFYING -> "Checking $carName" to "Reading the car's status…"
             DetectionState.LOCKING -> "Locking $carName" to "Sending the lock command…"
             DetectionState.LOCKED -> "$carName locked" to "AutoLock locked it for you."

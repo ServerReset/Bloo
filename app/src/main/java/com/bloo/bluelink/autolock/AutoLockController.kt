@@ -241,6 +241,32 @@ object AutoLockController {
                 delay(1000)
             }
             if (stateFor(vin).detection == DetectionState.ABORTED) return@withLock
+            // Still beside the car (unloading, children getting out)? Then hold, and look again, before locking. Only good evidence
+            // holds it back (see WalkAwayGeometry); with no usable fix this goes straight on, as it always did.
+            if (!skipGrace.contains(vin) && besideCar(context, vin)) {
+                AppLog.log("AutoLock: you're still beside $vin; waiting before locking.")
+                // The countdown is over but it is waiting: graceRemaining 0 is what the notification shows as "waiting for you to step away".
+                _state.update { it + (vin to AutoLockEvalState(detection = DetectionState.GRACE, graceRemaining = 0)) }
+                val until = System.currentTimeMillis() + BESIDE_WAIT_MS
+                var beside = true
+                while (beside && System.currentTimeMillis() < until) {
+                    delay(BESIDE_RECHECK_MS)
+                    if (stateFor(vin).detection == DetectionState.ABORTED) return@withLock
+                    if (skipGrace.contains(vin)) break
+                    beside = besideCar(context, vin)
+                }
+                if (beside && !skipGrace.contains(vin)) {
+                    _state.update {
+                        it + (vin to AutoLockEvalState(
+                            detection = DetectionState.SKIPPED,
+                            lastOutcome = "Skipped. You were still beside the car.",
+                        ))
+                    }
+                    AppLog.log("AutoLock: still beside $vin after ${BESIDE_WAIT_MS / 1000}s; not locking.")
+                    notifyNotDetected(context, vin, carNameFor(context, vin), "You were still beside it, so AutoLock didn't lock it. Lock it yourself when you leave.")
+                    return@withLock
+                }
+            }
             advance(vin, DetectionState.VERIFYING)
 
             // Read the CACHED status -- never wake the car for the pre-lock check, matching
@@ -286,6 +312,18 @@ object AutoLockController {
                 }
             }
         }
+    }
+
+    /** Whether a fresh, trustworthy location fix shows the phone beside [vin]'s last known place (see WalkAwayGeometry). */
+    private suspend fun besideCar(context: Context, vin: String): Boolean {
+        val car = suspendRunCatching { SnapshotStore(context).current().vehicles.firstOrNull { it.vin == vin } }.getOrNull() ?: return false
+        val loc = withTimeoutOrNull(10_000) { suspendRunCatching { LocationHelper.currentLocation(context) }.getOrNull() } ?: return false
+        val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000L
+        val mock = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) loc.isMock else @Suppress("DEPRECATION") loc.isFromMockProvider
+        // No accuracy reported is "unknown", which is too vague to hold a lock back.
+        val accuracy = if (loc.hasAccuracy()) loc.accuracy.toDouble() else Double.MAX_VALUE
+        val fix = WalkAwayGeometry.Fix(loc.latitude, loc.longitude, accuracy, ageMs, mock)
+        return WalkAwayGeometry.stillBesideCar(fix, car.lat, car.lon)
     }
 
     private suspend fun ensureVehicleCached(context: Context, vin: String): VehicleSnapshot? {
@@ -442,4 +480,8 @@ object AutoLockController {
     }
 
     private const val CONFIRM_TIMEOUT_MS = 120_000L
+
+    /** How long a lock waits while the phone is still beside the car, and how often it looks again. */
+    private const val BESIDE_WAIT_MS = 120_000L
+    private const val BESIDE_RECHECK_MS = 15_000L
 }
