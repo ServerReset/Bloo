@@ -72,6 +72,54 @@ if [ "${BLOO_TEST_COMMAND:-}" = "lock" ]; then
   if await 'pending=\[\] ' 150 first; then echo "RESULT: the lock command finished"; fi
 fi
 sleep 10
+
+# AutoLock, end to end, in DRY RUN (it reads the real car's status but never sends a command): the disconnect, the walk, the
+# countdown, the status check and the decision; the watcher staying up afterwards; a departure surviving the app being killed
+# before the walk; and turning AutoLock off without a crash.
+DBG="adb shell am broadcast -n $PKG/$APP.autolock.AutoLockDebugReceiver --es cmd"
+svc_up() { adb shell dumpsys activity services "$PKG/$APP.autolock.AutoLockService" 2>/dev/null | grep -c "ServiceRecord"; }
+count() { grep -cE "$1" "/tmp/bt-$2.txt" 2>/dev/null; }
+# Waits up to $3 seconds for more lines matching $1 in capture $2 than there were when it was called.
+await_more() { local n; n=$(count "$1" "$2"); for _ in $(seq 1 "$3"); do [ "$(count "$1" "$2")" -gt "$n" ] && return 0; sleep 1; done; return 1; }
+DONE='autolock: .*detection=(LOCKED|SKIPPED|ERROR|ABORTED)'
+echo "--- AutoLock"
+fixture testautolockon; sleep 8
+if [ "$(svc_up)" -gt 0 ]; then echo "RESULT: AutoLock on: the watcher is running"; else echo "RESULT: AutoLock on: the watcher is NOT running"; fi
+$DBG trigger >/dev/null
+if await 'autolock: detection=CONFIRMING' 30 first; then echo "RESULT: a disconnect waits for a walk"; else echo "RESULT: the disconnect did not start an evaluation"; fi
+before=$(count "$DONE" first)
+$DBG walk >/dev/null
+for _ in $(seq 1 120); do [ "$(count "$DONE" first)" -gt "$before" ] && break; sleep 1; done
+grep -E "detection=GRACE" -q /tmp/bt-first.txt && echo "RESULT: the walk started the countdown"
+echo "RESULT: the evaluation ended: $(grep -E "$DONE" /tmp/bt-first.txt | tail -1 | sed 's/.*autolock: //')"
+sleep 12
+if [ "$(svc_up)" -gt 0 ]; then echo "RESULT: the watcher is still running after the evaluation"; else echo "RESULT: the watcher STOPPED after the evaluation"; fi
+
+echo "--- AutoLock: the app is killed between the disconnect and the walk"
+adb shell input keyevent KEYCODE_HOME; sleep 4
+$DBG trigger >/dev/null
+await_more 'autolock: detection=CONFIRMING' first 30
+adb shell am kill $PKG; sleep 4
+[ -z "$(adb shell pidof $PKG | tr -d '\r')" ] && echo "RESULT: the app process was killed mid-evaluation"
+before=$(count "$DONE" first)
+$DBG walk >/dev/null
+for _ in $(seq 1 120); do [ "$(count "$DONE" first)" -gt "$before" ] && break; sleep 1; done
+if [ "$(count "$DONE" first)" -gt "$before" ]; then
+  echo "RESULT: the walk in the restarted app resumed the departure: $(grep -E "$DONE" /tmp/bt-first.txt | tail -1 | sed 's/.*autolock: //')"
+else
+  echo "RESULT: the walk in the restarted app did NOT resume the departure"
+fi
+
+echo "--- AutoLock off"
+launch 20
+adb logcat -c -b crash
+fixture testautolockoff; sleep 8
+if [ -n "$(adb shell pidof $PKG | tr -d '\r')" ] && [ -z "$(adb logcat -d -b crash | grep -i "$PKG")" ]; then
+  echo "RESULT: turning AutoLock off did not crash the app"
+else
+  echo "RESULT: turning AutoLock off CRASHED the app"
+fi
+if [ "$(svc_up)" -eq 0 ]; then echo "RESULT: the watcher stopped"; else echo "RESULT: the watcher is still running after AutoLock was turned off"; fi
 show first
 
 echo "--- restarting the emulator"

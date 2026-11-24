@@ -66,6 +66,10 @@ class DebugFixturesReceiver : BroadcastReceiver() {
                 com.bloo.bluelink.ui.DebugAccountTest.commands.tryEmit(com.bloo.bluelink.ui.DebugAccountCommand.FinishOnboarding)
                 return
             }
+            "testautolockon", "testautolockoff" -> {
+                com.bloo.bluelink.ui.DebugAccountTest.commands.tryEmit(com.bloo.bluelink.ui.DebugAccountCommand.AutoLock(cmd == "testautolockon"))
+                return
+            }
             "testlockcar" -> {
                 com.bloo.bluelink.ui.DebugAccountTest.commands.tryEmit(com.bloo.bluelink.ui.DebugAccountCommand.LockCar)
                 return

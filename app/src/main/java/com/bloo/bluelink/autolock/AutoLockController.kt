@@ -77,6 +77,24 @@ object AutoLockController {
 
     fun stateFor(vin: String): AutoLockEvalState = _state.value[vin] ?: AutoLockEvalState()
 
+    init {
+        // Debug builds only: every state change as a test line (no VIN or car name), for the emulator's real-account test.
+        if (com.bloo.bluelink.BuildConfig.DEBUG) {
+            scope.launch {
+                var last = ""
+                state.collect { all ->
+                    val line = all.values.joinToString(" | ") { s ->
+                        "detection=${s.detection} remaining=${s.graceRemaining} outcome=\"${s.lastOutcome.orEmpty()}\""
+                    }
+                    if (line != last && line.isNotEmpty()) {
+                        last = line
+                        com.bloo.bluelink.ui.DebugProbe.mark("autolock: $line")
+                    }
+                }
+            }
+        }
+    }
+
     private fun mutexFor(vin: String): Mutex = locks.getOrPut(vin) { Mutex() }
 
     /** Sign-out: forget every car in [vins] -- cancel its evaluation and drop its state. */

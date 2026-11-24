@@ -18,7 +18,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  */
 internal object DebugProbe {
     fun mark(message: String) {
-        if (BuildConfig.DEBUG) android.util.Log.i("BlooTest", message)
+        // Anything shaped like a VIN is taken out here too, whoever wrote the line.
+        if (BuildConfig.DEBUG) android.util.Log.i("BlooTest", message.replace(Regex("[A-HJ-NPR-Z0-9]{17}"), "<vin>"))
     }
 }
 
@@ -28,6 +29,8 @@ internal sealed interface DebugAccountCommand {
     object AppLockOn : DebugAccountCommand
     object LockCar : DebugAccountCommand
     object FinishOnboarding : DebugAccountCommand
+    /** AutoLock on (dry run: it never sends a command, 5 s countdown) or off for the first car, through the app's own settings path. */
+    class AutoLock(val on: Boolean) : DebugAccountCommand
 }
 
 internal object DebugAccountTest {
@@ -54,6 +57,18 @@ internal fun DebugAccountTestHost(vm: AppViewModel) {
                 DebugAccountCommand.AppLockOn -> {
                     DebugProbe.mark("command: app lock on (device lock usable=${vm.canUseBiometrics()})")
                     vm.setBiometricLock(true)
+                }
+                is DebugAccountCommand.AutoLock -> {
+                    val car = state.value.vehicles.firstOrNull()
+                    DebugProbe.mark("command: AutoLock ${if (c.on) "on (dry run)" else "off"} (${if (car == null) "no car" else "car found"})")
+                    car?.let {
+                        vm.setAutoLockConfig(
+                            it.vin,
+                            com.bloo.bluelink.autolock.AutoLockConfig(
+                                enabled = c.on, deviceAddress = "00:00:00:00:00:00", deviceName = "debug", graceSeconds = 5, dryRun = true,
+                            ),
+                        )
+                    }
                 }
                 DebugAccountCommand.FinishOnboarding -> {
                     DebugProbe.mark("command: finish the first-run pages")

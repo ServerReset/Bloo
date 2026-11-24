@@ -70,7 +70,9 @@ class AutoLockDebugReceiver : BroadcastReceiver() {
                         // Bluetooth disconnect does.
                         AutoLockTrigger.onCarDisconnected(ctx, vin, log = false)
                     }
-                    "walk" -> AutoLockController.onWalkingConfirmedAny()
+                    // With the context, as the real Activity Recognition receiver passes it, so a walk in a freshly started process
+                    // resumes a departure on record (AutoLockPending).
+                    "walk" -> AutoLockController.onWalkingConfirmedAny(ctx)
                     // Posts the outcome notification directly, so the notification's channel,
                     // sound and wording can be verified without a car that happens to be
                     // unlocked (the emulator's test car reports "already locked", which the
