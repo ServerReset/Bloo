@@ -23,6 +23,8 @@ class SmartClimateTest {
         isDay = isDay,
         code = 0,
         hourly = hourly,
+        // The place's own clock, so which hours count as "next" never depends on when the test runs.
+        localTime = "2026-10-30T12:00",
     )
 
     private fun hour(tempF: Double) = HourPoint(time = "2026-10-30T12:00", tempC = (tempF - 32) * 5 / 9, code = 0, precipProbability = null)

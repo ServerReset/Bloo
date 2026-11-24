@@ -7,17 +7,22 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.bloo.bluelink.data.BootGate
 import com.bloo.bluelink.data.SnapshotStore
+import com.bloo.bluelink.data.metricDistance
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.suspendRunCatching
 
 /** What a home-screen widget draws from: the saved cars, and whether the app is sealed after a restart (then there are none to show). */
-internal data class WidgetCars(val sealed: Boolean, val cars: List<VehicleSnapshot>)
+internal data class WidgetCars(val sealed: Boolean, val cars: List<VehicleSnapshot>, val metric: Boolean = false)
+
+/** Whether the widget shows distances in kilometres: the app's own unit setting, provided once at the widget's root. */
+internal val LocalWidgetMetric = androidx.compose.runtime.staticCompositionLocalOf { false }
 
 /** Reads the widgets' cars. Both widgets load the same way, so the sealed check and the snapshot read live here once. */
 internal suspend fun loadWidgetCars(context: Context): WidgetCars {
     val sealed = BootGate.isLocked(context)
     val cars = if (sealed) emptyList() else suspendRunCatching { SnapshotStore(context).current().vehicles }.getOrDefault(emptyList())
-    return WidgetCars(sealed, cars)
+    val metric = suspendRunCatching { com.bloo.bluelink.data.SettingsStore(context).metricDistance() }.getOrDefault(false)
+    return WidgetCars(sealed, cars, metric)
 }
 
 /**

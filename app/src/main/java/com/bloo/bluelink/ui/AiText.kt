@@ -40,7 +40,7 @@ internal fun summaryPrompt(v: Vehicle, status: VehicleStatus?, state: UiState): 
         // Remaining status, most useful first.
         if (state.hasBattery(v)) status.evStatus?.batteryStatus?.let { parts += "The drive battery is at $it%." }
         if (state.hasFuel(v)) status.fuelLevel?.let { parts += "Fuel is at $it%." }
-        status.rangeMiFor(state.hasBattery(v))?.let { parts += "Estimated driving range is $it miles." }
+        status.rangeMiFor(state.hasBattery(v))?.let { parts += "Estimated driving range is ${kotlin.math.round(it).toInt()} miles." }
         status.airCtrlOn?.let { parts += "Climate is ${if (it) "on" else "off"}." }
         status.battery?.level?.let { parts += "The 12V starter battery is at $it%." }
         v.odometer?.trim()?.takeIf { it.isNotBlank() }?.let { parts += "The odometer reads $it miles." }

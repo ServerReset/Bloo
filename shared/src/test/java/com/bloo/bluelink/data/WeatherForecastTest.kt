@@ -78,4 +78,31 @@ class WeatherForecastTest {
         assertEquals(emptyList(), w.hourly)
         assertEquals(emptyList(), w.daily)
     }
+
+    private fun day(vararg hours: Int) = hours.map { h -> HourPoint("2024-06-01T%02d:00".format(h), 10.0 + h, 0, null) } +
+        HourPoint("2024-06-02T00:00", 9.0, 0, null)
+
+    private fun weatherAt(local: String?, points: List<HourPoint>) =
+        Weather(tempC = 10.0, feelsLikeC = 10.0, highC = null, lowC = null, windKph = 0.0, humidity = null, isDay = true, code = 0, hourly = points, localTime = local)
+
+    @Test fun theNextHoursStartAtTheCurrentHourNotMidnight() {
+        val w = weatherAt("2024-06-01T14:20", day(0, 1, 2, 13, 14, 15, 16))
+        assertEquals(listOf("2024-06-01T14:00", "2024-06-01T15:00", "2024-06-01T16:00"), w.upcomingHours().take(3).map { it.time })
+    }
+
+    @Test fun theForecastPlacesOwnClockWinsOverThePhones() {
+        // The car is somewhere it is 22:00 while the phone's clock says 09:00: the next hour is 22:00 there.
+        val w = weatherAt("2024-06-01T22:05", day(9, 10, 22, 23))
+        assertEquals("2024-06-01T22:00", w.upcomingHours(phoneHour = 9).first().time)
+    }
+
+    @Test fun lateAtNightTheNextHoursRollIntoTomorrow() {
+        val w = weatherAt("2024-06-01T23:30", day(22, 23))
+        assertEquals(listOf("2024-06-01T23:00", "2024-06-02T00:00"), w.upcomingHours().map { it.time })
+    }
+
+    @Test fun withoutThePlacesClockThePhonesHourIsUsed() {
+        val w = weatherAt(null, day(0, 1, 13, 14))
+        assertEquals("2024-06-01T13:00", w.upcomingHours(phoneHour = 13).first().time)
+    }
 }

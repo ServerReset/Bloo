@@ -35,6 +35,11 @@ data class VehicleSnapshot(
     val brandIndicator: String = "H",
     val percent: Int? = null,
     val rangeMi: Int? = null,
+    /**
+     * [rangeMi] before it was rounded to whole miles, so a surface showing kilometres converts the car's own figure: rounded first,
+     * a Canadian car's 263 km came back as 262. Null from an older phone; [rangeLabel] then uses [rangeMi].
+     */
+    val rangeMiExact: Double? = null,
     val locked: Boolean? = null,
     val charging: Boolean? = null,
     val climateOn: Boolean? = null,
@@ -108,7 +113,8 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
     // misreports as gas would have every refresh through this path (CarCommandRunner.refresh)
     // clobber percent/rangeMi with fuel data instead of battery data.
     val pct = status.percentFor(hasBattery)
-    val range = status.rangeMiFor(hasBattery)
+    val rangeExact = status.rangeMiFor(hasBattery)
+    val range = rangeExact?.let { kotlin.math.round(it).toInt() }
     // Hoisted to a local: a nullable property of another class is only smart-castable under
     // conditions this file has already been bitten by once (see rangeMi's note in AppViewModel). A
     // local is free and removes the question.
@@ -116,6 +122,7 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
     return copy(
         percent = pct ?: percent,
         rangeMi = range ?: rangeMi,
+        rangeMiExact = rangeExact ?: rangeMiExact,
         locked = status.doorLock ?: locked,
         charging = status.evStatus?.batteryCharge ?: charging,
         climateOn = status.airCtrlOn ?: climateOn,
@@ -143,6 +150,7 @@ fun VehicleSnapshot.merged(status: VehicleStatus, location: GeoLocation? = null)
 internal fun VehicleSnapshot.keepingStatusOf(old: VehicleSnapshot): VehicleSnapshot = copy(
     percent = percent ?: old.percent,
     rangeMi = rangeMi ?: old.rangeMi,
+    rangeMiExact = rangeMiExact ?: old.rangeMiExact,
     locked = locked ?: old.locked,
     charging = charging ?: old.charging,
     // Time left goes with the charging flag: a snapshot that says whether the car charges owns its figure.

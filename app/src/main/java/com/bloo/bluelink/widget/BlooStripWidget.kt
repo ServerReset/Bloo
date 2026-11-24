@@ -79,8 +79,12 @@ class BlooStripWidget : BlooGlanceWidget() {
     // Exact: the strip lays itself out from its real size (a roomier one gains a state line and a charge bar).
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val (sealed, cars) = loadWidgetCars(context)
-        provideContent { GlanceTheme { StripContent(cars) } }
+        val data = loadWidgetCars(context)
+        provideContent {
+            androidx.compose.runtime.CompositionLocalProvider(LocalWidgetMetric provides data.metric) {
+                GlanceTheme { StripContent(data.cars) }
+            }
+        }
     }
 }
 
@@ -135,7 +139,7 @@ private fun StripContent(cars: List<VehicleSnapshot>) {
                 )
                 if (tall) {
                     Text(
-                        car.stateLineOrParked(), maxLines = 1,
+                        car.stateLineOrParked(LocalWidgetMetric.current), maxLines = 1,
                         style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = (11 * us).sp),
                     )
                     if (opts.extras && car.percent != null) {

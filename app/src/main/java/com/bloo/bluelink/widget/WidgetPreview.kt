@@ -118,7 +118,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
                 val status: @Composable () -> Unit = {
                     if (plan.showStatus) {
                         RevealText(
-                            car?.stateLineOrParked() ?: "Locked · 210 mi", fontSize = (plan.statusSp * us).sp,
+                            car?.stateLineOrParked(com.bloo.bluelink.ui.LocalAppearance.current.metricDistance) ?: "Locked · 210 mi", fontSize = (plan.statusSp * us).sp,
                             color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -148,7 +148,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
                         Spacer(Modifier.height(8.dp))
                         value()
                         status()
-                        if (plan.showDetails) car?.detailLine()?.let {
+                        if (plan.showDetails) car?.detailLine(com.bloo.bluelink.ui.LocalAppearance.current.metricDistance)?.let {
                             Spacer(Modifier.height(4.dp))
                             RevealText(it, fontSize = (plan.detailSp * us).sp, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }

@@ -29,7 +29,12 @@ fun formatPlaceName(a: android.location.Address): GeocodedPlace? {
 }
 
 /** "1h 20m" / "45 min" duration formatter. */
-fun fmtMinutes(min: Int): String = if (min >= 60) "${min / 60}h ${min % 60}m" else "$min min"
+/** "45 min", "1h 55m", and on the hour "2h" rather than "2h 0m". */
+fun fmtMinutes(min: Int): String = when {
+    min < 60 -> "$min min"
+    min % 60 == 0 -> "${min / 60}h"
+    else -> "${min / 60}h ${min % 60}m"
+}
 
 /** °C -> whole-degree °F (rounded), the [ambientF] input for smart-climate calculations. */
 fun ambientFahrenheit(tempC: Double): Int = cToF(tempC).roundToInt()

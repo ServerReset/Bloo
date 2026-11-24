@@ -56,7 +56,9 @@ fun GeoLocation.distanceMilesTo(other: GeoLocation): Double {
     val dLon = Math.toRadians(other.longitude - longitude)
     val a = kotlin.math.sin(dLat / 2).let { it * it } +
         kotlin.math.cos(lat1) * kotlin.math.cos(lat2) * kotlin.math.sin(dLon / 2).let { it * it }
-    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+    // Clamped: rounding can push a near-antipodal pair a hair past 1, and the square root of the negative remainder is NaN.
+    val h = a.coerceIn(0.0, 1.0)
+    val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(h), kotlin.math.sqrt(1 - h))
     return earthRadiusMi * c
 }
 
@@ -67,10 +69,14 @@ fun VehicleStatus.percentFor(hasBattery: Boolean): Int? =
 
     if (hasBattery) evStatus?.batteryStatus else fuelLevel
 
-/** The headline range in miles (battery range for EVs, else distance-to-empty). */
-fun VehicleStatus.rangeMiFor(hasBattery: Boolean): Int? {
+/**
+ * The headline range in miles (battery range for EVs, else distance-to-empty), exactly as the car reported it. Not cut to whole
+ * miles here: a Canadian or European car reports kilometres, which arrive converted to miles, and truncating that before it was
+ * converted back showed 263 km as 262 and 300 km as 299. Round only where it is shown ([formatDistance]) or stored.
+ */
+fun VehicleStatus.rangeMiFor(hasBattery: Boolean): Double? {
     val batteryRange = evStatus?.drvDistance?.firstOrNull()?.rangeByFuel?.totalAvailableRange?.value
-    return ((if (hasBattery) batteryRange else null) ?: dte?.value)?.toInt()
+    return ((if (hasBattery) batteryRange else null) ?: dte?.value)?.toDouble()
 }
 
 /**

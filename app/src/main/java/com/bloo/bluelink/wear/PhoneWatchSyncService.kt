@@ -270,6 +270,7 @@ class PhoneWatchSyncService : WearableListenerService() {
                     climatePresets = snapshot.vehicles.associate { it.vin to SettingsStore(app).climatePresets(it.vin) }
                         .filterValues { it.isNotEmpty() },
                     fahrenheit = appearance.useFahrenheit,
+                    metricDistance = appearance.metricDistance,
                     accent = watchAccentOf(app, appearance),
                     glass = WatchGlass(appearance.glassClarity, appearance.ultraGlass),
                     type = WatchType(appearance.fontChoice, appearance.classicHeadings),

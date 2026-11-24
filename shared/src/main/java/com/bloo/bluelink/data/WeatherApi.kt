@@ -35,7 +35,24 @@ data class Weather(
      */
     val daily: List<DayPoint> = emptyList(),
     val fetchedAt: Long = System.currentTimeMillis(),
+    /**
+     * The time at the forecast's place when it was read ("2024-06-01T14:15"), in the same local clock the hourly points are labelled
+     * with, or null when the response did not carry it. What "now" means for [upcomingHours].
+     */
+    val localTime: String? = null,
 ) {
+    /**
+     * The hourly points from the current hour on. Open-Meteo's hourly list starts at midnight of today, so taking its first few
+     * meant midnight to 2 am, whatever the time was. Judged on the forecast place's own clock ([localTime]), so a car in another
+     * time zone is not read against the phone's hour; without it, the phone's own hour of today is used.
+     */
+    fun upcomingHours(phoneHour: Int = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)): List<HourPoint> {
+        val now = localTime?.takeIf { it.length >= 13 }?.take(13)
+        if (now != null) return hourly.filter { it.time.take(13) >= now }
+        val start = hourly.indexOfFirst { (it.hour ?: 0) >= phoneHour }
+        return if (start < 0) emptyList() else hourly.drop(start)
+    }
+
     fun feelsLikeF(): Double = cToF(feelsLikeC)
     // highC/lowC are nullable (Open-Meteo's daily block can be absent), so these propagate null
     // through rather than converting a missing reading into 32°F.
@@ -163,6 +180,8 @@ object WeatherApi {
         @SerialName("wind_speed_10m") val windKph: Double? = null,
         @SerialName("is_day") val isDay: Int? = null,
         @SerialName("weather_code") val weatherCode: Int? = null,
+        /** The time at the place, on its own clock (timezone=auto). */
+        val time: String? = null,
     )
 
     @Serializable
@@ -209,6 +228,7 @@ object WeatherApi {
                     lowC = parsed.daily?.min?.firstOrNull(), windKph = c.windKph ?: 0.0, humidity = c.humidity,
                     isDay = (c.isDay ?: 1) == 1, code = c.weatherCode ?: -1,
                     hourly = parsed.hourly?.toPoints().orEmpty(), daily = parsed.daily?.toPoints().orEmpty(),
+                    localTime = c.time,
                 )
             }
         }.getOrNull()

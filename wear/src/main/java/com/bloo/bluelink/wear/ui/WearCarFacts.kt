@@ -2,6 +2,7 @@ package com.bloo.bluelink.wear
 
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.doorLockLabel
+import com.bloo.bluelink.data.rangeLabel
 import com.bloo.bluelink.data.isDriving
 import com.bloo.bluelink.data.serviceCountdown
 import com.bloo.bluelink.data.serviceDue
@@ -13,9 +14,9 @@ import java.util.Locale
  * watch, and so the page grows with what the car actually tells us rather than with a fixed template.
  */
 internal object WearCarFacts {
-    fun status(v: VehicleSnapshot): List<Pair<String, String>> = buildList {
+    fun status(v: VehicleSnapshot, metric: Boolean = com.bloo.bluelink.wear.climate.WearPresets.metricDistance): List<Pair<String, String>> = buildList {
         if (v.hasBattery) v.percent?.let { add("Battery" to "$it%") }
-        v.rangeMi?.let { add("Range" to "$it mi") }
+        v.rangeLabel(metric)?.let { add("Range" to it) }
         doorLockLabel(v.locked)?.let { add("Doors" to it) }
         v.climateOn?.let { add("Climate" to (if (it) "On" else "Off")) }
         if (v.hasBattery) {

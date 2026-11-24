@@ -158,9 +158,7 @@ private fun CurrentConditions(weather: Weather, fahrenheit: Boolean, tint: Color
  */
 @Composable
 private fun WeatherHourlyStrip(weather: Weather, fahrenheit: Boolean) {
-    val nowHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val startIndex = weather.hourly.indexOfFirst { (it.hour ?: 0) >= nowHour }.coerceAtLeast(0)
-    val hours = weather.hourly.drop(startIndex).take(12)
+    val hours = weather.upcomingHours().take(12)
     if (hours.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(GapRow)) {
         MutedText("Next hours")

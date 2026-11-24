@@ -240,21 +240,31 @@ data class EvStatus(
     val remainTime2: RemainTime2? = null,
     val reservChargeInfos: ReservChargeInfos? = null,
 ) {
-    /** 0 = unplugged, 1 = fast (DC), 2 = portable/AC. */
+    /** 0 = unplugged, 1 = fast (DC), 2 = portable/AC, [PLUG_TYPE_UNKNOWN] = plugged in, type not reported. */
     val pluggedInLabel: String?
         get() = when (batteryPlugin) {
             0 -> "Not plugged in"
             1 -> "Plugged in (DC fast)"
             2 -> "Plugged in (AC)"
+            PLUG_TYPE_UNKNOWN -> "Plugged in"
             else -> null
         }
+
+    companion object {
+        /**
+         * A cable is connected but the car does not say which kind (European cars report only "fastened"). Not 1: that is DC fast
+         * everywhere else in the app, and a home AC charge read as DC showed "DC fast" and the DC charge limit.
+         */
+        const val PLUG_TYPE_UNKNOWN = 3
+    }
 
     /**
      * Minutes until the battery is full, or null when the car isn't reporting a usable estimate.
      * Non-positive means "no estimate", not "zero minutes".
      */
     val minutesToFull: Int?
-        get() = remainTime2?.atc?.value?.toInt()?.takeIf { it > 0 }
+        // Rounded up, not truncated: 0.6 minutes left truncated to 0, which reads as "no estimate" while the car is still charging.
+        get() = remainTime2?.atc?.value?.takeIf { it > 0.0 }?.let { kotlin.math.ceil(it).toInt() }
 }
 
 @Serializable

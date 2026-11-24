@@ -60,12 +60,12 @@ fun chargingLabel(charging: Boolean): String = if (charging) CHARGING_WORD else 
 
 /**
  * Format a distance in miles as "mi" or "km" based on the unit system. The API's distance figures
- * are always miles, so metric users get a multiply by [KM_PER_MI] and a re-labelled unit; imperial
- * users get the raw value. Metric ROUNDS rather than truncates.
+ * are always miles, so metric users get a multiply by [KM_PER_MI] and a re-labelled unit. Both
+ * ROUND: imperial used to truncate, so a car 0.9 mi away read "0 mi" while the same distance in
+ * kilometres read "1 km".
  */
 fun formatDistance(mi: Number, metric: Boolean): String =
-
-    if (metric) "${(mi.toDouble() * KM_PER_MI).roundToInt()} km" else "${mi.toInt()} mi"
+    if (metric) "${(mi.toDouble() * KM_PER_MI).roundToInt()} km" else "${mi.toDouble().roundToInt()} mi"
 
 /** Format speed from km/h (unlike [formatDistance]'s miles input): imperial converts to mph, metric passes through. */
 fun formatSpeed(kph: Double, metric: Boolean): String =

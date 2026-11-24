@@ -63,7 +63,7 @@ internal fun EuApi.parseStatus(vh: JsonObject): VehicleStatus {
     // 2] -> door closed, == 1 -> door open`, nothing to do with whether a cable is actually
     // connected.
     val plug = green.path("ChargingInformation", "ConnectorFastening", "State").intLoose()
-        ?.let { if (it != 0) 1 else 0 }
+        ?.let { if (it != 0) EvStatus.PLUG_TYPE_UNKNOWN else 0 }
     val chargeRemain = green.path("ChargingInformation", "Charging", "RemainTime").dbl()
     val rangeKm = (drivetrain.path("FuelSystem", "DTE", "Total")
         ?: drivetrain.path("FuelSystem", "DTE", "EV")).dbl()

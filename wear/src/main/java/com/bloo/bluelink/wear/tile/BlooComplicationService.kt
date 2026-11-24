@@ -11,6 +11,7 @@ import androidx.wear.watchface.complications.datasource.SuspendingComplicationDa
 import androidx.wear.tiles.TileService
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
+import com.bloo.bluelink.data.rangeLabel
 import com.bloo.bluelink.data.bigValue
 import com.bloo.bluelink.data.chargeLeftLabel
 import com.bloo.bluelink.data.doorLockLabel
@@ -110,7 +111,7 @@ class BlooLockComplicationService : BlooTextComplication(("Locked" to "Car locke
 
 /** The range ("248 mi") with the app's glyph; a tap opens the app. */
 class BlooRangeComplicationService : BlooTextComplication(("248 mi" to "Range 248 miles"), R.drawable.ic_stat_bloo, 2, null) {
-    override fun text(car: VehicleSnapshot) = car.rangeMi?.let { "$it mi" to "${car.name} range $it miles" }
+    override fun text(car: VehicleSnapshot) = car.rangeLabel(com.bloo.bluelink.wear.climate.WearPresets.metricDistance)?.let { "$it" to "${car.name} range $it" }
     override fun icon(car: VehicleSnapshot) = R.drawable.ic_stat_bloo
 }
 
@@ -126,10 +127,10 @@ class BlooClimateComplicationService : BlooTextComplication(("Off" to "Climate o
  * "80% · 248 mi · Locked": what a face with room for a line says about the car, leaving out what it does not know. While the
  * car charges it says how long is left in place of the range.
  */
-internal fun complicationLongLine(car: VehicleSnapshot): String =
+internal fun complicationLongLine(car: VehicleSnapshot, metric: Boolean = com.bloo.bluelink.wear.climate.WearPresets.metricDistance): String =
     listOfNotNull(
         car.bigValue(),
-        car.chargeLeftLabel()?.let { "$it left" } ?: car.rangeMi?.let { "$it mi" },
+        car.chargeLeftLabel()?.let { "$it left" } ?: car.rangeLabel(metric),
         // With no charge to lead with, the main value already IS the lock state; saying it twice reads as a stutter.
         doorLockLabel(car.locked).takeIf { car.percent != null },
     ).joinToString(" · ")

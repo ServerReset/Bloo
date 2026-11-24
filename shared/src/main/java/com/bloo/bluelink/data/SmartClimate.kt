@@ -132,7 +132,7 @@ fun smartClimatePlan(
     }
 
     // The next three hours: get ahead of a rise on a hot day, or of a fall on a cold one.
-    val next = w.hourly.take(3).map { cToF(it.tempC) }
+    val next = w.upcomingHours().take(3).map { cToF(it.tempC) }
     if (next.isNotEmpty()) {
         val peak = next.max()
         val low = next.min()

@@ -190,4 +190,13 @@ class CoordStringTest {
         }
         assertEquals(coordString(48.8566, 2.3522), loc.coordString())
     }
+
+    @Test fun aLatitudeAtOrPastThePoleStaysOnTheMap() {
+        for (lat in listOf(90.0, -90.0, 89.9, -100.0)) {
+            val y = MapTiles.tileY(lat, 10)
+            kotlin.test.assertTrue(y.isFinite(), "lat $lat gave $y")
+            kotlin.test.assertTrue(y in -1e-6..MapTiles.span(10) + 1e-6, "lat $lat gave $y")
+        }
+        kotlin.test.assertEquals(MapTiles.tileY(MapTiles.MAX_LATITUDE, 4), MapTiles.tileY(90.0, 4), 1e-9)
+    }
 }

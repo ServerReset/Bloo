@@ -79,7 +79,10 @@ class EuApiTest {
         // The reverse real shape: door auto-closed over an inserted cable
         // (ChargingDoor.State == 0), connector actually fastened (== 1).
         val status = api.parseStatus(greenFixture(chargingDoorState = 0, connectorFasteningState = 1))
-        assertEquals(1, status.evStatus?.batteryPlugin)
+        // Plugged in, kind unknown: the European status does not say AC or DC, so it must not read as DC fast (1).
+        assertEquals(EvStatus.PLUG_TYPE_UNKNOWN, status.evStatus?.batteryPlugin)
+        assertEquals(true, status.evStatus?.isPluggedIn)
+        assertEquals("Plugged in", status.evStatus?.pluggedInLabel)
     }
 
     @Test
@@ -90,7 +93,7 @@ class EuApiTest {
                 "door=$door should not affect an unplugged connector reading",
             )
             assertEquals(
-                1, api.parseStatus(greenFixture(door, connectorFasteningState = 1)).evStatus?.batteryPlugin,
+                EvStatus.PLUG_TYPE_UNKNOWN, api.parseStatus(greenFixture(door, connectorFasteningState = 1)).evStatus?.batteryPlugin,
                 "door=$door should not affect a plugged connector reading",
             )
         }

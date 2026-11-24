@@ -31,6 +31,9 @@ object MapTiles {
      * Fractional tile X for a longitude. Linear in longitude: -180 maps to 0 and +180 to [span],
      * exactly.
      */
+    /** The latitude where the Web Mercator square ends: atan(sinh(π)) in degrees. */
+    const val MAX_LATITUDE = 85.05112878
+
     fun tileX(lon: Double, zoom: Int): Double = (lon + 180.0) / 360.0 * span(zoom)
 
     /**
@@ -38,7 +41,9 @@ object MapTiles {
      * visually undistorted. North is SMALLER y: the equator lands at exactly half of [span].
      */
     fun tileY(lat: Double, zoom: Int): Double {
-        val latRad = lat / 180.0 * PI
+        // Clamped to Web Mercator's own edge (about 85.05°): past it the map has no tiles, and at the pole itself the formula is
+        // infinite, which a bad fix (latitude 90) turned into a NaN pan that blanked the map.
+        val latRad = lat.coerceIn(-MAX_LATITUDE, MAX_LATITUDE) / 180.0 * PI
         return (1.0 - ln(tan(latRad) + 1.0 / cos(latRad)) / PI) / 2.0 * span(zoom)
     }
 

@@ -34,7 +34,8 @@ import com.bloo.bluelink.data.toGeoLocation
             v.generation
         }
         val percent = status?.percentFor(hasBattery)
-        val range = status?.rangeMiFor(hasBattery)
+        val rangeExact = status?.rangeMiFor(hasBattery)
+        val range = rangeExact?.let { kotlin.math.round(it).toInt() }
         // `locate()` prefers the GPS carried by a status refresh, but falls back to
         // `repoFor(v).location(v)` (findMyCar) and stores that in `_state.locations` only -- and
         // Canada's repo has no GPS on its status at all, so that fallback is its ONLY source.
@@ -52,6 +53,7 @@ import com.bloo.bluelink.data.toGeoLocation
             brandIndicator = v.brandIndicator,
             percent = percent,
             rangeMi = range,
+            rangeMiExact = rangeExact,
             locked = status?.doorLock,
             charging = status?.evStatus?.batteryCharge,
             climateOn = status?.airCtrlOn,

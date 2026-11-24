@@ -129,7 +129,7 @@ object WearDataLayerSync {
         WearLog.log("sync: ${payload.vehicles.size} car(s)")
         WearNotificationPrefs(app).apply(payload.notify)
         WearLook.applyOrSeed(app, payload.look)
-        WearPresets.update(app, payload.climatePresets, payload.fahrenheit)
+        WearPresets.update(app, payload.climatePresets, payload.fahrenheit, payload.metricDistance)
         WearAccent.apply(app, payload.accent)
         WearGlass.apply(app, payload.glass)
         WearType.apply(app, payload.type)

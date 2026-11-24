@@ -107,7 +107,9 @@ class BlooWidget : BlooGlanceWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val data = loadWidgetCars(context)
         provideContent {
-            GlanceTheme { WidgetContent(data) }
+            androidx.compose.runtime.CompositionLocalProvider(LocalWidgetMetric provides data.metric) {
+                GlanceTheme { WidgetContent(data) }
+            }
         }
     }
 }
@@ -210,7 +212,7 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
                 Text(car.bigValue(), maxLines = 1, style = valueStyle)
                 if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
                 if (plan.showDetails) {
-                    car.detailLine()?.let { line ->
+                    car.detailLine(LocalWidgetMetric.current)?.let { line ->
                         Spacer(GlanceModifier.height(4.dp))
                         Text(line, maxLines = 1, style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = (plan.detailSp * us).sp))
                     }
@@ -306,7 +308,7 @@ private fun ControlGrid(car: VehicleSnapshot, pending: String?, armed: Boolean, 
 @Composable
 private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit) {
     Text(
-        note ?: car.stateLineOrParked(), maxLines = 1,
+        note ?: car.stateLineOrParked(LocalWidgetMetric.current), maxLines = 1,
         style = TextStyle(
             color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant,
             fontSize = size,
@@ -488,10 +490,10 @@ internal val WidgetGap = 8.dp
 // --- The car's words ---------------------------------------------------------------------------
 
 /** The detail line the roomiest layouts show: charge limit, odometer, service - whichever exist. */
-internal fun VehicleSnapshot.detailLine(): String? = listOfNotNull(
+internal fun VehicleSnapshot.detailLine(metric: Boolean = false): String? = listOfNotNull(
     chargeLimitPct?.let { "Limit $it%" },
     odometer?.takeIf { it.isNotBlank() }?.let { "Odo $it" },
-    lastServiceMiles?.let { "Service ${it} mi" },
+    lastServiceMiles?.let { "Service ${com.bloo.bluelink.data.formatDistance(it, metric)}" },
 ).joinToString("   ·   ").ifBlank { null }
 
 /** The value's and the bar's colour by level (red low, amber, green, blue charging), shared with the watch. */

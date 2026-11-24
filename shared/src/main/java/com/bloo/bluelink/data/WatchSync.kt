@@ -43,6 +43,8 @@ data class WatchSyncPayload(
     val climatePresets: Map<String, List<ClimatePreset>> = emptyMap(),
     /** Whether the phone shows temperatures in Fahrenheit, so a preset reads the same on the watch. */
     val fahrenheit: Boolean = true,
+    /** Whether the phone shows distances in kilometres, so the watch's range reads in the same unit (false from an older phone). */
+    val metricDistance: Boolean = false,
     /** The colours of the phone's palette, so the watch wears the same ones (null from an older phone: the watch keeps the brand's). */
     val accent: WatchAccent? = null,
     /** The phone's Glass setting, so the watch's glass reads as glassy as the phone's (null from an older phone: the watch keeps its own). */

@@ -28,6 +28,10 @@ internal object WearPresets {
     @Volatile var fahrenheit: Boolean = true
         private set
 
+    /** The phone's distance unit: true shows the watch's range in kilometres. Kept here with the temperature unit, its sibling. */
+    @Volatile var metricDistance: Boolean = false
+        private set
+
     @Volatile private var loaded = false
 
     private fun prefs(context: Context) =
@@ -42,19 +46,23 @@ internal object WearPresets {
             _presets.value = p.getString("presets", null)
                 ?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() }.orEmpty()
             fahrenheit = p.getBoolean("fahrenheit", true)
+            metricDistance = p.getBoolean("metricDistance", false)
             loaded = true
         }
     }
 
     /** Takes the phone's presets (it is the source of truth) and stores them. */
-    fun update(context: Context, presets: Map<String, List<ClimatePreset>>, fahrenheit: Boolean) {
+    fun update(context: Context, presets: Map<String, List<ClimatePreset>>, fahrenheit: Boolean, metricDistance: Boolean = this.metricDistance) {
         ensureLoaded(context)
         this.fahrenheit = fahrenheit
-        if (_presets.value == presets && prefs(context).getBoolean("fahrenheit", true) == fahrenheit) return
+        this.metricDistance = metricDistance
+        val p = prefs(context)
+        if (_presets.value == presets && p.getBoolean("fahrenheit", true) == fahrenheit && p.getBoolean("metricDistance", false) == metricDistance) return
         _presets.value = presets
-        prefs(context).edit {
+        p.edit {
             putString("presets", json.encodeToString(serializer, presets))
             putBoolean("fahrenheit", fahrenheit)
+            putBoolean("metricDistance", metricDistance)
         }
     }
 

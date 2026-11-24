@@ -36,6 +36,13 @@ class DisplayChargeLimitTest {
     }
 
     @Test
+    fun `plugged in with the kind unknown shows the everyday AC target, not the DC one`() {
+        // A European car only says a cable is fastened. Read as DC, a home charge showed the 90% fast-charge limit.
+        assertNull(ev(plugin = EvStatus.PLUG_TYPE_UNKNOWN, ac = 80, dc = 90).targetForCurrentPlug())
+        assertEquals(80, ev(plugin = EvStatus.PLUG_TYPE_UNKNOWN, ac = 80, dc = 90).displayChargeLimit())
+    }
+
+    @Test
     fun `unplugged falls back to the AC target, not null`() {
         // The exact case reported: a parked car, batteryPlugin 0 (or unreported), still has
         // a configured AC limit worth showing.

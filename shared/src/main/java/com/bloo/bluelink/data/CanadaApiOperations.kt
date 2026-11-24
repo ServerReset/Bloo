@@ -97,15 +97,12 @@ internal fun CanadaApi.parseStatus(vs: JsonObject, modelYear: Int?): VehicleStat
         airTemp = (vs["airTemp"] as? JsonObject)?.let {
             val unit = it["unit"].int()
             // The CA backend reports the climate setpoint in the same hex-"H" Celsius-index encoding
-            // it accepts ([tempToHex]), so decode it back to a °F numeric string here: every consumer
-            // feeds airTemp.value straight into degLabel(), which treats its input as °F, and an
-            // undecoded "0AH" rendered as garbage. A plain number on unit 0 is a Celsius reading --
-            // hexTempToF passes it through and the unit stays 0, so degLabel converts it once (a car
-            // at 22.5°C was being read as °F and shown as -5°C). The unit code is rewritten to 1
-            // alongside a decoded hex value, since it has to keep describing the value beside it.
-            val rawTemp = it["value"]?.str()
-            val decoded = hexTempToF(rawTemp, unit, modelYear)
-            TempValue(decoded, if (decoded != rawTemp) 1 else unit)
+            // it accepts ([tempToHex]), so decode it back to a plain Celsius number here, keeping unit 0:
+            // every consumer passes the unit to degLabel, which keeps a Celsius value's half degree when
+            // it is shown in Celsius. (Decoded to °F with unit 1, a car at 22.5°C came back through
+            // °F as 72.5 and was shown to a Celsius user as 23°C.) A plain number on unit 0 is
+            // already a Celsius reading and passes through.
+            TempValue(hexTempToC(it["value"]?.str(), unit, modelYear), unit)
         },
         battery = (vs["battery"] as? JsonObject)?.let { Battery12V(batSoc = it["batSoc"].int()) },
         evStatus = evStatus,
@@ -188,16 +185,17 @@ internal fun CanadaApi.tempToHex(tempF: Int, modelYear: Int?): String {
 }
 
 /** Inverse of [tempToHex]: decode the API's hex-"H" Celsius-index setpoint
- *  (e.g. "0AH") back to a °F numeric string for display. Mirrors KiaUvoApiCA's
+ *  (e.g. "11H") back to a Celsius numeric string ("22.5", or "22" for a whole degree) for display,
+ *  still in Celsius, so its unit code (0) keeps describing it. Mirrors KiaUvoApiCA's
  *  get_hex_temp_into_index guard - only `unit == 0` hex-"H" values are the
  *  encoded setpoint; anything else (a plain number, "OFF", unit != 0) is
  *  passed through untouched so [degLabel] handles it. Round-trips with
  *  tempToHex to within the table's half-degree resolution. */
-internal fun CanadaApi.hexTempToF(raw: String?, unit: Int?, modelYear: Int?): String? {
+internal fun CanadaApi.hexTempToC(raw: String?, unit: Int?, modelYear: Int?): String? {
     if (raw == null) return null
     if (unit != 0 || !raw.endsWith("H")) return raw
     val index = raw.dropLast(1).toIntOrNull(16) ?: return raw
     val table = if ((modelYear ?: TEMP_RANGE_MODEL_YEAR) >= TEMP_RANGE_MODEL_YEAR) TEMP_RANGE_NEW else TEMP_RANGE_OLD
     val celsius = table.getOrNull(index) ?: return raw
-    return cToF(celsius).toString()
+    return if (celsius % 1.0 == 0.0) celsius.toInt().toString() else celsius.toString()
 }
