@@ -37,6 +37,12 @@ import com.bloo.uicommon.BlooSlider
 import com.bloo.uicommon.SecondaryTextStyle
 import com.bloo.uicommon.StepRow
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
+import com.bloo.uicommon.AppIcons
+import com.bloo.uicommon.GapGroup
+import com.bloo.uicommon.ButtonEmphasis
 import com.bloo.uicommon.RevealText
 import com.bloo.uicommon.MorphTextButton
 import androidx.lifecycle.Lifecycle
@@ -354,6 +360,8 @@ private fun AutoLockSettings(
                 )
             }
 
+            AutoLockBesideCarRow(v.name)
+
             ToggleRow(
                 "Dry run (testing mode)",
                 current.dryRun,
@@ -441,4 +449,78 @@ private fun DetectionState.label(): String = when (this) {
     DetectionState.SKIPPED -> "Skipped"
     DetectionState.ABORTED -> "Cancelled"
     DetectionState.ERROR -> "Error"
+}
+
+/**
+ * "Stay unlocked while you're beside it": AutoLock's one use of the phone's location. After a walk is detected, it reads where the
+ * phone is, once, and holds the lock back while the phone is still beside the car (see WalkAwayGeometry). That read happens with the
+ * app in the background, which on Android 10+ needs background location; this row asks for it, behind its own explanation first
+ * (the prominent disclosure Google Play requires), and only when the person chooses to.
+ */
+@Composable
+private fun AutoLockBesideCarRow(carName: String) {
+    val context = LocalContext.current
+    var recheck by remember { mutableStateOf(0) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) recheck++ }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val fineOk = remember(recheck) { context.hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) }
+    val backgroundOk = remember(recheck) {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || context.hasPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    }
+    var showDisclosure by remember { mutableStateOf(false) }
+    val backgroundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { recheck++ }
+    // Android asks for "while using the app" first; "all the time" can only be asked for after that (on 11+ it opens the setting).
+    val fineLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        recheck++
+        if (granted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+    }
+
+    SectionDivider()
+    StatusRow("Stay unlocked while you're beside it", if (fineOk && backgroundOk) "On" else "Off")
+    BodySmallText(
+        if (fineOk && backgroundOk) {
+            "If you're still next to $carName when the countdown ends, it waits until you step away."
+        } else {
+            "Needs your location all the time, so AutoLock can tell you're still next to $carName (unloading, children getting out)."
+        },
+    )
+    if (!(fineOk && backgroundOk)) {
+        MorphTextButton("Turn on", onClick = { showDisclosure = true })
+    }
+
+    if (showDisclosure) {
+        GlassAlertDialog(
+            onDismissRequest = { showDisclosure = false },
+            icon = AppIcons.Info,
+            title = "Use your location for AutoLock?",
+            text = {
+                RevealText(
+                    "Bloo collects your phone's location to hold AutoLock back while you're still beside $carName, even when " +
+                        "Bloo is closed or not in use.",
+                    style = SecondaryTextStyle(),
+                )
+                Spacer(Modifier.height(GapGroup))
+                RevealText(
+                    "It reads it once, only after you've walked away from the car, compares it with where the car is, and keeps " +
+                        "nothing. It is never shared or sent anywhere. Android will ask you to allow location \"all the time\".",
+                    style = SecondaryTextStyle(),
+                )
+            },
+            buttons = {
+                DialogButton("Continue", {
+                    showDisclosure = false
+                    if (!fineOk) {
+                        fineLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        backgroundLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                    }
+                }, ButtonEmphasis.Confirm)
+                DialogButton("Not now", { showDisclosure = false })
+            },
+        )
+    }
 }

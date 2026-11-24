@@ -19,6 +19,10 @@
          The app works fine without either (a place can be typed in Settings instead). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- AutoLock only, and only when the person turns on "Stay unlocked while you're beside it": after a walk is detected it
+         reads where the phone is, once, to hold the lock back while the phone is still next to the car. It is asked for in
+         AutoLock's settings behind its own explanation (AutoLockBesideCarDisclosure), never at install or start-up. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <!-- AutoLock (app/.../autolock/): locks a car when the phone disconnects from its
          paired Bluetooth device, confirmed by Activity Recognition. Off by default per
