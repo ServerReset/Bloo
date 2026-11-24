@@ -59,9 +59,10 @@ internal fun DebugAccountTestHost(vm: AppViewModel) {
                     vm.setBiometricLock(true)
                 }
                 is DebugAccountCommand.AutoLock -> {
-                    val car = state.value.vehicles.firstOrNull()
-                    DebugProbe.mark("command: AutoLock ${if (c.on) "on (dry run)" else "off"} (${if (car == null) "no car" else "car found"})")
-                    car?.let {
+                    // On for the first car; off for every car (the debug trigger may have turned it on for another).
+                    val cars = if (c.on) listOfNotNull(state.value.vehicles.firstOrNull()) else state.value.vehicles
+                    DebugProbe.mark("command: AutoLock ${if (c.on) "on (dry run)" else "off"} (${cars.size} car(s))")
+                    cars.forEach {
                         vm.setAutoLockConfig(
                             it.vin,
                             com.bloo.bluelink.autolock.AutoLockConfig(

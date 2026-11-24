@@ -86,8 +86,10 @@ count() { grep -cE "$1" "/tmp/bt-$2.txt" 2>/dev/null; }
 await_more() { local n; n=$(count "$1" "$2"); for _ in $(seq 1 "$3"); do [ "$(count "$1" "$2")" -gt "$n" ] && return 0; sleep 1; done; return 1; }
 DONE='autolock: .*detection=(LOCKED|SKIPPED|ERROR|ABORTED)'
 echo "--- AutoLock"
-fixture testautolockon; sleep 8
-if [ "$(svc_up)" -gt 0 ]; then echo "RESULT: AutoLock on: the watcher is running"; else echo "RESULT: AutoLock on: the watcher is NOT running"; fi
+# Waits up to 20 s for the watcher to be up ($1 = up) or down ($1 = down).
+await_svc() { for _ in $(seq 1 20); do if [ "$1" = up ]; then [ "$(svc_up)" -gt 0 ] && return 0; else [ "$(svc_up)" -eq 0 ] && return 0; fi; sleep 1; done; return 1; }
+fixture testautolockon
+if await_svc up; then echo "RESULT: AutoLock on: the watcher is running"; else echo "RESULT: AutoLock on: the watcher is NOT running"; fi
 $DBG trigger >/dev/null
 if await 'autolock: detection=CONFIRMING' 30 first; then echo "RESULT: a disconnect waits for a walk"; else echo "RESULT: the disconnect did not start an evaluation"; fi
 before=$(count "$DONE" first)
@@ -120,13 +122,13 @@ fi
 echo "--- AutoLock off"
 launch 20
 adb logcat -c -b crash
-fixture testautolockoff; sleep 8
+fixture testautolockoff; sleep 3
 if [ -n "$(adb shell pidof $PKG | tr -d '\r')" ] && [ -z "$(adb logcat -d -b crash | grep -i "$PKG")" ]; then
   echo "RESULT: turning AutoLock off did not crash the app"
 else
   echo "RESULT: turning AutoLock off CRASHED the app"
 fi
-if [ "$(svc_up)" -eq 0 ]; then echo "RESULT: the watcher stopped"; else echo "RESULT: the watcher is still running after AutoLock was turned off"; fi
+if await_svc down; then echo "RESULT: the watcher stopped"; else echo "RESULT: the watcher is still running after AutoLock was turned off"; fi
 show first
 
 echo "--- restarting the emulator"

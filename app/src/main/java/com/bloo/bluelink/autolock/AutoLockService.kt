@@ -125,6 +125,15 @@ class AutoLockService : Service() {
             return START_STICKY
         }
         if (intent.action == ACTION_START_WATCH) {
+            // Is any car's AutoLock still on? The address mirror says, synchronously (it is rewritten before every start and stop).
+            // A start that raced a turn-off (the app coming to the foreground just as AutoLock was switched off) used to bring the
+            // watcher back after the stop, with nothing to watch for.
+            if (AutoLockAddresses.anyVin(applicationContext) == null) {
+                AppLog.log("AutoLock: watcher start ignored - AutoLock is off for every car.")
+                watchVin = null
+                promoteThenStop()
+                return START_NOT_STICKY
+            }
             val vin = intent.getStringExtra(EXTRA_VIN)
             AppLog.log("AutoLock: background Bluetooth watcher started")
             if (vin != null) {
