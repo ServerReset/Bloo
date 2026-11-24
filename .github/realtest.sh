@@ -57,13 +57,19 @@ launch 25
 fixture off
 echo "--- signing in"
 fixture testlogin --es user64 "$U64" --es password64 "$P64" --es pin64 "$N64" --es brand "$BRAND"
-if await 'screen=Garage .*cars=[1-9]' 150 first; then echo "RESULT: signed in, garage loaded"; else echo "RESULT: the garage did not load"; fi
+if await 'cars=[1-9]' 150 first; then echo "RESULT: signed in, cars loaded"; else echo "RESULT: the cars did not load"; fi
+# Past the first-run pages, as someone who has used the app would be, so the restart lands on the garage.
+fixture testonboarded
+if await 'screen=Garage .*cars=[1-9]' 60 first; then echo "RESULT: garage shown"; else echo "RESULT: the garage was not shown"; fi
 echo "--- app lock on"
 fixture testapplock; sleep 5
-echo "--- locking the car"
-fixture testlockcar
-sleep 5
-if await 'pending=\[\] ' 150 first; then echo "RESULT: the lock command finished"; fi
+# The car command runs only when BLOO_TEST_COMMAND=lock is set: the restart sign-in is what this run checks.
+if [ "${BLOO_TEST_COMMAND:-}" = "lock" ]; then
+  echo "--- locking the car"
+  fixture testlockcar
+  sleep 5
+  if await 'pending=\[\] ' 150 first; then echo "RESULT: the lock command finished"; fi
+fi
 sleep 10
 show first
 

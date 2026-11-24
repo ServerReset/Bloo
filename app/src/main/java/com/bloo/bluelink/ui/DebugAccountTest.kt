@@ -27,6 +27,7 @@ internal sealed interface DebugAccountCommand {
     class Reauth(val user: String, val password: String, val pin: String, val brand: Brand) : DebugAccountCommand
     object AppLockOn : DebugAccountCommand
     object LockCar : DebugAccountCommand
+    object FinishOnboarding : DebugAccountCommand
 }
 
 internal object DebugAccountTest {
@@ -53,6 +54,10 @@ internal fun DebugAccountTestHost(vm: AppViewModel) {
                 DebugAccountCommand.AppLockOn -> {
                     DebugProbe.mark("command: app lock on (device lock usable=${vm.canUseBiometrics()})")
                     vm.setBiometricLock(true)
+                }
+                DebugAccountCommand.FinishOnboarding -> {
+                    DebugProbe.mark("command: finish the first-run pages")
+                    vm.finishOnboarding()
                 }
                 DebugAccountCommand.LockCar -> {
                     val car = state.value.vehicles.firstOrNull()
