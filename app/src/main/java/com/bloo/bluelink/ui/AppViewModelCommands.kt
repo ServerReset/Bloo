@@ -346,11 +346,15 @@ internal fun AppViewModel.runCommand(
             }
         } finally {
             // Hold the lock for at least MIN_COMMAND_LOCK_MS so a double-tap cannot fire an
-            // overlapping request.
-            val elapsed = System.currentTimeMillis() - startedAt
-            if (elapsed < MIN_COMMAND_LOCK_MS) kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
-            _state.update { it.copy(pending = it.pending - key) }
-            CarCommandGate.end(key)
+            // overlapping request. NonCancellable: if the screen goes away in those seconds, the delay threw and the release below
+            // never ran, so the process-wide gate kept refusing this command (from the widget, the watch and the app) until the app
+            // was killed.
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                val elapsed = System.currentTimeMillis() - startedAt
+                if (elapsed < MIN_COMMAND_LOCK_MS) kotlinx.coroutines.delay(MIN_COMMAND_LOCK_MS - elapsed)
+                _state.update { it.copy(pending = it.pending - key) }
+                CarCommandGate.end(key)
+            }
         }
     }
 }

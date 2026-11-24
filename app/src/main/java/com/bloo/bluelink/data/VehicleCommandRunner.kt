@@ -25,7 +25,8 @@ object VehicleCommandRunner {
 
     /** Executes one phone command end to end and returns the user-facing [Result]. */
     suspend fun run(ctx: Context, vin: String, cmd: String, climateTarget: String): Result {
-        val action = actionFor(cmd) ?: return Result(true, "Done")
+        // A name this runner does not know is not a success: "Done" for it told a schedule or a search that nothing happened well.
+        val action = actionFor(cmd) ?: return Result(false, "Bloo can't run \"$cmd\"")
         val snap = SnapshotStore(ctx).current().vehicles.firstOrNull { it.vin == vin }
             ?: return Result(false, "Car not found")
         val command = suspendRunCatching { commandFor(ctx, action, snap, climateTarget) }

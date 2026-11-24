@@ -72,15 +72,16 @@ class SessionStore(context: Context) {
      */
     private suspend fun vault(): SecureVault = withContext(Dispatchers.IO) {
         val v = CredentialStore.vaultFor(context)
-        if (v.getString(IMPORTED) == null) {
+        if (v.getStringUnsealed(IMPORTED) == null && !v.locked) {
             val old = suspendRunCatching { context.dataStore.data.first() }.getOrNull()
-            v.edit {
+            val saved = v.edit {
                 old?.asMap()?.forEach { (k, value) ->
                     (value as? String)?.let { put("session/${k.name}", it) }
                 }
                 put(IMPORTED, "1")
             }
-            suspendRunCatching { context.dataStore.edit { it.clear() } }
+            // The old file is emptied only once its contents are in the vault.
+            if (saved) suspendRunCatching { context.dataStore.edit { it.clear() } }
         }
         v
     }
@@ -89,7 +90,8 @@ class SessionStore(context: Context) {
     suspend fun save(session: Session) {
         val v = vault()
         withContext(Dispatchers.IO) {
-            v.edit {
+            // A sign-in: allowed to replace a vault that cannot be opened (see SecureVault.edit).
+            v.edit(replaceUnreadable = true) {
                 put(key(session.brand, "access"), session.accessToken)
                 session.refreshToken?.let { put(key(session.brand, "refresh"), it) }
                 put(key(session.brand, "username"), session.username)

@@ -41,7 +41,8 @@ class CredentialStore(context: Context) {
     fun save(credentials: Credentials) {
         val b = credentials.brand.name
         val brands = brandSet().toMutableSet().apply { add(b) }
-        secrets.edit {
+        // A sign-in: the one write allowed to replace a vault that cannot be opened (see SecureVault.edit).
+        secrets.edit(replaceUnreadable = true) {
             put("${b}_email", credentials.email)
             put("${b}_password", credentials.password)
             put("${b}_pin", credentials.pin)
@@ -141,11 +142,13 @@ class CredentialStore(context: Context) {
         /** The vault, with the one-time import of the old EncryptedSharedPreferences file done. */
         fun vaultFor(context: Context): SecureVault {
             val vault = SecureVault.of(context)
-            if (vault.getString(KEY_IMPORTED) == null) synchronized(this) {
-                if (vault.getString(KEY_IMPORTED) == null) importLegacy(context, vault)
+            // Read past the seal: sealed after a restart, the marker reads as missing, and the import used to rewrite the vault on
+            // every call. Only a vault that is open (or new) is imported into.
+            if (vault.getStringUnsealed(KEY_IMPORTED) == null && !vault.locked) synchronized(this) {
+                if (vault.getStringUnsealed(KEY_IMPORTED) == null) importLegacy(context, vault)
             }
             // Neither app has a PIN any more: the old PIN records and their lockout counters are removed once, here.
-            if (OLD_PIN_KEYS.any { vault.getString(it) != null }) vault.edit { OLD_PIN_KEYS.forEach { remove(it) } }
+            if (OLD_PIN_KEYS.any { vault.getStringUnsealed(it) != null }) vault.edit { OLD_PIN_KEYS.forEach { remove(it) } }
             return vault
         }
 
@@ -196,7 +199,7 @@ class CredentialStore(context: Context) {
                 )
             }.getOrNull()
             val all = runCatching { old?.all }.getOrNull() ?: return
-            vault.edit {
+            val saved = vault.edit {
                 all.forEach { (k, v) ->
                     when (v) {
                         is String -> put(k, v)
@@ -206,7 +209,8 @@ class CredentialStore(context: Context) {
                 }
                 put(KEY_IMPORTED, "1")
             }
-            runCatching { context.deleteSharedPreferences(LEGACY_PREFS) }
+            // Deleted only once its contents are safely in the vault: a refused write would otherwise lose them.
+            if (saved) runCatching { context.deleteSharedPreferences(LEGACY_PREFS) }
         }
     }
 }

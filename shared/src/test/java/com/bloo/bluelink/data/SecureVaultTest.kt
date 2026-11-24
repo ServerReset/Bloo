@@ -104,4 +104,28 @@ class SecureVaultTest {
         w.isLocked = false
         assertEquals("secret", SecureVault(f, w).getString("pw"))
     }
+
+    @Test fun aWriteDuringAKeystoreHiccup_isRefused_andNothingIsWiped() {
+        val f = file(); val w = FakeWrapper()
+        SecureVault(f, w).edit { put("HYUNDAI_password", "secret"); put("session/access", "token") }
+        val before = f.readText()
+        val good = w.key
+        w.key = ByteArray(32) { 7 } // one failed read in a background job
+        val v = SecureVault(f, w)
+        assertFalse(v.edit { put("legacy_session_imported", "1") }, "it used to start a new, nearly empty vault here")
+        assertEquals(before, f.readText(), "the file is left exactly as it was")
+        w.key = good
+        assertEquals("secret", SecureVault(f, w).getString("HYUNDAI_password"), "still signed in once the key is back")
+        assertEquals("token", SecureVault(f, w).getString("session/access"))
+    }
+
+    @Test fun aSignInMayReplaceAVaultWhoseKeyIsGoneForGood_keepingTheOldFile() {
+        val f = file(); val w = FakeWrapper()
+        SecureVault(f, w).edit { put("pw", "old") }
+        w.key = ByteArray(32) { 9 } // the old key is never coming back
+        val v = SecureVault(f, w)
+        assertTrue(v.edit(replaceUnreadable = true) { put("pw", "new") })
+        assertEquals("new", SecureVault(f, w).getString("pw"))
+        assertTrue(File(f.parentFile, f.name + ".lost").exists(), "the unreadable vault is kept beside it")
+    }
 }

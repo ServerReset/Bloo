@@ -72,9 +72,15 @@ class SecureVault(
     /**
      * Applies every change in [block] and writes the vault once. Returns false, and changes nothing, when the write cannot be made
      * (the vault is locked, or its key is unavailable), so a failed save never leaves a half-written vault behind.
+     *
+     * A vault file that is there but could not be opened (a Keystore hiccup, a read error) is not written over: the write would have
+     * started a new, nearly empty vault, and one failed read in a background job signed the person out of every account. Only an
+     * explicit sign-in ([replaceUnreadable]) may replace it, so a vault whose key is gone for good can still be recovered from; the old
+     * file is kept beside it as ".lost".
      */
-    fun edit(block: Editor.() -> Unit): Boolean = synchronized(lock) {
+    fun edit(replaceUnreadable: Boolean = false, block: Editor.() -> Unit): Boolean = synchronized(lock) {
         ensureLoaded()
+        if (!loaded && file.exists() && !replaceUnreadable) return false
         val before = values
         val ed = Editor(HashMap(values)).apply(block)
         values = ed.map

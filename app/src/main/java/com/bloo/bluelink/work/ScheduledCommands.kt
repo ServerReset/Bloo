@@ -85,14 +85,37 @@ object ScheduledCommands {
 
     private fun requestCode(vin: String, cmd: String): Int = (vin + "|" + cmd).hashCode()
 
-    /** Runs a command that came due, and logs what happened. The alarm receiver awaits it before it lets the system sleep. */
+    /**
+     * Runs a command that came due, and logs what happened. The alarm receiver awaits it before it lets the system sleep. A command
+     * that could not run says so in a notification: it used to go only to the log, so a scheduled lock that failed (no network, a
+     * session that had expired, the app sealed after a restart) left the person believing the car had been locked.
+     */
     suspend fun execute(context: Context, vin: String, cmd: String, target: String) {
-        val outcome = try {
-            VehicleCommandRunner.run(context.applicationContext, vin, cmd, target).message
-        } catch (e: Exception) {
-            rethrowIfCancellation(e)
-            "failed: ${e.message}"
+        val app = context.applicationContext
+        val result = if (com.bloo.bluelink.data.BootGate.isLocked(app)) {
+            VehicleCommandRunner.Result(false, "Bloo has been waiting for you to sign in since the phone restarted")
+        } else {
+            try {
+                VehicleCommandRunner.run(app, vin, cmd, target)
+            } catch (e: Exception) {
+                rethrowIfCancellation(e)
+                VehicleCommandRunner.Result(false, e.message ?: "Command failed")
+            }
         }
-        AppLog.log("Scheduled $cmd for $vin: $outcome")
+        AppLog.log("Scheduled $cmd for $vin: ${result.message}")
+        if (!result.ok) {
+            val name = runCatching { com.bloo.bluelink.data.SnapshotStore(app).current().vehicles.firstOrNull { it.vin == vin }?.name }
+                .getOrNull() ?: "your car"
+            com.bloo.bluelink.data.Notifications.post(
+                app,
+                id = ("scheduled|$vin|$cmd").hashCode(),
+                title = "Scheduled ${scheduledLabel(cmd)} for $name didn't run",
+                text = "${result.message}. Open Bloo to do it now.",
+                clears = false,
+            )
+        }
     }
+
+    /** "lock", "unlock", "climate": the command's own word, for the failure notice. */
+    private fun scheduledLabel(cmd: String): String = cmd.replace('_', ' ')
 }
