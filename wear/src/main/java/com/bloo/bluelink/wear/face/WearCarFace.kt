@@ -39,7 +39,7 @@ fun WearCarFace(
     stale: Boolean = false,
     /** A short line that takes the caption's place for a moment ("Sending…", "Done", "Updated 2 h ago"). */
     status: FaceStatus? = null,
-    /** What the car is doing, under the value in the centre (see [carStateLine]). */
+    /** What the car is doing, under the value in the centre (see [com.bloo.bluelink.data.carStateLine]). */
     carState: String = "",
     /** Holding the centre (a long press, with a buzz) changes the four quarters. */
     onHubHold: (() -> Unit)? = null,

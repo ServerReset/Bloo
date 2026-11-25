@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.smartClimateHintFor
 import com.bloo.bluelink.data.SmartComfort
 import com.bloo.bluelink.data.smartComfort
 import com.bloo.bluelink.data.SmartClimateMode
@@ -75,16 +76,8 @@ internal object WearSmartClimate {
     }
 
     /** "Cool to 62°" or "Heat to 78°", with the outside temperature, in the phone's unit (the phone words the first part the same way). */
-    fun describe(hint: Hint): String {
-        val fahrenheit = WearPresets.fahrenheit
-        // The target is the plan's, so the hint shows the number that is actually sent.
-        val verb = when (hint.mode) {
-            SmartClimateMode.HEAT -> "Heat to "
-            SmartClimateMode.COOL -> "Cool to "
-            SmartClimateMode.HOLD -> "Hold at "
-        }
-        return verb + degLabel(hint.targetF.toString(), fahrenheit) + " · " + degLabel(hint.ambientF.toString(), fahrenheit) + " outside"
-    }
+    // The target is the plan's, so the hint shows the number that is actually sent; the words are the phone's own (shared).
+    fun describe(hint: Hint): String = smartClimateHintFor(hint.mode, hint.targetF, hint.ambientF, WearPresets.fahrenheit)
 
     private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 

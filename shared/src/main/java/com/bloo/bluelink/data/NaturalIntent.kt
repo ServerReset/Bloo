@@ -28,7 +28,6 @@ Time now: $nowHhmm
 Request: $query
 """.trimIndent()
 
-private val naturalJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
 /**
  * Reads the model's reply. The reply is found by its braces, so a sentence around the JSON is ignored; an unknown intent becomes "none".
@@ -38,7 +37,7 @@ fun parseNaturalIntent(reply: String): NaturalIntent? {
     val start = reply.indexOf('{')
     val end = reply.lastIndexOf('}')
     if (start < 0 || end <= start) return null
-    val parsed = runCatching { naturalJson.decodeFromString<NaturalIntent>(reply.substring(start, end + 1)) }.getOrNull() ?: return null
+    val parsed = runCatching { BlooLenientJson.decodeFromString<NaturalIntent>(reply.substring(start, end + 1)) }.getOrNull() ?: return null
     val intent = parsed.intent.trim().lowercase()
     return NaturalIntent(
         intent = if (intent in NATURAL_INTENTS) intent else "none",

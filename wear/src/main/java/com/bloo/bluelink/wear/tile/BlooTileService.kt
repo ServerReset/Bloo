@@ -14,6 +14,8 @@ import androidx.wear.protolayout.TimelineBuilders
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
+import com.bloo.bluelink.data.staleLabel
+import com.bloo.bluelink.data.carStateLine
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.bigValue
@@ -209,9 +211,9 @@ class BlooTileService : TileService() {
 
     /** The value where the quarters meet. Its own clickable: it sits over the quarters, so a tap on it opens the app. */
     private fun hub(car: VehicleSnapshot, size: Float): LayoutElement {
-        val stale = if (car.isStale()) car.updatedLabel() else null
+        val stale = car.staleLabel()
         // An old reading says so (in red, as the face does) instead of passing as current; a car that is charging says how long is left.
-        val state = carStateLine(car)
+        val state = car.carStateLine()
         val line = if (stale != null) tileText(stale, 10f, STALE, bold = true)
         else state.takeIf { it.isNotBlank() }?.let { tileText(it, 10f, INK) }
         return tileBox(

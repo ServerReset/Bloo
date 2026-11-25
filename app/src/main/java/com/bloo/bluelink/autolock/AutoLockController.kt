@@ -37,7 +37,6 @@ import com.bloo.bluelink.suspendRunCatching
 data class AutoLockEvalState(
     val detection: DetectionState = DetectionState.IDLE,
     val graceRemaining: Int = 0,
-    val statusSummary: String? = null,
     val lastLockAtEpochMs: Long? = null,
     val lastOutcome: String? = null,
 )

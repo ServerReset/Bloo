@@ -233,7 +233,7 @@ private fun PreviewControls(choice: Choice, car: VehicleSnapshot?, plan: WidgetP
 private fun PreviewChips(car: VehicleSnapshot?, max: Int) {
     val scheme = MaterialTheme.colorScheme
     val chips = buildList {
-        add((if (car?.climateOn == true) "Climate on" else "Climate off") to (car?.climateOn == true))
+        add(com.bloo.bluelink.data.climateLabel(car?.climateOn == true) to (car?.climateOn == true))
         if (car?.hasBattery != false) add(chargingLabel(car?.charging == true) to (car?.charging == true))
         car?.chargeLimitPct?.let { add("Limit $it%" to false) }
     }.take(max)

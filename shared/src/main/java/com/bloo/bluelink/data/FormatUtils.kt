@@ -80,18 +80,23 @@ fun smartClimateTargetF(ambientF: Int): Int {
 fun smartClimateIsCooling(ambientF: Int): Boolean = smartClimateMode(ambientF) == SmartClimateMode.COOL
 
 /** What smart climate says it will do for [ambientF], in the person's unit: "Cool to 69°", "Heat to 75°" or "Hold at 70°". */
-fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String {
-    val target = degLabel(smartClimateTargetF(ambientF).toString(), fahrenheit)
-    return when (smartClimateMode(ambientF)) {
-        SmartClimateMode.HEAT -> "Heat to "
-        SmartClimateMode.COOL -> "Cool to "
-        SmartClimateMode.HOLD -> "Hold at "
-    } + target
-}
+fun smartClimateLabel(ambientF: Int, fahrenheit: Boolean): String =
+    smartClimateLabelFor(smartClimateMode(ambientF), smartClimateTargetF(ambientF), fahrenheit)
+
+/** The same words for a plan already made: [mode] and the [targetF] it sends. */
+fun smartClimateLabelFor(mode: SmartClimateMode, targetF: Int, fahrenheit: Boolean): String = when (mode) {
+    SmartClimateMode.HEAT -> "Heat to "
+    SmartClimateMode.COOL -> "Cool to "
+    SmartClimateMode.HOLD -> "Hold at "
+} + degLabel(targetF.toString(), fahrenheit)
 
 /** The compact smart-climate hint the watch shows under its row: "Cool to 62° · 88° outside". */
 fun smartClimateHint(ambientF: Int, fahrenheit: Boolean): String =
-    smartClimateLabel(ambientF, fahrenheit) + " · " + degLabel(ambientF.toString(), fahrenheit) + " outside"
+    smartClimateHintFor(smartClimateMode(ambientF), smartClimateTargetF(ambientF), ambientF, fahrenheit)
+
+/** [smartClimateHint] for a plan already made: its [mode], the [targetF] it sends, and the outside [ambientF]. */
+fun smartClimateHintFor(mode: SmartClimateMode, targetF: Int, ambientF: Int, fahrenheit: Boolean): String =
+    smartClimateLabelFor(mode, targetF, fahrenheit) + " · " + degLabel(ambientF.toString(), fahrenheit) + " outside"
 
 /** Just the temperature a saved climate preset sets, as "79°" (the unit is established by context). */
 fun climatePresetTemp(req: ClimateRequest, fahrenheit: Boolean): String = "${degValue(req.tempF.toDouble(), fahrenheit)}°"

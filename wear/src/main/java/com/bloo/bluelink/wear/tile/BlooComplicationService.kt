@@ -9,6 +9,7 @@ import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUp
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import androidx.wear.tiles.TileService
+import com.bloo.bluelink.data.staleLabel
 import com.bloo.bluelink.data.SnapshotStore
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.rangeLabel
@@ -37,7 +38,7 @@ class BlooComplicationService : SuspendingComplicationDataSourceService() {
         val snapshot = suspendRunCatching { SnapshotStore(applicationContext).current() }.getOrNull() ?: return NoDataComplicationData()
         val car: VehicleSnapshot = snapshot.selected ?: return NoDataComplicationData()
         // An old reading says so (aloud, and in the long line's title) instead of passing as current.
-        val age = if (car.isStale()) car.updatedLabel() else null
+        val age = car.staleLabel()
         val description = "${car.name}, ${car.bigValue()}" + car.spokenAge()
         // The bolt says "charging": a car that is not (or has no battery) shows its figure without it.
         val icon = if (car.charging == true) bolt() else null

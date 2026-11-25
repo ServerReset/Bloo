@@ -251,7 +251,7 @@ internal fun ChargeBar(car: VehicleSnapshot, tint: androidx.glance.unit.ColorPro
 @Composable
 private fun StatusChips(car: VehicleSnapshot, maxChips: Int = 3) {
     val chips = buildList {
-        car.climateOn?.let { add((if (it) "Climate on" else "Climate off") to it) }
+        car.climateOn?.let { add(com.bloo.bluelink.data.climateLabel(it) to it) }
         if (car.hasBattery) car.charging?.let { add(chargingLabel(it) to it) }
         car.chargeLimitPct?.let { add("Limit $it%" to false) }
     }.take(maxChips)

@@ -12,6 +12,7 @@ import androidx.wear.watchface.complications.data.MonochromaticImageComplication
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.RangedValueComplicationData
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
+import com.bloo.bluelink.data.staleLabel
 import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.isStale
 import com.bloo.bluelink.data.updatedLabel
@@ -36,7 +37,7 @@ internal fun Context.complicationTap(requestCode: Int, tapKey: String? = null): 
 
 /** ", updated 2 hr ago" for a reading old enough to doubt, else nothing: how a spoken description owns up to its age. */
 internal fun VehicleSnapshot.spokenAge(): String =
-    if (isStale()) updatedLabel()?.let { ", updated $it" }.orEmpty() else ""
+    staleLabel()?.let { ", updated $it" }.orEmpty()
 
 internal fun shortTextData(shown: String, description: String, icon: MonochromaticImage?, tap: PendingIntent): ComplicationData =
     ShortTextComplicationData.Builder(plain(shown), plain(description))

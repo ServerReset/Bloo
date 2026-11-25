@@ -55,6 +55,9 @@ fun engineLabel(engineOn: Boolean?): String? = when (engineOn) {
 /** The word for a car that is charging, shared by every surface that names the state. */
 const val CHARGING_WORD = "Charging"
 
+/** The climate's state in two words, "Climate on" or "Climate off": one wording for the widget, the watch and its notifications. */
+fun climateLabel(on: Boolean): String = if (on) "Climate on" else "Climate off"
+
 /** The charging word for the car's widget and preview: "Charging" or "Not charging". */
 fun chargingLabel(charging: Boolean): String = if (charging) CHARGING_WORD else "Not charging"
 

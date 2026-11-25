@@ -149,7 +149,7 @@ object WearNotifier {
         title = "${v.name} climate on",
         status = Status.Builder()
             .addTemplate("#what#")
-            .addPart("what", Status.TextPart("Climate on"))
+            .addPart("what", Status.TextPart(com.bloo.bluelink.data.climateLabel(true)))
             .build(),
     ) {
         addAction(0, "Stop", actionIntent(app, v.vin, CarAction.CLIMATE_OFF))

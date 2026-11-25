@@ -13,7 +13,6 @@ import kotlin.math.pow
  * Y forward, Z up), colours linear RGB 0..1.
  */
 class PaintedMesh(val positions: FloatArray, val colors: FloatArray, val indices: IntArray) {
-    val vertexCount get() = positions.size / 3
     val triangleCount get() = indices.size / 3
 }
 

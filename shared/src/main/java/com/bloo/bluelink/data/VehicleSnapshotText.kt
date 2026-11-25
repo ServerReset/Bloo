@@ -43,6 +43,16 @@ private const val STALE_GLANCE_MS = 30L * 60_000L
 /** [relativeLabel] for this car's last reading, or null when it has never had one. */
 fun VehicleSnapshot.updatedLabel(): String? = relativeLabel(fetchedAt).takeIf { it.isNotBlank() }
 
+/** "12 min ago" when the last reading is old enough to doubt ([isStale]), else null: what a glance adds to say its figures are old. */
+fun VehicleSnapshot.staleLabel(now: Long = System.currentTimeMillis()): String? = if (isStale(now)) updatedLabel() else null
+
+/** What the car is doing, in a few words (the watch face's centre, the tile): running or parked, locked or not, the climate on. */
+fun VehicleSnapshot.carStateLine(): String = listOfNotNull(
+    engineLabel(engineOn),
+    doorLockLabel(locked),
+    if (climateOn == true) climateLabel(true) else null,
+).joinToString(" · ")
+
 /** Whether the last reading is old enough to doubt: over half an hour. */
 fun VehicleSnapshot.isStale(now: Long = System.currentTimeMillis()): Boolean =
     fetchedAt > 0L && now - fetchedAt > STALE_GLANCE_MS
