@@ -41,6 +41,10 @@ internal data class WidgetPlan(
     val spareDp: Float = 0f,
     /** STACK: how many status chips fit across the width without clipping. */
     val maxChips: Int = 3,
+    /** Lines the car's name may wrap to: two on a narrow widget with the height to spare, so it is not cut to "Yo...". */
+    val nameLines: Int = 1,
+    /** Lines the status ("Locked · 210 mi") may wrap to, on the same terms. */
+    val statusLines: Int = 1,
 ) {
     val minimal: Boolean get() = arrangement == WidgetArrangement.MINIMAL
 
@@ -195,16 +199,28 @@ internal fun planWidget(
         val grow = minOf(spare0 * 0.7f / plan.stackRows(), MAX_BUTTON_DP - rowButtonH).coerceAtLeast(0f)
         plan.copy(buttonHeightDp = rowButtonH + grow)
     } else plan
+    // A narrow widget cuts its name and status line short ("Yo...", "Locked · 210 ..."). Where the height has room, let
+    // each wrap to a second line instead: the name first (it says which car), then the status.
+    var wrapped = grown
+    if (innerW < NARROW_DP) {
+        val withName = wrapped.copy(nameLines = 2)
+        if (innerH - withName.heightDp(fs) >= 0f) wrapped = withName
+        val withStatus = wrapped.copy(statusLines = 2)
+        if (wrapped.showStatus && innerH - withStatus.heightDp(fs) >= 0f) wrapped = withStatus
+    }
     // What is still left is the gap above the value; the controls are anchored to the bottom by the widget itself, so
     // they are on screen however the launcher's real height differs from the one it reports.
-    return grown.copy(spareDp = (innerH - grown.heightDp(fs)).coerceAtLeast(0f))
+    return wrapped.copy(spareDp = (innerH - wrapped.heightDp(fs)).coerceAtLeast(0f))
 }
+
+/** Below this inner width a widget wraps its name and status line rather than cutting them short (a 2-cell-wide widget). */
+private const val NARROW_DP = 150f
 
 /** The plan's total height, in dp, for tests: it must never exceed the widget's inner height. */
 internal fun WidgetPlan.heightDp(fontScale: Float): Float {
     fun line(sp: Float) = sp * fontScale * LINE
     val value = valueSp * fontScale * VALUE_LINE
-    val header = maxOf(line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f), if (refresh) REFRESH_DP else 0f)
+    val header = maxOf(nameLines * line(nameSp) + (if (showUpdated) line(WIDGET_UPDATED_SP) else 0f), if (refresh) REFRESH_DP else 0f)
     return when (arrangement) {
         WidgetArrangement.MINIMAL -> maxOf(line(nameSp), if (refresh) REFRESH_DP else 0f) + GAP + maxOf(value, buttonHeightDp)
         WidgetArrangement.SIDE -> maxOf(
@@ -212,7 +228,7 @@ internal fun WidgetPlan.heightDp(fontScale: Float): Float {
             buttonHeightDp * (if (maxActions > gridColumns) 2 else 1) + (if (maxActions > gridColumns) GAP else 0f),
         )
         WidgetArrangement.STACK -> header + GAP + value +
-            (if (showStatus) line(statusSp) else 0f) + (if (showDetails) 4f + line(detailSp) else 0f) +
+            (if (showStatus) statusLines * line(statusSp) else 0f) + (if (showDetails) 4f + line(detailSp) else 0f) +
             (if (showBar) WIDGET_BAR_DP + 2 * GAP else 0f) + (if (showChips) WIDGET_CHIP_DP * fontScale.coerceAtLeast(1f) + GAP else 0f) +
             GAP + stackRows() * buttonHeightDp + (stackRows() - 1) * GAP
     }

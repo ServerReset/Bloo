@@ -102,4 +102,17 @@ class WidgetPlanTest {
         val innerW = 150f - 32f - 8f
         assertTrue(plan.valueSp * 3 * 0.76f <= innerW + 0.5f, "$plan")
     }
+
+    @Test fun aNarrowTallWidgetWrapsItsNameAndStatusInsteadOfCuttingThem() {
+        // The "Tall" preview: two cells wide, four high. Its name read "Yo..." and its status "Locked · 210 ...".
+        val plan = planWidget(110f, 400f, 1f, false, valueChars = 3, actionCount = 2)
+        assertTrue(plan.nameLines == 2, "name wraps ($plan)")
+        assertTrue(plan.statusLines == 2, "status wraps ($plan)")
+        assertTrue(plan.heightDp(1f) <= 400f - 32f + 0.5f, "and still fits ($plan)")
+    }
+
+    @Test fun aWideWidgetKeepsOneLineEach() {
+        val plan = planWidget(320f, 400f, 1f, false, valueChars = 3, actionCount = 3)
+        assertTrue(plan.nameLines == 1 && plan.statusLines == 1, "room across: no wrapping ($plan)")
+    }
 }
