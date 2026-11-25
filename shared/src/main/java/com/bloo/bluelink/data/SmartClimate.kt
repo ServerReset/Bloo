@@ -195,12 +195,12 @@ object ClimateChoices {
 
     /** The feel answers for [vin], the newest last. */
     fun feedback(context: Context, vin: String): List<ClimateFeedback> =
-        decodeClimateFeedback(context.getSharedPreferences(FEEL_PREFS, Context.MODE_PRIVATE).getString(vin, "").orEmpty())
+        decodeClimateFeedback(context.privatePrefs(FEEL_PREFS).getString(vin, "").orEmpty())
 
     /** Keeps a feel answer, the newest last, trimmed to [CLIMATE_FEEDBACK_KEPT]. */
     fun recordFeedback(context: Context, vin: String, ambientF: Int, deltaF: Int) {
         val kept = (feedback(context, vin) + ClimateFeedback(ambientF, deltaF)).takeLast(CLIMATE_FEEDBACK_KEPT)
-        context.getSharedPreferences(FEEL_PREFS, Context.MODE_PRIVATE).edit()
+        context.privatePrefs(FEEL_PREFS).edit()
             .putString(vin, kept.joinToString(",") { "${it.ambientF}:${it.deltaF}" }).apply()
     }
 
@@ -220,5 +220,5 @@ object ClimateChoices {
         prefs(context).edit().putString(vin, encodeClimateChoices(kept)).apply()
     }
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.privatePrefs(PREFS)
 }

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.privatePrefs
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
@@ -52,7 +53,7 @@ object ScheduledCommands {
 
     private const val PREFS = "bloo_scheduled_commands"
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = context.privatePrefs(PREFS)
 
     /** Keeps a pending command across a reboot: an alarm does not survive one. Stored as "vin|cmd" -> "target|minute". */
     private fun remember(context: Context, vin: String, cmd: String, target: String, minuteOfDay: Int) {

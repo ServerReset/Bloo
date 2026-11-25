@@ -38,7 +38,7 @@ object DiagSettings {
 
     /** Reads the saved switches. Call once, early, before anything logs. Off unless the person chose otherwise (or the temporary default is on). */
     fun load(context: Context) {
-        val p = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val p = context.privatePrefs(PREFS)
         logging = p.getBoolean("logging", TEMP_LOGGING_ON_BY_DEFAULT)
         advanced = logging && p.getBoolean("advanced", TEMP_LOGGING_ON_BY_DEFAULT)
     }
@@ -51,7 +51,7 @@ object DiagSettings {
     }
 
     private fun save(context: Context) {
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        context.privatePrefs(PREFS).edit()
             .putBoolean("logging", logging)
             .putBoolean("advanced", advanced)
             .apply()

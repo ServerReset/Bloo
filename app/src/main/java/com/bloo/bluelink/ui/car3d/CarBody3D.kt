@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui.car3d
 
+import com.bloo.bluelink.data.privatePrefs
 import android.content.Context
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -40,7 +41,7 @@ enum class CarBody(
 
         /** The user's choice in Settings, or null for automatic. */
         fun override(context: Context): CarBody? =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("body", null)?.let { n -> entries.firstOrNull { it.name == n } }
+            context.privatePrefs(PREFS).getString("body", null)?.let { n -> entries.firstOrNull { it.name == n } }
 
         private val shapes = HashMap<CarBody, CarShape>()
 
@@ -69,9 +70,9 @@ enum class CarPaint(val label: String, val rgb: FloatArray, val swatch: Long) {
     companion object {
         private const val PREFS = "car_look"
         fun current(context: Context): CarPaint =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("paint", null)?.let { n -> entries.firstOrNull { it.name == n } } ?: WHITE
+            context.privatePrefs(PREFS).getString("paint", null)?.let { n -> entries.firstOrNull { it.name == n } } ?: WHITE
         fun set(context: Context, paint: CarPaint) =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("paint", paint.name).apply()
+            context.privatePrefs(PREFS).edit().putString("paint", paint.name).apply()
     }
 }
 

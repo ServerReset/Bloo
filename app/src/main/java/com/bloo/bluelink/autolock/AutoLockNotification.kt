@@ -91,9 +91,8 @@ object AutoLockNotification {
 
     private fun openAppIntent(context: Context): PendingIntent {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_IMMUTABLE else 0
-        return PendingIntent.getActivity(context, 0, intent, flags)
+        // FLAG_IMMUTABLE exists from API 23, under the app's minimum, so it needs no version check.
+        return PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
     private fun actionIntent(context: Context, vin: String, action: String): PendingIntent {

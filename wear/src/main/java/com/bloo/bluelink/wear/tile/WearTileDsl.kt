@@ -136,10 +136,6 @@ internal fun tileModifiers(
         if (padding != null) setPadding(ModifiersBuilders.Padding.Builder().setAll(dp(padding)).build())
     }.build()
 
-/**
- * A tap that opens the watch app, on the face control [actionKey] (and, when a quarter was pressed, its [slot]) so the app runs
- * exactly what a press on the face would. With neither, it just opens the app.
- */
 /** Reads the phone's accent and the tile's snapshot, in that order. Both tiles start here. */
 internal suspend fun loadTileSnapshot(context: Context): SnapshotStore.SnapshotData? {
     // The phone's accent, read before anything is drawn (the tile has no Compose theme to carry it).
@@ -147,6 +143,10 @@ internal suspend fun loadTileSnapshot(context: Context): SnapshotStore.SnapshotD
     return suspendRunCatching { SnapshotStore(context).current() }.getOrNull()
 }
 
+/**
+ * A tap that opens the watch app, on the face control [actionKey] (and, when a quarter was pressed, its [slot]) so the app runs
+ * exactly what a press on the face would. With neither, it just opens the app.
+ */
 internal fun Context.tileLaunch(actionKey: String? = null, slot: Int? = null): ActionBuilders.Action {
     val activity = ActionBuilders.AndroidActivity.Builder()
         .setPackageName(packageName)
