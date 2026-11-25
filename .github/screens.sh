@@ -224,6 +224,15 @@ shot 09-garage-light
 front light-second; next_car
 shot 10-second-car-light
 
+# The widget, as its settings screen previews it (a made-up widget id: the screen shows the default options for it).
+fixture dark
+launch 20
+adb shell am start -n $PKG/$APP.widget.BlooWidgetConfigActivity --ei appWidgetId 4242 >/dev/null; sleep 12
+shot 13-widget-settings
+scroll_down
+shot 14-widget-settings-scrolled
+adb shell input keyevent KEYCODE_BACK; sleep 2
+
 # Two columns on a tablet-sized screen (800dp across): a car opening to full screen and back, recorded and cut into frames, to check it
 # grows and shrinks without squashing (its blocks are half the screen at both ends, and should stay so all the way).
 adb shell wm size 1600x2560
