@@ -55,10 +55,6 @@ internal object WearLog {
         val context = app ?: return
         if (batch.isEmpty()) return
         val bytes = batch.joinToString("\n").encodeToByteArray()
-        suspendRunCatching {
-            Wearable.getNodeClient(context).connectedNodes.await().forEach {
-                Wearable.getMessageClient(context).sendMessage(it.id, WatchSyncProtocol.PATH_WATCH_LOG, bytes).await()
-            }
-        }
+        WearMessages.send(context, WatchSyncProtocol.PATH_WATCH_LOG, bytes)
     }
 }

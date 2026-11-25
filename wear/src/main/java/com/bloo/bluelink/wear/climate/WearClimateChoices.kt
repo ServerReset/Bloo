@@ -71,14 +71,7 @@ internal object WearClimateChoices {
         _comfortModels.value = _comfortModels.value + (vin to (comfortModelFor(vin) ?: ComfortModel()).learn(mode, levels))
         WearSmartClimate.replan()
         val bytes = Json.encodeToString(WatchComfortChoice.serializer(), WatchComfortChoice(vin, mode.name, levels.toList())).encodeToByteArray()
-        val app = context.applicationContext
-        ioScope().launch {
-            runCatching {
-                Wearable.getNodeClient(app).connectedNodes.await().forEach {
-                    Wearable.getMessageClient(app).sendMessage(it.id, WatchSyncProtocol.PATH_COMFORT_CHOICE, bytes).await()
-                }
-            }
-        }
+        WearMessages.sendLater(context, WatchSyncProtocol.PATH_COMFORT_CHOICE, bytes)
     }
 
     /** The phone's comfort setup and learned comfort arrived: kept, and any plan made from older ones is made again. */
@@ -109,14 +102,7 @@ internal object WearClimateChoices {
         _models.value = _models.value + (vin to (modelFor(vin) ?: ClimateModel()).learn(ambientF, deltaF))
         WearSmartClimate.replan()
         val bytes = Json.encodeToString(WatchClimateFeedback.serializer(), WatchClimateFeedback(vin, ambientF, deltaF)).encodeToByteArray()
-        val app = context.applicationContext
-        ioScope().launch {
-            runCatching {
-                Wearable.getNodeClient(app).connectedNodes.await().forEach {
-                    Wearable.getMessageClient(app).sendMessage(it.id, WatchSyncProtocol.PATH_CLIMATE_FEEDBACK, bytes).await()
-                }
-            }
-        }
+        WearMessages.sendLater(context, WatchSyncProtocol.PATH_CLIMATE_FEEDBACK, bytes)
     }
 
     /** The phone's feel answers arrived: kept, and any plan made from older ones is made again. */

@@ -44,15 +44,7 @@ class WearNotificationPrefs(context: Context) {
     /** Tell the phone about a change made here, so both sides stay the same. */
     fun sendToPhone(context: Context) {
         val bytes = Json.encodeToString(com.bloo.bluelink.data.WatchNotifyPrefs.serializer(), current()).encodeToByteArray()
-        val app = context.applicationContext
-        ioScope().launch {
-            runCatching {
-                com.google.android.gms.wearable.Wearable.getNodeClient(app).connectedNodes.await().forEach {
-                    com.google.android.gms.wearable.Wearable.getMessageClient(app)
-                        .sendMessage(it.id, WatchSyncProtocol.PATH_NOTIF_PREFS, bytes).await()
-                }
-            }
-        }
+        WearMessages.sendLater(context, WatchSyncProtocol.PATH_NOTIF_PREFS, bytes)
     }
 
     var charging: Boolean

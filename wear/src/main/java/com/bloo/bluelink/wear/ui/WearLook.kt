@@ -50,13 +50,7 @@ internal object WearLook {
         val app = context.applicationContext
         if (markDirty) prefs(app).edit { putBoolean("look_dirty", true) }
         val bytes = Json.encodeToString(WatchLookPrefs.serializer(), current(app)).encodeToByteArray()
-        ioScope().launch {
-            runCatching {
-                Wearable.getNodeClient(app).connectedNodes.await().forEach {
-                    Wearable.getMessageClient(app).sendMessage(it.id, WatchSyncProtocol.PATH_LOOK_PREFS, bytes).await()
-                }
-            }
-        }
+        WearMessages.sendLater(app, WatchSyncProtocol.PATH_LOOK_PREFS, bytes)
     }
 
     private var seeded = false
