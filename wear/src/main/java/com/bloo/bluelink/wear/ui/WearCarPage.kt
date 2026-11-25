@@ -326,8 +326,10 @@ internal fun WearCarPage(
                 WearPullDisc(pull, refreshing = ui.refreshing, backdrop = backdrop)
                 if (current) {
                     // The car's name floats over every page of the car on screen: one element, not one per page.
+                    // The name alone: the charge is already the face's headline and its ring, and the longer "My Car · 72%" ran
+                    // past the round display's curve.
                     WearNameOverlay(
-                    name = car.percent?.let { "${car.name} · $it%" } ?: car.name,
+                    name = car.name,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     backdrop = backdrop,
                 )
