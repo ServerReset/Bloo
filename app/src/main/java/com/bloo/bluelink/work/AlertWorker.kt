@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.hasPermission
 import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.lastKnownStatus
 import androidx.work.ExistingPeriodicWorkPolicy

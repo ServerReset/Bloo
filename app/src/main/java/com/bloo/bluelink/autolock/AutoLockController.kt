@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.hasPermission
 import com.bloo.bluelink.data.brand
 import android.content.Context
 import com.bloo.bluelink.data.AppLog

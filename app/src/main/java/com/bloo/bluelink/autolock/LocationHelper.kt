@@ -1,7 +1,8 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.hasPermission
 import android.content.Context
-import com.bloo.bluelink.ui.hasLocationPermission
+import com.bloo.bluelink.data.hasLocationPermission
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.hasPermission
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
@@ -28,9 +29,7 @@ object ActivityRecognitionManager {
     }
 
     internal fun hasPermission(context: Context): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) ==
-            PackageManager.PERMISSION_GRANTED
+        context.hasPermission(Manifest.permission.ACTIVITY_RECOGNITION, Build.VERSION_CODES.Q)
 
     @SuppressLint("MissingPermission") // Guarded by hasPermission() + runCatching.
     fun start(context: Context) {

@@ -131,12 +131,7 @@ suspend fun SettingsStore.setWeatherFromDeviceLocation(preloaded: android.locati
         // of relying on the SecurityException throw inside the runCatching below to do the same
         // thing. Keep the runCatching anyway -- TIME is revoked mid-call by the user sometimes, and
         // a missed weather label must never crash a settings click.
-        if (androidx.core.app.ActivityCompat.checkSelfPermission(
-                context, android.Manifest.permission.ACCESS_COARSE_LOCATION,
-            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
-        }
+        if (!context.hasPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)) return false
         suspendRunCatching {
             val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
             listOf(

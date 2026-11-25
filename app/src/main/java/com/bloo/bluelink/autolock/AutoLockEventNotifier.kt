@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.hasPermission
 import androidx.core.net.toUri
 import com.bloo.bluelink.data.ChannelOnce
 import com.bloo.bluelink.data.clearsAfterAWhile

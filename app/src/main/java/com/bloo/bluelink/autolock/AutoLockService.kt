@@ -13,7 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.SnapshotStore
-import com.bloo.bluelink.ui.hasPermission
+import com.bloo.bluelink.data.hasPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

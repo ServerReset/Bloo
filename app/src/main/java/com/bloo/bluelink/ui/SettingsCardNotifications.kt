@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.hasPermission
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -196,9 +197,7 @@ internal fun NotificationsCardContent(
         // permission prompt bumps [recheck] so a grant clears its own warning.
         val ignored = recheck
         val backgroundBlocked = (notif.charging || autoLockOn) && !LiveCharge.isBackgroundUnrestricted(context)
-        val activityBlocked = autoLockOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) !=
-            PackageManager.PERMISSION_GRANTED
+        val activityBlocked = autoLockOn && !context.hasPermission(Manifest.permission.ACTIVITY_RECOGNITION, Build.VERSION_CODES.Q)
         val alarmsBlocked = autoLockOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             context.getSystemService(android.app.AlarmManager::class.java)?.canScheduleExactAlarms() != true
         val chipBlocked = notif.charging && Build.VERSION.SDK_INT >= 36 &&

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.wear
 
+import com.bloo.bluelink.data.hasPermission
 import com.bloo.bluelink.data.rangeLabel
 import com.bloo.bluelink.data.clearsAfterAWhile
 import android.Manifest
@@ -270,9 +271,7 @@ object WearNotifier {
     }
 
     /** Notifications need a runtime grant from Android 13 (watches included). */
-    fun canPost(context: Context): Boolean =
-        android.os.Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    fun canPost(context: Context): Boolean = context.hasPermission(Manifest.permission.POST_NOTIFICATIONS, 33)
 }
 
 /**

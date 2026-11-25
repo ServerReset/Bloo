@@ -1,5 +1,6 @@
 package com.bloo.bluelink
 
+import com.bloo.bluelink.data.hasPermission
 import com.bloo.bluelink.ui.openExternalUrl
 import com.bloo.uicommon.ProgressBar
 import com.bloo.bluelink.data.downloadLabel

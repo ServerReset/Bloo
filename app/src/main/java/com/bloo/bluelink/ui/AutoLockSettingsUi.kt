@@ -1,5 +1,6 @@
 package com.bloo.bluelink.ui
 
+import com.bloo.bluelink.data.hasPermission
 import android.Manifest
 import android.app.NotificationManager
 import android.content.pm.PackageManager
@@ -283,9 +284,7 @@ private fun AutoLockSettings(
     // The slider drags locally and persists once, on settle: a DataStore write behind every frame of
     // a drag is a write per frame.
     var grace by remember(current.graceSeconds) { mutableFloatStateOf(current.graceSeconds.toFloat()) }
-    val notificationsOk = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-        PackageManager.PERMISSION_GRANTED
+    val notificationsOk = context.hasPermission(Manifest.permission.POST_NOTIFICATIONS, Build.VERSION_CODES.TIRAMISU)
 
     SettingsGroup("AutoLock") {
         BodySmallText(

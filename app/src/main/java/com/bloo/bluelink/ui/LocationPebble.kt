@@ -5,6 +5,7 @@ package com.bloo.bluelink.ui
  * and its supporting pieces: CarMap, weatherIcon/weatherTint and the openUrl/openApp/dial launchers.
  */
 
+import com.bloo.bluelink.data.hasLocationPermission
 import com.bloo.bluelink.data.CarCommandIds
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box

@@ -248,12 +248,7 @@ object Notifications {
  * from this instead of another copy.
  */
 internal fun postBuilt(context: Context, id: Int, builder: androidx.core.app.NotificationCompat.Builder): Boolean {
-    if (androidx.core.app.ActivityCompat.checkSelfPermission(
-            context, android.Manifest.permission.POST_NOTIFICATIONS,
-        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-    ) {
-        return false
-    }
+    if (!context.hasPermission(android.Manifest.permission.POST_NOTIFICATIONS, 33)) return false
     return runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }.isSuccess
 }
 
