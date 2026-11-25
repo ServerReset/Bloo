@@ -179,6 +179,18 @@ class FormatUtilsTest {
     }
 
     @Test
+    fun parseOdometerMiles_readsTheNumberBeforeAUnit() {
+        assertEquals(12480, parseOdometerMiles("12,480 mi"))
+        assertEquals(15300, parseOdometerMiles("15300"))
+    }
+
+    @Test
+    fun formatDistanceGrouped_groupsInTheChosenUnit() {
+        assertEquals("2,500 mi", formatDistanceGrouped(2500, metric = false))
+        assertEquals("4,023 km", formatDistanceGrouped(2500, metric = true))
+    }
+
+    @Test
     fun parseOdometerMiles_blankOrUnparseable_returnsNull() {
         assertNull(parseOdometerMiles(null))
         assertNull(parseOdometerMiles(""))

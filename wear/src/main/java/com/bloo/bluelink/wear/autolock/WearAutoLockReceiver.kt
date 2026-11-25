@@ -38,7 +38,7 @@ class WearAutoLockReceiver : BroadcastReceiver() {
                 // unlocked since would be judged on stale data.
                 runCatching { WearCredentialSync.refresh(app) }
                 val vehicles = runCatching { SnapshotStore(app).current().vehicles }.getOrDefault(emptyList())
-                for (vin in WearAutoLock.targets(vehicles)) {
+                for (vin in com.bloo.bluelink.autolock.LockPolicy.targets(vehicles)) {
                     val locked = lockWithRetry(app, vin)
                     // What it did is said on the wrist (and the phone's own Auto lock says the same on the phone).
                     val name = vehicles.firstOrNull { it.vin == vin }?.name ?: "your car"
@@ -51,14 +51,19 @@ class WearAutoLockReceiver : BroadcastReceiver() {
     }
 
     /**
-     * One lock, retried twice (2.5s, then 5s apart) when the car does not answer: a network blip should not leave the car open. The phone's
-     * AutoLock does the same.
+     * One lock under the phone's own retry rule (com.bloo.bluelink.autolock.LockRetry): again after 2.5 s and 5 s when the car does not
+     * answer, but not when the day's limit is reached or the lock is already being sent. With no session of its own the watch hands the
+     * lock to the phone once, and that is the end of it: it used to count the hand-over as "no answer" and send it three times.
+     * Returns true locked, false failed, null handed to the phone.
      */
-    private suspend fun lockWithRetry(app: Context, vin: String): Boolean {
-        repeat(3) { attempt ->
-            if (suspendRunCatching { runWatchCommandChecked(app, vin, CarAction.LOCK) }.getOrNull() == true) return true
-            if (attempt < 2) delay(if (attempt == 0) 2_500L else 5_000L)
+    private suspend fun lockWithRetry(app: Context, vin: String): Boolean? {
+        val (result, _) = com.bloo.bluelink.autolock.LockRetry.run(stopOnNull = true) {
+            suspendRunCatching { WearCredentialSync.runLocally(app, vin, CarAction.LOCK, null) }.getOrNull()
         }
-        return false
+        if (result == null) {
+            WearDataLayerSync.sendCommand(app, vin, CarAction.LOCK, null)
+            return null
+        }
+        return result.ok
     }
 }

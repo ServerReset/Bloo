@@ -122,8 +122,16 @@ fun nextServiceMiles(lastServiceMiles: Int, intervalMiles: Int): Int =
 /** Parse the API's odometer string ("12,345.6") into whole miles (grouping commas stripped,
  *  fraction truncated), or null if blank/unparseable. */
 fun parseOdometerMiles(odometer: String?): Int? =
+    // The reading's leading number, so a unit after it ("12,480 mi") still reads, and "12,345.6" is 12,345 (stripping every
+    // non-digit, as the watch did, read it as 123,456).
+    odometer?.let { ODOMETER_NUMBER.find(it)?.value?.replace(",", "")?.toDoubleOrNull()?.toInt() }
 
-    odometer?.trim()?.takeIf { it.isNotBlank() }?.replace(",", "")?.toDoubleOrNull()?.toInt()
+private val ODOMETER_NUMBER = Regex("[0-9][0-9,]*(\\.[0-9]+)?")
+
+/** A long distance in miles as "2,500 mi" or "4,023 km", grouped, in the person's unit (for service countdowns and odometers). */
+fun formatDistanceGrouped(mi: Number, metric: Boolean): String =
+    if (metric) String.format(java.util.Locale.US, "%,d km", (mi.toDouble() * KM_PER_MI).roundToInt())
+    else String.format(java.util.Locale.US, "%,d mi", mi.toDouble().roundToInt())
 
 /**
  * Whether an app-lock should re-engage after [elapsedMs] in the background, given the lock-timing

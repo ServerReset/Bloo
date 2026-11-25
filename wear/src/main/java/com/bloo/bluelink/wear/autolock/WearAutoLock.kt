@@ -11,7 +11,6 @@ import android.hardware.TriggerEventListener
 import android.os.SystemClock
 import androidx.core.content.edit
 import com.bloo.bluelink.data.VehicleSnapshot
-import com.bloo.bluelink.data.isDriving
 import com.bloo.bluelink.data.privatePrefs
 
 /**
@@ -61,9 +60,7 @@ object WearAutoLock {
      * The cars a trigger would lock: everything the watch knows that is not already locked and whose
      * engine is not running. Pure, so it is unit-tested without a watch.
      */
-    fun targets(vehicles: List<VehicleSnapshot>): List<String> =
-        // Not a car that is moving either: someone is driving it, whatever the engine flag says.
-        vehicles.filter { it.locked != true && it.engineOn != true && !it.isDriving }.map { it.vin }
+    fun targets(vehicles: List<VehicleSnapshot>): List<String> = com.bloo.bluelink.autolock.LockPolicy.targets(vehicles)
 
     /** Whether a trigger at [nowElapsed] falls inside the cooldown after a run at [lastRunElapsed] (0 = never). Pure, for tests. */
     fun inCooldown(lastRunElapsed: Long, nowElapsed: Long): Boolean =

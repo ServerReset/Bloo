@@ -1,7 +1,10 @@
 package com.bloo.bluelink.autolock
 
 import com.bloo.bluelink.data.CarCommandResult
+import com.bloo.bluelink.data.VehicleSnapshot
 import com.bloo.bluelink.data.VehicleStatus
+import com.bloo.bluelink.data.isDriving
+import kotlinx.coroutines.delay
 
 /** Outcome of evaluating a status snapshot against the auto-lock policy. */
 sealed interface LockDecision {
@@ -23,8 +26,16 @@ object LockPolicy {
     fun decide(status: VehicleStatus): LockDecision = when {
         status.doorLock == true -> LockDecision.Skip("Already locked")
         status.engine == true -> LockDecision.Skip("Engine running")
+        status.isDriving -> LockDecision.Skip("Car is moving")
         else -> LockDecision.Lock
     }
+
+    /**
+     * The same rule over the glance snapshots the watch holds: the cars an auto lock would lock, in order. One rule for both devices;
+     * the watch used to keep its own copy, which had drifted.
+     */
+    fun targets(vehicles: List<VehicleSnapshot>): List<String> =
+        vehicles.filter { it.locked != true && it.engineOn != true && !it.isDriving }.map { it.vin }
 }
 
 /**
@@ -46,4 +57,21 @@ object LockRetry {
 
     /** The server's "daily ... limit" wording (see AutoLockController.notifyLockFailed). */
     fun isLimit(message: String?): Boolean = message?.contains("limit", ignoreCase = true) == true
+
+    /**
+     * Runs [attempt] under this policy: again after 2.5 s and then 5 s while it fails in a way a retry can help, and returns the last
+     * result with how many attempts were made. A null result means "no answer"; [stopOnNull] ends the run there instead, for a caller
+     * whose null means the request was handed on (the watch relaying to the phone) rather than lost.
+     */
+    suspend fun run(stopOnNull: Boolean = false, attempt: suspend () -> CarCommandResult?): Pair<CarCommandResult?, Int> {
+        var result = attempt()
+        var n = 1
+        while (!(stopOnNull && result == null)) {
+            val wait = nextDelayMs(result, n) ?: break
+            delay(wait)
+            result = attempt()
+            n++
+        }
+        return result to n
+    }
 }
