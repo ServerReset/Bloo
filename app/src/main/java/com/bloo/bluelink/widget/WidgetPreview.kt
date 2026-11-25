@@ -111,7 +111,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
                 )
             }
             Box(Modifier.fillMaxSize().padding(pad)) {
-                val header: @Composable () -> Unit = { PreviewHeader(car, choice, plan.nameSp * us, plan.nameLines) }
+                val header: @Composable () -> Unit = { PreviewHeader(car, choice, plan.nameSp * us) }
                 val value: @Composable () -> Unit = {
                     RevealText(valueText, fontSize = (plan.valueSp * us).sp, fontWeight = FontWeight.Bold, color = levelColor, maxLines = 1, overflow = TextOverflow.Clip)
                 }
@@ -119,7 +119,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
                     if (plan.showStatus) {
                         RevealText(
                             car?.stateLineOrParked(com.bloo.bluelink.ui.LocalAppearance.current.metricDistance) ?: "Locked · 210 mi", fontSize = (plan.statusSp * us).sp,
-                            color = scheme.onSurfaceVariant, maxLines = plan.statusLines, overflow = TextOverflow.Ellipsis,
+                            color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -174,12 +174,12 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
 }
 
 @Composable
-private fun PreviewHeader(car: VehicleSnapshot?, choice: Choice, nameSp: Float, nameLines: Int = 1) {
+private fun PreviewHeader(car: VehicleSnapshot?, choice: Choice, nameSp: Float) {
     val scheme = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.DirectionsCar, null, tint = scheme.primary, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
-        RevealText(car?.name ?: "Your car", fontWeight = FontWeight.Bold, fontSize = nameSp.sp, maxLines = nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        RevealText(car?.name ?: "Your car", fontWeight = FontWeight.Bold, fontSize = nameSp.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (choice.refresh) PreviewButton(Icons.Filled.Refresh, 32.dp, Modifier)
     }
 }

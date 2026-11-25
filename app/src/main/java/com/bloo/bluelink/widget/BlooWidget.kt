@@ -206,11 +206,11 @@ private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: St
         }
         WidgetArrangement.STACK -> Box(root) {
             Column(GlanceModifier.fillMaxSize()) {
-                Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp, nameLines = plan.nameLines)
+                Header(car, showUpdated = plan.showUpdated, opts = opts, pending = pending, nameSp = (plan.nameSp * us).sp)
                 // What the plan left over is one fixed gap above the value.
                 Spacer(GlanceModifier.height((plan.spareDp / 2f).dp))
                 Text(car.bigValue(), maxLines = 1, style = valueStyle)
-                if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp, plan.statusLines)
+                if (plan.showStatus) StatusText(car, note, (plan.statusSp * us).sp)
                 if (plan.showDetails) {
                     car.detailLine(LocalWidgetMetric.current)?.let { line ->
                         Spacer(GlanceModifier.height(4.dp))
@@ -302,9 +302,9 @@ private fun ControlGrid(car: VehicleSnapshot, pending: String?, armed: Boolean, 
 
 /** The line under the value: a failure note (in red) else the car's state line. */
 @Composable
-private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit, lines: Int = 1) {
+private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit) {
     Text(
-        note ?: car.stateLineOrParked(LocalWidgetMetric.current), maxLines = lines,
+        note ?: car.stateLineOrParked(LocalWidgetMetric.current), maxLines = 1,
         style = TextStyle(
             color = if (note != null) GlanceTheme.colors.error else GlanceTheme.colors.onSurfaceVariant,
             fontSize = size,
@@ -316,7 +316,7 @@ private fun StatusText(car: VehicleSnapshot, note: String?, size: TextUnit, line
 // --- Header and controls -----------------------------------------------------------------------
 
 @Composable
-private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptions, pending: String?, nameSp: TextUnit = 15.sp, nameLines: Int = 1) {
+private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptions, pending: String?, nameSp: TextUnit = 15.sp) {
     val stale = car.isStale()
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Image(
@@ -327,7 +327,7 @@ private fun Header(car: VehicleSnapshot, showUpdated: Boolean, opts: WidgetOptio
         Spacer(GlanceModifier.width(6.dp))
         Column(GlanceModifier.defaultWeight()) {
             Text(
-                car.name, maxLines = nameLines,
+                car.name, maxLines = 1,
                 style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = nameSp, fontWeight = FontWeight.Bold),
             )
             if (showUpdated) {
