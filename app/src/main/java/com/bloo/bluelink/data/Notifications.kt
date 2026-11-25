@@ -11,9 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.bloo.bluelink.R
-import com.bloo.bluelink.ui.hasPermission
 import com.bloo.bluelink.Shortcuts
-import com.bloo.uicommon.content
 
 /** Posts Bloo's local alerts (service due, door left open, car left running). */
 object Notifications {
