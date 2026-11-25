@@ -3,8 +3,8 @@ package com.bloo.bluelink.wear
 import android.content.Context
 import com.bloo.bluelink.data.BlooColors
 import com.bloo.bluelink.data.WatchAccent
-import com.bloo.bluelink.data.privatePrefs
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.bloo.bluelink.data.PrefsMirror
+import kotlinx.serialization.builtins.nullable
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -13,35 +13,24 @@ import kotlinx.coroutines.flow.StateFlow
  * a phone has sent any, the watch keeps the brand's own.
  */
 internal object WearAccent {
-    private const val PREFS = "bloo_wear_accent"
-    private val _accent = MutableStateFlow<WatchAccent?>(null)
-    val accent: StateFlow<WatchAccent?> = _accent
-
-    /** The colour of what is on or in motion on the watch's own surfaces: the phone's accent once it has sent one, else the brand's. */
-    val active: Int get() = _accent.value?.primary ?: BlooColors.brandAccent
-
-    /** Reads what was stored last time, once; later calls change nothing. */
-    fun load(context: Context) {
-        if (_accent.value != null) return
-        val prefs = context.privatePrefs(PREFS)
-        if (!prefs.contains("primary")) return
-        _accent.value = WatchAccent(
-            primary = prefs.getInt("primary", 0), onPrimary = prefs.getInt("onPrimary", 0),
-            secondary = prefs.getInt("secondary", 0), tertiary = prefs.getInt("tertiary", 0),
+    private val mirror = PrefsMirror("bloo_wear_accent", WatchAccent.serializer().nullable, null) { p ->
+        if (!p.contains("primary")) null
+        else WatchAccent(
+            primary = p.getInt("primary", 0), onPrimary = p.getInt("onPrimary", 0),
+            secondary = p.getInt("secondary", 0), tertiary = p.getInt("tertiary", 0),
         )
     }
+    val accent: StateFlow<WatchAccent?> = mirror.value
+
+    /** The colour of what is on or in motion on the watch's own surfaces: the phone's accent once it has sent one, else the brand's. */
+    val active: Int get() = accent.value?.primary ?: BlooColors.brandAccent
+
+    /** Reads what was stored last time, once; later calls change nothing. */
+    fun load(context: Context) = mirror.load(context)
 
     /** The phone's colours arrived: worn at once and kept. Null (an older phone) or the same colours change nothing. */
     fun apply(context: Context, accent: WatchAccent?) {
-        if (accent == null || accent == _accent.value) return
-        context.privatePrefs(PREFS).edit()
-            .putInt("primary", accent.primary)
-            .putInt("onPrimary", accent.onPrimary)
-            .putInt("secondary", accent.secondary)
-            .putInt("tertiary", accent.tertiary)
-            .apply()
-        _accent.value = accent
         // The tile draws in these colours too: ask it to draw again.
-        WearSurfaces.refresh(context)
+        if (mirror.apply(context, accent)) WearSurfaces.refresh(context)
     }
 }
