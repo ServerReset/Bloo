@@ -51,4 +51,10 @@ class WearAlertRulesTest {
     @Test fun unknownChargeLevelsRaiseNothing() {
         assertEquals(WearAlertPlan(false, false, false), planWearAlerts(car(null, false), car(null, false), allOn))
     }
+
+    @Test fun chargedMeansReachingTheCarsOwnLimit() {
+        fun limited(pct: Int, charging: Boolean) = car(pct, charging).copy(chargeLimitPct = 80)
+        assertTrue(planWearAlerts(limited(79, true), limited(80, false), allOn).chargeComplete, "stopped at its 80% limit")
+        assertFalse(planWearAlerts(limited(60, true), limited(60, false), allOn).chargeComplete, "stopped short of it")
+    }
 }

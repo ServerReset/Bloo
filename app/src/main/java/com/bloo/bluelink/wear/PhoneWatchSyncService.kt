@@ -171,14 +171,10 @@ class PhoneWatchSyncService : WearableListenerService() {
     }
 
     private suspend fun runCommand(request: WatchCommandRequest) {
-        val result = if (request.command.action == CarAction.REFRESH) {
-            // Not a car command: the watch is asking for fresh status. Fetch it, and the snapshot write pushes it back.
-            val ok = suspendRunCatching { CarCommandRunner.refresh(applicationContext, vin = request.command.vin, force = false) }.getOrDefault(false)
-            CarCommandResult(request.command.vin, request.command.action, ok = ok, message = if (ok) null else "Couldn't refresh")
-        } else suspendRunCatching { CarCommandRunner.execute(applicationContext, request.command) }
-            .getOrElse {
-                CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message)
-            }
+        // The runner handles REFRESH itself (fresh status, which the snapshot write pushes back to the watch) and turns any failure
+        // into a failed result; this only guards against the call itself throwing.
+        val result = suspendRunCatching { CarCommandRunner.execute(applicationContext, request.command) }
+            .getOrElse { CarCommandResult(request.command.vin, request.command.action, ok = false, message = it.message) }
         val out = WatchCommandResult(
             requestId = request.requestId, vin = result.vin, action = result.action, ok = result.ok,
             message = result.message,

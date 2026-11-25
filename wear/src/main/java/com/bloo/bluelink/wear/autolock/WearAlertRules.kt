@@ -32,8 +32,11 @@ internal fun planWearAlerts(
     val pct = now.percent
     val card = now.charging == true && prefs.charging
     if (before == null) return WearAlertPlan(card, chargeComplete = false, lowBattery = false)
+    // "Charged" means it reached the car's own limit (within a point, as on the phone), or near full when the car reports no limit:
+    // a car set to stop at 80% never reached the old fixed 95%, so it was never told its charge was done.
+    val fullAt = now.chargeLimitPct?.takeIf { it in 50..100 }?.minus(1) ?: WEAR_FULL_PERCENT
     val complete = prefs.chargeComplete && before.charging == true && now.charging != true &&
-        pct != null && pct >= WEAR_FULL_PERCENT
+        pct != null && pct >= fullAt
     val was = before.percent
     val low = prefs.lowBattery && was != null && pct != null &&
         was >= WEAR_LOW_PERCENT && pct < WEAR_LOW_PERCENT && now.charging != true
