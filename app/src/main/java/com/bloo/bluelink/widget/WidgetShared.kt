@@ -51,3 +51,14 @@ internal fun Preferences.unlockArmedFor(vin: String, now: Long = System.currentT
 /** A failed command's note while it is fresh (it takes the car name's place for a few seconds), else null. */
 internal fun Preferences.freshNote(now: Long = System.currentTimeMillis()): String? =
     this[WidgetKeys.NOTE]?.split("|")?.takeIf { it.size == 2 && now - (it[1].toLongOrNull() ?: 0L) < NOTE_MS }?.get(0)
+
+/**
+ * The controls a widget offers, in order: lock always, then climate, charge (only for a car with a battery) and the lights, as the
+ * options choose. One rule for the widget, its size plan and the settings preview, which each used to work it out for themselves.
+ */
+internal fun widgetActionKeys(climate: Boolean, charge: Boolean, flash: Boolean, hasBattery: Boolean): List<String> = buildList {
+    add(com.bloo.bluelink.data.CarAction.TOGGLE_LOCK)
+    if (climate) add(com.bloo.bluelink.data.CarAction.TOGGLE_CLIMATE)
+    if (charge && hasBattery) add(com.bloo.bluelink.data.CarAction.TOGGLE_CHARGE)
+    if (flash) add(com.bloo.bluelink.data.CarAction.FLASH_LIGHTS)
+}

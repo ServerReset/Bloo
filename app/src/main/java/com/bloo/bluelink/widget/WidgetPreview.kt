@@ -69,7 +69,7 @@ internal fun WidgetPreview(car: VehicleSnapshot?, photoUrl: String?, choice: Cho
     val scheme = MaterialTheme.colorScheme
     val us = choice.textSize.scale
     val valueText = car?.bigValue() ?: "80%"
-    val actions = 1 + (if (choice.climate) 1 else 0) + (if (choice.charge && (car?.hasBattery != false)) 1 else 0) + (if (choice.flash) 1 else 0)
+    val actions = widgetActionKeys(choice.climate, choice.charge, choice.flash, car?.hasBattery != false).size
     val plan = remember(size, choice, valueText, actions) {
         planWidget(size.width.value, size.height.value, us, choice.compact, valueText.length, actions, choice.refresh)
     }
@@ -196,11 +196,13 @@ private fun PreviewButton(icon: ImageVector, diameter: Dp, modifier: Modifier) {
 @Composable
 private fun PreviewControls(choice: Choice, car: VehicleSnapshot?, plan: WidgetPlan, circles: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    val items = buildList {
-        add(Icons.Filled.Lock to "Lock")
-        if (choice.climate) add(Icons.Filled.AcUnit to "Climate")
-        if (choice.charge && (car?.hasBattery != false)) add(Icons.Filled.Bolt to "Charge")
-        if (choice.flash) add(AppIcons.Flash to "Flash")
+    val items = widgetActionKeys(choice.climate, choice.charge, choice.flash, car?.hasBattery != false).map { key ->
+        when (key) {
+            com.bloo.bluelink.data.CarAction.TOGGLE_CLIMATE -> Icons.Filled.AcUnit to "Climate"
+            com.bloo.bluelink.data.CarAction.TOGGLE_CHARGE -> Icons.Filled.Bolt to "Charge"
+            com.bloo.bluelink.data.CarAction.FLASH_LIGHTS -> AppIcons.Flash to "Flash"
+            else -> Icons.Filled.Lock to "Lock"
+        }
     }.take(plan.maxActions)
     val d = plan.buttonHeightDp.dp
     if (circles) {

@@ -1,5 +1,6 @@
 package com.bloo.bluelink.autolock
 
+import com.bloo.bluelink.data.brand
 import android.content.Context
 import com.bloo.bluelink.data.AppLog
 import com.bloo.bluelink.data.Brand
@@ -361,7 +362,7 @@ object AutoLockController {
     }
 
     private suspend fun statusFor(context: Context, v: Vehicle): VehicleStatus? {
-        val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
+        val repo = repositoryFor(v.brand, SessionStore(context), CredentialStore(context))
         return withTimeoutOrNull(30_000) { BlueLinkGate.statusMutex.withLock { repo.status(v, refresh = false) } }
     }
 

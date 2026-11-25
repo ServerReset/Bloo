@@ -170,7 +170,7 @@ private fun Message(root: GlanceModifier, title: String, detail: String) {
 private fun AdaptiveBody(root: GlanceModifier, car: VehicleSnapshot, pending: String?, armed: Boolean, note: String?, opts: WidgetOptions) {
     val size = LocalSize.current
     val context = androidx.glance.LocalContext.current
-    val actionCount = 1 + (if (opts.climate) 1 else 0) + (if (opts.charge && car.hasBattery) 1 else 0) + (if (opts.flash) 1 else 0)
+    val actionCount = widgetActionKeys(opts.climate, opts.charge, opts.flash, car.hasBattery).size
     val plan = planWidget(
         widthDp = size.width.value,
         heightDp = size.height.value,
@@ -279,12 +279,8 @@ private fun StatusChips(car: VehicleSnapshot, maxChips: Int = 3) {
 }
 
 /** The controls the widget offers for [car], in order, honouring its options: lock always, then climate, charge (a car with a battery) and lights, at most [max]. */
-private fun widgetActions(car: VehicleSnapshot, opts: WidgetOptions, max: Int): List<String> = buildList {
-    add(CarAction.TOGGLE_LOCK)
-    if (opts.climate) add(CarAction.TOGGLE_CLIMATE)
-    if (opts.charge && car.hasBattery) add(CarAction.TOGGLE_CHARGE)
-    if (opts.flash) add(CarAction.FLASH_LIGHTS)
-}.take(max)
+private fun widgetActions(car: VehicleSnapshot, opts: WidgetOptions, max: Int): List<String> =
+    widgetActionKeys(opts.climate, opts.charge, opts.flash, car.hasBattery).take(max)
 
 /** SIDE: the controls as a grid of circles beside the readout. */
 @Composable
@@ -502,17 +498,5 @@ internal fun levelTint(car: VehicleSnapshot): androidx.glance.unit.ColorProvider
         androidx.compose.ui.graphics.Color(BlooColors.levelColor(car.percent, car.charging == true, 0xFF888888.toInt())),
     )
 
-/**
- * The intent a tap on the widget fires: the app, on the car the widget shows (the same "open" a launcher shortcut
- * makes, so a locked app waits for its unlock first). The data uri makes each car's intent distinct, because Android
- * treats two intents differing only in extras as the same one -- two widgets for two cars would share a tap.
- */
-internal fun openCarIntent(context: Context, vin: String?): Intent {
-    val intent = Intent(context, MainActivity::class.java)
-    if (vin == null) return intent
-    return intent
-        .setAction(Shortcuts.ACTION)
-        .setData(android.net.Uri.parse("bloo://car/${android.net.Uri.encode(vin)}"))
-        .putExtra(Shortcuts.EXTRA_VIN, vin)
-        .putExtra(Shortcuts.EXTRA_CMD, "open")
-}
+/** The intent a tap on the widget fires: the app on the widget's car, exactly as a notification or launcher shortcut opens it. */
+internal fun openCarIntent(context: Context, vin: String?): Intent = Shortcuts.openCardIntent(context, vin)

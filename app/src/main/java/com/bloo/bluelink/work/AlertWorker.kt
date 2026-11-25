@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.lastKnownStatus
 import androidx.work.ExistingPeriodicWorkPolicy
 import android.content.Context
@@ -109,7 +110,7 @@ class AlertWorker(context: Context, params: WorkerParameters) : BlooWorker(conte
         // Vehicle IDENTITY comes from that snapshot too, as in LiveChargePollWorker: re-fetching the fleet list is a
         // network round trip per brand every tick for cars this worker already knows. A car added elsewhere is picked
         // up by the next foreground refresh; with no snapshot at all (a fresh install) the list is fetched as before.
-        val snapshotsByBrand = snapshots.groupBy { Brand.fromIndicator(it.toVehicle().brandIndicator) }
+        val snapshotsByBrand = snapshots.groupBy { it.brand }
 
         val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {

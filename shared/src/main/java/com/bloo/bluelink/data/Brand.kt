@@ -212,6 +212,9 @@ enum class Brand(
 /** The telematics brand a vehicle belongs to. */
 val Vehicle.brand: Brand get() = Brand.fromIndicator(brandIndicator)
 
+/** The telematics brand a stored car belongs to (no [Vehicle] built just to ask). */
+val VehicleSnapshot.brand: Brand get() = Brand.fromIndicator(brandIndicator)
+
 /** Brand-specific apps, sites and phone numbers - the single source of truth. */
 data class BrandLinks(
     /** Play Store package of the official companion app. */

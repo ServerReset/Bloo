@@ -125,8 +125,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     internal fun canadaRepo(brand: Brand): CanadaRepository = repoFor(brand) as CanadaRepository
 
-    internal fun brandOf(v: Vehicle): Brand =
-        Brand.fromIndicator(v.brandIndicator)
+    internal fun brandOf(v: Vehicle): Brand = v.brand
 
     internal fun repoFor(v: Vehicle): VehicleRepository = repoFor(brandOf(v))
 

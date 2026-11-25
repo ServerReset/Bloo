@@ -82,7 +82,7 @@ object CarCommandRunner {
             val snap = store.current().vehicles.firstOrNull { it.vin == command.vin }
                 ?: return@withLock CarCommandResult(command.vin, command.action, ok = false, message = "Car not found")
             val v = snap.toVehicle()
-            val repo = repositoryFor(Brand.fromIndicator(v.brandIndicator), SessionStore(context), CredentialStore(context))
+            val repo = repositoryFor(v.brand, SessionStore(context), CredentialStore(context))
             val climate = ClimateRequest(
                 tempF = command.tempF, defrost = command.defrost, durationMinutes = command.durationMinutes,
                 steeringWheelHeat = WheelHeatLevel.fromApi(command.steeringWheelHeat),
@@ -168,7 +168,7 @@ object CarCommandRunner {
      * [Brand.reportsClimateState], the same flag [execute]'s own `climateFlag` helper reads.
      */
     fun optimistic(snap: VehicleSnapshot, action: String): VehicleSnapshot {
-        val climateKnown = Brand.fromIndicator(snap.brandIndicator).reportsClimateState
+        val climateKnown = snap.brand.reportsClimateState
         return when (action) {
             CarAction.TOGGLE_LOCK -> snap.copy(locked = !(snap.locked ?: false))
             CarAction.LOCK -> snap.copy(locked = true)
@@ -221,7 +221,7 @@ object CarCommandRunner {
             targets.forEach { snap ->
                 suspendRunCatching {
                     val v = snap.toVehicle()
-                    val brand = Brand.fromIndicator(v.brandIndicator)
+                    val brand = v.brand
                     val repo = reposByBrand.getOrPut(brand) {
                         repositoryFor(brand, SessionStore(context), CredentialStore(context))
                     }

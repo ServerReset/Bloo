@@ -1,5 +1,6 @@
 package com.bloo.bluelink.work
 
+import com.bloo.bluelink.data.brand
 import com.bloo.bluelink.data.lastKnownStatus
 import android.content.Context
 import androidx.work.BackoffPolicy
@@ -80,7 +81,7 @@ class LiveChargePollWorker(context: Context, params: WorkerParameters) : BlooWor
         // foreground refresh (AppViewModel's own saveVehiclesKeepingStatus),
         // same as it always was for anything this worker missed.
         val snapshotsByBrand = SnapshotStore(applicationContext).current().vehicles
-            .groupBy { Brand.fromIndicator(it.toVehicle().brandIndicator) }
+            .groupBy { it.brand }
         val credentials = CredentialStore(applicationContext)
         for (brand in store.loggedInBrands()) {
             val repo = suspendRunCatching { repositoryFor(brand, store, credentials) }
